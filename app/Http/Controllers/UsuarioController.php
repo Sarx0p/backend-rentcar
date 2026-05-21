@@ -24,8 +24,8 @@ class UsuarioController extends Controller
                 $buscar = $request->buscar;
                 $query->where(function ($q) use ($buscar) {
                     $q->where('nombre',   'LIKE', "%{$buscar}%")
-                      ->orWhere('apellido', 'LIKE', "%{$buscar}%")
-                      ->orWhere('correo',   'LIKE', "%{$buscar}%");
+                        ->orWhere('apellido', 'LIKE', "%{$buscar}%")
+                        ->orWhere('correo',   'LIKE', "%{$buscar}%");
                 });
             }
 
@@ -57,7 +57,6 @@ class UsuarioController extends Controller
                 ],
                 'data' => $usuarios,
             ], 200);
-
         } catch (\Exception $e) {
             return response()->json([
                 'status'  => 'error',
@@ -120,7 +119,6 @@ class UsuarioController extends Controller
                 'message' => "Usuario creado correctamente con el rol {$rolEnum->value}.",
                 'data'    => $usuario->load('roles'),
             ], 201);
-
         } catch (\Exception $e) {
             DB::rollBack();
 
@@ -141,13 +139,11 @@ class UsuarioController extends Controller
                 'status' => 'success',
                 'data'   => $usuario,
             ], 200);
-
         } catch (ModelNotFoundException $e) {
             return response()->json([
                 'status'  => 'error',
                 'message' => 'Usuario no encontrado.',
             ], 404);
-
         } catch (\Exception $e) {
             return response()->json([
                 'status'  => 'error',
@@ -171,7 +167,9 @@ class UsuarioController extends Controller
                 'nombre'   => 'sometimes|string|max:100',
                 'apellido' => 'sometimes|string|max:100',
                 'correo'   => [
-                    'sometimes', 'email', 'max:150',
+                    'sometimes',
+                    'email',
+                    'max:150',
                     Rule::unique('users', 'correo')->ignore($id),
                 ],
                 'password' => 'sometimes|string|min:8|max:255',
@@ -227,13 +225,11 @@ class UsuarioController extends Controller
                 'message' => 'Usuario actualizado correctamente.',
                 'data'    => $usuario->fresh('roles'),
             ], 200);
-
         } catch (ModelNotFoundException $e) {
             return response()->json([
                 'status'  => 'error',
                 'message' => 'Usuario no encontrado.',
             ], 404);
-
         } catch (\Exception $e) {
             return response()->json([
                 'status'  => 'error',
@@ -242,8 +238,8 @@ class UsuarioController extends Controller
         }
     }
 
-  
-    public function destroy(string $id)
+
+    public function destroy(Request $request, string $id)
     {
         try {
             $usuario = User::findOrFail($id);
@@ -251,23 +247,35 @@ class UsuarioController extends Controller
             if (auth('api')->id() === $usuario->id) {
                 return response()->json([
                     'status'  => 'error',
-                    'message' => 'No puedes eliminar tu propia cuenta de administrador.',
+                    'message' => 'No puedes alterar tu propia cuenta.',
                 ], 403);
             }
 
-            $usuario->delete();
+
+            $nuevoEstado = strtoupper($request->get('estado', 'INACTIVO'));
+
+         
+            if (!UsuarioEstadoEnum::tryFrom($nuevoEstado)) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'El estado solicitado no es válido.',
+                    'estados_validos' => array_column(UsuarioEstadoEnum::cases(), 'value'),
+                ], 422);
+            }
+
+            $usuario->estado = $nuevoEstado;
+            $usuario->save();
 
             return response()->json([
                 'status'  => 'success',
-                'message' => 'Usuario eliminado correctamente.',
+                'message' => "El usuario ahora se encuentra en estado: {$nuevoEstado}.",
+                'data'    => $usuario->load('roles'),
             ], 200);
-
         } catch (ModelNotFoundException $e) {
             return response()->json([
                 'status'  => 'error',
                 'message' => 'Usuario no encontrado.',
             ], 404);
-
         } catch (\Exception $e) {
             return response()->json([
                 'status'  => 'error',
