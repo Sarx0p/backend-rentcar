@@ -18,11 +18,11 @@ class DatabaseSeeder extends Seeder
         ]);
 
         User::factory()->create([
-           'nombre'=> 'Test',
-           'apellido'=> 'User',
-           'correo'=> 'test@gmail.com',
-           'password'=> bcrypt('12345678'),
-           'estado'=> 'ACTIVO',
-        ]);
+            'nombre'   => 'Test',
+            'apellido' => 'User',
+            'correo'   => 'test@gmail.com',
+            'password' => bcrypt('12345678'),
+            'estado'   => 'ACTIVO',
+        ])->assignRole('ADMINISTRADOR');  
     }
 }
