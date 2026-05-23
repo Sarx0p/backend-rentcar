@@ -18,8 +18,8 @@ class Reserva extends Model
         'estado',
         'cliente_id',
         'vehiculo_id',
-        'usuario_id', 
-        'cancelacion_id',
+        'usuario_id',
+       
     ];
 
     protected $hidden = [
@@ -47,9 +47,9 @@ class Reserva extends Model
         return $this->belongsTo(User::class, 'usuario_id');
     }
 
-    public function cancelacion(): BelongsTo
+    public function cancelacion(): HasOne
     {
-        return $this->belongsTo(Cancelacion::class, 'cancelacion_id');
+        return $this->hasOne(Cancelacion::class, 'reserva_id');
     }
 
     public function contrato(): HasOne

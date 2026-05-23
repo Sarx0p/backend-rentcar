@@ -204,36 +204,7 @@ class ClienteController extends Controller
      */
     public function destroy(string $id)
     {
-        try {
-            $userAuth = auth('api')->user();
-
-
-            if (!$userAuth->hasRole(RolEnum::ADMINISTRADOR->value)) {
-                return response()->json([
-                    'status'  => 'error',
-                    'message' => 'Solo el administrador puede eliminar clientes',
-                ], 403);
-            }
-
-            $cliente = Cliente::findOrFail($id);
-            $cliente->delete();
-
-            return response()->json([
-                'status'  => 'success',
-                'message' => 'Cliente eliminado con éxito',
-            ], 200);
-
-        } catch (ModelNotFoundException $e) {
-            return response()->json([
-                'status'  => 'error',
-                'message' => 'Cliente no encontrado',
-            ], 404);
-        } catch (\Exception $e) {
-            return response()->json([
-                'status'  => 'error',
-                'message' => 'Error interno del servidor',
-            ], 500);
-        }
+       
     }
      public function licenciaVigente(string $id)
     {
