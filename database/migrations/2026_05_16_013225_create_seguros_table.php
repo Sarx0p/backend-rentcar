@@ -13,9 +13,13 @@ return new class extends Migration
     {
         Schema::create('seguros', function (Blueprint $table) {
             $table->id();
-            $table->string('aseguradora', 100);
-            $table->string('numero_poliza', 100);
-            $table->date('vencimiento');
+            $table->string('aseguradora', 150);
+            $table->string('numero_poliza', 50)->unique();
+            $table->date('fecha_inicio');
+            $table->date('fecha_vencimiento');
+            $table->text('cobertura')->nullable();
+            $table->string('estado', 30);
+            $table->foreignId('vehiculo_id')->constrained('vehiculos');
             $table->timestamps();
         });
     }
