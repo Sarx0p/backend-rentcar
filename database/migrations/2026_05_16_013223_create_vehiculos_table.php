@@ -16,11 +16,10 @@ return new class extends Migration
             $table->string('placa', 20)->unique();
             $table->string('color', 30);
             $table->integer('anio');
-            $table->string('estado', 50); 
+            $table->string('estado', 50);
             $table->foreignId('modelo_id')->constrained('modelos');
             $table->foreignId('categoria_id')->constrained('categorias');
             $table->foreignId('propietario_id')->constrained('propietarios');
-            $table->foreignId('seguro_id')->constrained('seguros');
             $table->timestamps();
         });
     }

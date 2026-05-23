@@ -20,7 +20,6 @@ class Vehiculo extends Model
         'propietario_id',
         'categoria_id',
         'modelo_id',
-        'seguro_id',
     ];
 
     protected $hidden = [
