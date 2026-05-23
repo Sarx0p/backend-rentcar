@@ -22,7 +22,7 @@ class ReservaController extends Controller
      */
     public function index()
     {
-       try {
+        try {
             $userAuth = auth('api')->user();
 
             if (
@@ -48,7 +48,6 @@ class ReservaController extends Controller
                 'status' => 'success',
                 'data'   => $reservas,
             ], 200);
-
         } catch (\Exception $e) {
             return response()->json([
                 'status'  => 'error',
@@ -140,7 +139,6 @@ class ReservaController extends Controller
                 'message' => 'Reserva creada con éxito',
                 'data'    => $reserva,
             ], 201);
-
         } catch (ModelNotFoundException $e) {
             return response()->json([
                 'status'  => 'error',
@@ -166,7 +164,7 @@ class ReservaController extends Controller
      */
     public function show(string $id)
     {
-       try {
+        try {
             $userAuth = auth('api')->user();
 
             if (
@@ -194,7 +192,6 @@ class ReservaController extends Controller
                 'status' => 'success',
                 'data'   => $reserva,
             ], 200);
-
         } catch (ModelNotFoundException $e) {
             return response()->json([
                 'status'  => 'error',
@@ -252,7 +249,6 @@ class ReservaController extends Controller
                     'vehiculo:id,placa,color',
                 ]),
             ], 200);
-
         } catch (ModelNotFoundException $e) {
             return response()->json([
                 'status'  => 'error',
@@ -312,15 +308,15 @@ class ReservaController extends Controller
 
             DB::transaction(function () use ($request, $reserva, $userAuth) {
 
-                $cancelacion = Cancelacion::create([
+                Cancelacion::create([
                     'fecha_cancelacion' => now(),
                     'motivo'            => $request->motivo,
                     'usuario_id'        => $userAuth->id,
+                    'reserva_id'        => $reserva->id,
                 ]);
 
                 $reserva->update([
-                    'estado'         => EstadoReservaEnum::CANCELADA->value,
-                    'cancelacion_id' => $cancelacion->id,
+                    'estado' => EstadoReservaEnum::CANCELADA->value,
                 ]);
 
                 $reserva->vehiculo->update([
@@ -334,11 +330,10 @@ class ReservaController extends Controller
                 'data'    => $reserva->fresh([
                     'cliente:id,nombre',
                     'vehiculo:id,placa,color,estado',
-                    'cancelacion:id,fecha_cancelacion,motivo,usuario_id',
+                    'cancelacion:id,fecha_cancelacion,motivo,usuario_id,reserva_id',
                     'cancelacion.user:id,nombre,apellido',
                 ]),
             ], 200);
-
         } catch (ModelNotFoundException $e) {
             return response()->json([
                 'status'  => 'error',

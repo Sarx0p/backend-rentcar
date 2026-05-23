@@ -21,7 +21,6 @@ return new class extends Migration
             $table->foreignId('cliente_id')->constrained('clientes');
             $table->foreignId('vehiculo_id')->constrained('vehiculos');
             $table->foreignId('usuario_id')->constrained('users');
-            $table->foreignId('cancelacion_id')->nullable()->constrained('cancelaciones');//problema logico si lo dejaba como antes era obligatorio qeu existiera una cancelacion desde el principio pero hoy ya esta corrregido
             $table->timestamps();
         });
     }
