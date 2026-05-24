@@ -13,9 +13,9 @@ class ClienteController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
-       try {
+        try {
             $userAuth = auth('api')->user();
 
             if (
@@ -28,13 +28,19 @@ class ClienteController extends Controller
                 ], 403);
             }
 
-            $clientes = Cliente::latest()->paginate(10);
+            $clientes = Cliente::when($request->search, function ($query, $search) {
+                $query->where('nombre', 'like', '%' . $search . '%')
+                      ->orWhere('dui', 'like', '%' . $search . '%')
+                      ->orWhere('numero_licencia', 'like', '%' . $search . '%')
+                      ->orWhere('telefono', 'like', '%' . $search . '%');
+            })
+            ->latest()
+            ->paginate(10); 
 
             return response()->json([
                 'status' => 'success',
                 'data'   => $clientes,
             ], 200);
-
         } catch (\Exception $e) {
             return response()->json([
                 'status'  => 'error',
@@ -79,7 +85,6 @@ class ClienteController extends Controller
                 'message' => 'Cliente registrado con éxito',
                 'data'    => $cliente,
             ], 201);
-
         } catch (ValidationException $e) {
             return response()->json([
                 'status'  => 'error',
@@ -99,7 +104,7 @@ class ClienteController extends Controller
      */
     public function show(string $id)
     {
-       try {
+        try {
             $userAuth = auth('api')->user();
 
             if (
@@ -115,7 +120,7 @@ class ClienteController extends Controller
             $cliente = Cliente::with([
                 'reservas' => function ($query) {
                     $query->select('id', 'cliente_id', 'vehiculo_id', 'fecha_inicio', 'fecha_fin', 'estado')
-                          ->latest();
+                        ->latest();
                 },
                 'reservas.vehiculo' => function ($query) {
                     $query->select('id', 'placa', 'color', 'estado', 'modelo_id');
@@ -126,7 +131,6 @@ class ClienteController extends Controller
                 'status' => 'success',
                 'data'   => $cliente,
             ], 200);
-
         } catch (ModelNotFoundException $e) {
             return response()->json([
                 'status'  => 'error',
@@ -145,7 +149,7 @@ class ClienteController extends Controller
      */
     public function update(Request $request, string $id)
     {
-       try {
+        try {
             $userAuth = auth('api')->user();
 
             if (
@@ -178,7 +182,6 @@ class ClienteController extends Controller
                 'message' => 'Cliente actualizado con éxito',
                 'data'    => $cliente,
             ], 200);
-
         } catch (ModelNotFoundException $e) {
             return response()->json([
                 'status'  => 'error',
@@ -196,17 +199,13 @@ class ClienteController extends Controller
                 'message' => 'Error interno del servidor',
             ], 500);
         }
-
     }
 
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(string $id)
-    {
-       
-    }
-     public function licenciaVigente(string $id)
+    public function destroy(string $id) {}
+    public function licenciaVigente(string $id)
     {
         try {
             $userAuth = auth('api')->user();
@@ -234,7 +233,6 @@ class ClienteController extends Controller
                     'vencimiento_licencia' => $cliente->vencimiento_licencia,
                 ],
             ], 200);
-
         } catch (ModelNotFoundException $e) {
             return response()->json([
                 'status'  => 'error',

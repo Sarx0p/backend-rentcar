@@ -20,7 +20,7 @@ class ReservaController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
         try {
             $userAuth = auth('api')->user();
@@ -42,7 +42,20 @@ class ReservaController extends Controller
                 'vehiculo.modelo.marca:id,nombre',
                 'vehiculo.categoria:id,nombre',
                 'user:id,nombre,apellido',
-            ])->latest()->paginate(10);
+            ])
+                ->when($request->search, function ($query, $search) {
+                    $query->where('tipo_reserva', 'like', '%' . $search . '%')
+                        ->orWhere('estado', 'like', '%' . $search . '%')
+                        ->orWhereHas('cliente', function ($q) use ($search) {
+                            $q->where('nombre', 'like', '%' . $search . '%')
+                                ->orWhere('dui', 'like', '%' . $search . '%');
+                        });
+                })
+                ->when($request->estado, function ($query, $estado) {
+                    $query->where('estado', $estado);
+                })
+                ->latest()
+                ->paginate(10);
 
             return response()->json([
                 'status' => 'success',
@@ -115,7 +128,7 @@ class ReservaController extends Controller
                     'cliente_id'      => $request->cliente_id,
                     'vehiculo_id'     => $request->vehiculo_id,
                     'usuario_id'      => $userAuth->id,
-                    'cancelacion_id'  => null,
+
                 ]);
 
                 $vehiculo->update([
