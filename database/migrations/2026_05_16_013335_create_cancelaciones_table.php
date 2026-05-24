@@ -16,6 +16,7 @@ return new class extends Migration
             $table->dateTime('fecha_cancelacion');
             $table->text('motivo')->nullable();
             $table->foreignId('usuario_id')->constrained('users');
+            $table->foreignId('reserva_id')->unique()->constrained('reservas'); 
             $table->timestamps();
         });
     }

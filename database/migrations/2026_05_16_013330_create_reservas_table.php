@@ -17,11 +17,10 @@ return new class extends Migration
             $table->date('fecha_inicio');
             $table->date('fecha_fin');
             $table->string('tipo_reserva', 50);
-            $table->string('estado', 30); 
+            $table->string('estado', 30);
             $table->foreignId('cliente_id')->constrained('clientes');
             $table->foreignId('vehiculo_id')->constrained('vehiculos');
-            $table->foreignId('usuario_id')->constrained('users'); 
-            $table->foreignId('cancelacion_id')->constrained('cancelaciones');
+            $table->foreignId('usuario_id')->constrained('users');
             $table->timestamps();
         });
     }

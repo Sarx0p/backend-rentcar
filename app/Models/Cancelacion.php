@@ -4,7 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
+
 
 class Cancelacion extends Model
 {
@@ -14,6 +14,7 @@ class Cancelacion extends Model
         'fecha_cancelacion',
         'motivo',
         'usuario_id',
+        'reserva_id',
     ];
 
     protected $hidden = [
@@ -29,8 +30,8 @@ class Cancelacion extends Model
     {
         return $this->belongsTo(User::class, 'usuario_id');
     }
-    public function reservas(): HasMany
+    public function reserva(): BelongsTo
     {
-        return $this->hasMany(Reserva::class, 'cancelacion_id');
+        return $this->belongsTo(Reserva::class, 'reserva_id');
     }
 }
