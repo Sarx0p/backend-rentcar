@@ -19,7 +19,7 @@ return new class extends Migration
             $table->date('fecha_vencimiento');
             $table->text('cobertura')->nullable();
             $table->string('estado', 30);
-            $table->foreignId('vehiculo_id')->constrained('vehiculos');
+            $table->foreignId('vehiculo_id')->nullable()->constrained('vehiculos');
             $table->timestamps();
         });
     }
