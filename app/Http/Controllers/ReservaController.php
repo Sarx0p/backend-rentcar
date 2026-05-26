@@ -73,7 +73,7 @@ class ReservaController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(Request $request)
+  public function store(Request $request)
     {
         try {
             $userAuth = auth('api')->user();
@@ -87,16 +87,24 @@ class ReservaController extends Controller
                     'message' => 'No tienes permiso para crear reservas',
                 ], 403);
             }
-
             $request->validate([
-                'fecha_inicio' => 'required|date|after_or_equal:today',
-                'fecha_fin'    => 'required|date|after:fecha_inicio',
                 'tipo_reserva' => 'required|in:' . implode(',', array_column(TipoReservaEnum::cases(), 'value')),
                 'cliente_id'   => 'required|exists:clientes,id',
                 'vehiculo_id'  => 'required|exists:vehiculos,id',
+                'fecha_inicio' => 'required|date',
+                'fecha_fin'    => 'required|date|after:fecha_inicio',
             ]);
-
-
+            if ($request->tipo_reserva === TipoReservaEnum::ANTISIPADA->value) {
+                $request->validate([
+                    'fecha_inicio' => 'date|after_or_equal:tomorrow',
+                ], [
+                    'fecha_inicio.after_or_equal' => 'Para una reserva ANTISIPADA, la fecha de inicio debe ser al menos desde el día de mañana.',
+                ]);
+            } else {
+                $request->validate([
+                    'fecha_inicio' => 'date|after_or_equal:today',
+                ]);
+            }
             $cliente = Cliente::findOrFail($request->cliente_id);
 
             if ($cliente->vencimiento_licencia->isPast()) {
@@ -105,18 +113,37 @@ class ReservaController extends Controller
                     'message' => 'El cliente tiene la licencia vencida, no puede hacer una reserva',
                 ], 422);
             }
-
-
             $vehiculo = Vehiculo::findOrFail($request->vehiculo_id);
 
-            if ($vehiculo->estado !== VehiculoEstadoEnum::DISPONIBLE->value) {
+            if (in_array($vehiculo->estado, [
+                VehiculoEstadoEnum::MANTENIMIENTO->value,
+                VehiculoEstadoEnum::FUERA_SERVICIO->value,
+                VehiculoEstadoEnum::INACTIVO->value,
+            ])) {
                 return response()->json([
                     'status'  => 'error',
                     'message' => 'El vehículo no está disponible, estado actual: ' . $vehiculo->estado,
                 ], 422);
             }
+            $traslapada = Reserva::where('vehiculo_id', $request->vehiculo_id)
+                ->whereNotIn('estado', [EstadoReservaEnum::CANCELADA->value])
+                ->where(function ($query) use ($request) {
+                    $query->where('fecha_inicio', '<', $request->fecha_fin)
+                          ->where('fecha_fin', '>', $request->fecha_inicio);
+                })->exists();
 
+            if ($traslapada) {
+                $fechasOcupadas = Reserva::where('vehiculo_id', $request->vehiculo_id)
+                    ->whereNotIn('estado', [EstadoReservaEnum::CANCELADA->value])
+                    ->select('fecha_inicio', 'fecha_fin')
+                    ->get();
 
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'El vehículo ya tiene una reserva en esas fechas',
+                    'fechas_ocupadas' => $fechasOcupadas,
+                ], 422);
+            }
             $reserva = DB::transaction(function () use ($request, $vehiculo, $userAuth) {
 
                 $reserva = Reserva::create([
@@ -128,12 +155,13 @@ class ReservaController extends Controller
                     'cliente_id'      => $request->cliente_id,
                     'vehiculo_id'     => $request->vehiculo_id,
                     'usuario_id'      => $userAuth->id,
-
                 ]);
 
-                $vehiculo->update([
-                    'estado' => VehiculoEstadoEnum::RESERVADO->value,
-                ]);
+                if ($vehiculo->estado === VehiculoEstadoEnum::DISPONIBLE->value) {
+                    $vehiculo->update([
+                        'estado' => VehiculoEstadoEnum::RESERVADO->value,
+                    ]);
+                }
 
                 return $reserva;
             });
@@ -152,6 +180,7 @@ class ReservaController extends Controller
                 'message' => 'Reserva creada con éxito',
                 'data'    => $reserva,
             ], 201);
+
         } catch (ModelNotFoundException $e) {
             return response()->json([
                 'status'  => 'error',
@@ -222,7 +251,7 @@ class ReservaController extends Controller
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, string $id)
+  public function update(Request $request, string $id)
     {
         try {
             $userAuth = auth('api')->user();
@@ -247,10 +276,40 @@ class ReservaController extends Controller
             }
 
             $request->validate([
-                'fecha_inicio' => 'sometimes|date|after_or_equal:today',
-                'fecha_fin'    => 'sometimes|date|after:fecha_inicio',
                 'tipo_reserva' => 'sometimes|in:' . implode(',', array_column(TipoReservaEnum::cases(), 'value')),
+                'fecha_inicio' => 'sometimes|date',
+                'fecha_fin'    => 'sometimes|date|after:fecha_inicio',
             ]);
+            $tipoEvaluar = $request->tipo_reserva ?? $reserva->tipo_reserva;
+            if ($request->has('fecha_inicio') && $tipoEvaluar === TipoReservaEnum::ANTISIPADA->value) {
+                $request->validate([
+                    'fecha_inicio' => 'date|after_or_equal:tomorrow',
+                ], [
+                    'fecha_inicio.after_or_equal' => 'Para una reserva ANTISIPADA, la fecha de inicio debe ser al menos desde el día de mañana.',
+                ]);
+            }
+
+            if ($request->has('fecha_inicio') || $request->has('fecha_fin')) {
+
+                $inicioEvaluar = $request->fecha_inicio ?? $reserva->fecha_inicio;
+                $finEvaluar = $request->fecha_fin ?? $reserva->fecha_fin;
+
+                $traslapada = Reserva::where('vehiculo_id', $reserva->vehiculo_id)
+                    ->where('id', '!=', $id)
+                    ->whereNotIn('estado', [EstadoReservaEnum::CANCELADA->value])
+                    ->where(function ($query) use ($inicioEvaluar, $finEvaluar) {
+                        $query->where('fecha_inicio', '<', $finEvaluar)
+                              ->where('fecha_fin', '>', $inicioEvaluar);
+                    })->exists();
+
+                if ($traslapada) {
+                    return response()->json([
+                        'status'  => 'error',
+                        'message' => 'No se puede actualizar: El vehículo ya tiene otra reserva en esas fechas',
+                    ], 422);
+                }
+            }
+
 
             $reserva->update($request->only(['fecha_inicio', 'fecha_fin', 'tipo_reserva']));
 
@@ -290,8 +349,7 @@ class ReservaController extends Controller
         //
     }
 
-
-    public function cancelar(Request $request, string $id)
+   public function cancelar(Request $request, string $id)
     {
         try {
             $userAuth = auth('api')->user();
@@ -331,10 +389,11 @@ class ReservaController extends Controller
                 $reserva->update([
                     'estado' => EstadoReservaEnum::CANCELADA->value,
                 ]);
-
-                $reserva->vehiculo->update([
-                    'estado' => VehiculoEstadoEnum::DISPONIBLE->value,
-                ]);
+                if ($reserva->vehiculo->estado === VehiculoEstadoEnum::RESERVADO->value) {
+                    $reserva->vehiculo->update([
+                        'estado' => VehiculoEstadoEnum::DISPONIBLE->value,
+                    ]);
+                }
             });
 
             return response()->json([
