@@ -35,7 +35,7 @@ class ClienteController extends Controller
                       ->orWhere('telefono', 'like', '%' . $search . '%');
             })
             ->latest()
-            ->paginate(10); 
+            ->paginate(10);
 
             return response()->json([
                 'status' => 'success',
