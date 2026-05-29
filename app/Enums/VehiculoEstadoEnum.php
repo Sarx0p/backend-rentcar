@@ -10,5 +10,6 @@ enum VehiculoEstadoEnum: string
     case MANTENIMIENTO = 'MANTENIMIENTO';
     case FUERA_SERVICIO = 'FUERA DE SERVICIO';
     case INACTIVO = 'INACTIVO';
+    
 
 }

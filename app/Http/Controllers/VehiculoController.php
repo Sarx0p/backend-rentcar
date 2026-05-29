@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\EstadoReservaEnum;
 use App\Enums\RolEnum;
+use App\Enums\VehiculoEstadoEnum;
 use App\Models\Vehiculo;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -10,17 +12,33 @@ use Illuminate\Validation\ValidationException;
 
 class VehiculoController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
         try {
             $vehiculos = Vehiculo::with(['modelo.marca', 'categoria'])
+                ->whereNotIn('estado', [
+                    VehiculoEstadoEnum::MANTENIMIENTO->value,
+                    VehiculoEstadoEnum::FUERA_SERVICIO->value,
+                    VehiculoEstadoEnum::INACTIVO->value,
+                    VehiculoEstadoEnum::RENTADO->value,
+                ])
+                ->when(
+                    $request->filled('fecha_inicio') && $request->filled('fecha_fin'),
+                    function ($query) use ($request) {
+                        $query->whereDoesntHave('reservas', function ($q) use ($request) {
+                            $q->whereNotIn('estado', [EstadoReservaEnum::CANCELADA->value])
+                                ->whereDate('fecha_inicio', '<', $request->fecha_fin)
+                                ->whereDate('fecha_fin',    '>', $request->fecha_inicio);
+                        });
+                    }
+                )
                 ->orderBy('id')
                 ->get();
 
             if ($vehiculos->isEmpty()) {
                 return response()->json([
                     'status'  => 'error',
-                    'message' => 'No existen vehiculos registrados.',
+                    'message' => 'No hay vehículos disponibles.',
                 ], 404);
             }
 
@@ -28,7 +46,6 @@ class VehiculoController extends Controller
                 'status' => 'success',
                 'data'   => $vehiculos,
             ], 200);
-
         } catch (\Exception $e) {
             return response()->json([
                 'status'  => 'error',
@@ -82,7 +99,6 @@ class VehiculoController extends Controller
                 'message' => 'Vehiculo registrado correctamente.',
                 'data'    => $vehiculo,
             ], 201);
-
         } catch (ValidationException $e) {
             DB::rollBack();
 
@@ -90,7 +106,6 @@ class VehiculoController extends Controller
                 'status'  => 'error',
                 'message' => 'Faltan campos requeridos.',
             ], 422);
-
         } catch (\Exception $e) {
             DB::rollBack();
 
@@ -118,7 +133,6 @@ class VehiculoController extends Controller
                 'status' => 'success',
                 'data'   => $vehiculo,
             ], 200);
-
         } catch (\Exception $e) {
             return response()->json([
                 'status'  => 'error',
@@ -134,6 +148,6 @@ class VehiculoController extends Controller
 
     public function destroy(string $id)
     {
-        //
+        
     }
 }
