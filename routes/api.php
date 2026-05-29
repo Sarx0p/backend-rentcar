@@ -12,11 +12,6 @@ use App\Http\Controllers\ModeloController;
 use App\Http\Controllers\CategoriaController;
 use App\Http\Controllers\DashboardController;
 
-Route::middleware('auth:api')->group(function () {
-    Route::get('/vehiculos',      [VehiculoController::class, 'index']);
-    Route::get('/vehiculos/{id}', [VehiculoController::class, 'show']);
-    Route::post('/vehiculos',     [VehiculoController::class, 'store']);
-});
 
 Route::get('/marcas', [MarcaController::class, 'index']);
 
@@ -63,6 +58,11 @@ Route::prefix('admin')->group(function () {
 
         Route::apiResource('reservas', ReservaController::class)->except(['destroy']);
         Route::patch('reservas/{id}/cancelar', [ReservaController::class, 'cancelar']);
+
+        
+        Route::get('vehiculos', [VehiculoController::class, 'index']);
+        Route::get('vehiculos/{id}', [VehiculoController::class, 'show']);
+        Route::post('vehiculos', [VehiculoController::class, 'store']);
     });
 
 });
