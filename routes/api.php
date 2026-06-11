@@ -10,8 +10,12 @@ use App\Http\Controllers\VehiculoController;
 use App\Http\Controllers\MarcaController;
 use App\Http\Controllers\ModeloController;
 use App\Http\Controllers\CategoriaController;
+use App\Http\Controllers\ContratoController;
 use App\Http\Controllers\DashboardController;
-
+use App\Http\Controllers\PagoController;
+use App\Http\Controllers\CargoAdicionalController;
+use App\Http\Controllers\CierreRentaController;
+use App\Http\Controllers\IncidenciaController;
 
 Route::get('/marcas', [MarcaController::class, 'index']);
 
@@ -57,12 +61,16 @@ Route::prefix('admin')->group(function () {
         Route::get('clientes/{id}/licencia-vigente', [ClienteController::class, 'licenciaVigente']);
 
         Route::apiResource('reservas', ReservaController::class)->except(['destroy']);
-        Route::patch('reservas/{id}/cancelar', [ReservaController::class, 'cancelar']);
-
-        
+        Route::patch('raeservas/{id}/cancelar', [ReservaController::class, 'cancelar']);
         Route::get('vehiculos', [VehiculoController::class, 'index']);
         Route::get('vehiculos/{id}', [VehiculoController::class, 'show']);
         Route::post('vehiculos', [VehiculoController::class, 'store']);
+        Route::get('contratos/{id}/pdf', [ContratoController::class, 'generarPdf']);
+        Route::apiResource('contratos', ContratoController::class)->only(['index', 'show', 'store']);
+        Route::apiResource('pagos', PagoController::class)->only(['index', 'show', 'store']);
+        Route::apiResource('cargos-adicionales', CargoAdicionalController::class)->only(['index', 'show', 'store']);
+        Route::apiResource('incidencias', IncidenciaController::class)->only(['index', 'show', 'store']);
+        Route::apiResource('cierres-renta', CierreRentaController::class)->only(['index', 'show', 'store']);
     });
 
 });
