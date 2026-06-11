@@ -1,0 +1,218 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Enums\EstadoContratoEnum;
+use App\Enums\EstadoPagoEnum;
+use App\Enums\EstadoTransaccionEnum;
+use App\Enums\MetodoPagoEnum;
+use App\Enums\RolEnum;
+use App\Models\Contrato;
+use App\Models\Pago;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Nette\Schema\ValidationException;
+
+class PagoController extends Controller
+{
+    /**
+     * Display a listing of the resource.
+     */
+    public function index(Request $request)
+    {
+        try {
+            $userAuth = auth('api')->user();
+
+            if (
+                !$userAuth->hasRole(RolEnum::ADMINISTRADOR->value) &&
+                !$userAuth->hasRole(RolEnum::EMPLEADO->value)
+            ) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'No tienes permiso para ver los pagos',
+                ], 403);
+            }
+
+            $pagos = Pago::with([
+                'contrato:id,numero_contrato,monto_total_renta,estado_pago',
+            ])
+                ->when($request->search, function ($query, $search) {
+                    $query->where('metodo_pago', 'like', '%' . $search . '%')
+                        ->orWhere('estado_transaccion', 'like', '%' . $search . '%')
+                        ->orWhereHas('contrato', function ($q) use ($search) {
+                            $q->where('numero_contrato', 'like', '%' . $search . '%');
+                        });
+                })
+                ->when($request->estado_transaccion, function ($query, $estado) {
+                    $query->where('estado_transaccion', $estado);
+                })
+                ->when($request->metodo_pago, function ($query, $metodo) {
+                    $query->where('metodo_pago', $metodo);
+                })
+                ->when($request->fecha_inicio && $request->fecha_fin, function ($query) use ($request) {
+                    $query->whereDate('fecha_pago', '>=', $request->fecha_inicio)
+                        ->whereDate('fecha_pago', '<=', $request->fecha_fin);
+                })
+                ->latest()
+                ->paginate(10);
+
+            return response()->json([
+                'status' => 'success',
+                'data'   => $pagos,
+            ], 200);
+        } catch (\Exception) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Error interno del servidor',
+            ], 500);
+        }
+    }
+
+    /**
+     * Store a newly created resource in storage.
+     */
+    public function store(Request $request)
+    {
+        try {
+            $userAuth = auth('api')->user();
+
+            if (
+                !$userAuth->hasRole(RolEnum::ADMINISTRADOR->value) &&
+                !$userAuth->hasRole(RolEnum::EMPLEADO->value)
+            ) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'No tienes permiso para registrar pagos',
+                ], 403);
+            }
+
+            $request->validate([
+                'contrato_id' => 'required|exists:contratos,id',
+                'monto'       => 'required|numeric|min:0.01',
+                'metodo_pago' => 'required|in:' . implode(',', array_column(MetodoPagoEnum::cases(), 'value')),
+                'fecha_pago'  => 'required|date',
+            ]);
+
+            $contrato = Contrato::findOrFail($request->contrato_id);
+
+            if ($contrato->estado_contrato !== EstadoContratoEnum::ACTIVO->value) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'Solo se pueden registrar pagos en contratos ACTIVOS',
+                ], 422);
+            }
+
+            if ($contrato->estado_pago === EstadoPagoEnum::PAGADO->value) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'Este contrato ya está completamente pagado',
+                ], 422);
+            }
+
+            $pago = DB::transaction(function () use ($request, $contrato) {
+
+                $pago = Pago::create([
+                    'contrato_id'        => $contrato->id,
+                    'monto'              => $request->monto,
+                    'metodo_pago'        => $request->metodo_pago,
+                    'estado_transaccion' => EstadoTransaccionEnum::CONFIRMADO->value,
+                    'fecha_pago'         => $request->fecha_pago,
+                ]);
+
+
+                $totalPagado = $contrato->pagos()
+                    ->where('estado_transaccion', EstadoTransaccionEnum::CONFIRMADO->value)
+                    ->sum('monto');
+
+                $contrato->update([
+                    'estado_pago' => $totalPagado >= $contrato->monto_total_renta
+                        ? EstadoPagoEnum::PAGADO->value
+                        : EstadoPagoEnum::PARCIAL->value,
+                ]);
+
+                return $pago;
+            });
+
+            $pago->load('contrato:id,numero_contrato,monto_total_renta,estado_pago');
+
+            return response()->json([
+                'status'  => 'success',
+                'message' => 'Pago registrado con éxito',
+                'data'    => $pago,
+            ], 201);
+        } catch (ModelNotFoundException $e) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Contrato no encontrado',
+            ], 404);
+        } catch (ValidationException $e) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Error de validación',
+                'errors'  => $e->errors(),
+            ], 422);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Error interno del servidor',
+            ], 500);
+        }
+    }
+
+    /**
+     * Display the specified resource.
+     */
+    public function show(string $id)
+    {
+        try {
+            $userAuth = auth('api')->user();
+
+            if (
+                !$userAuth->hasRole(RolEnum::ADMINISTRADOR->value) &&
+                !$userAuth->hasRole(RolEnum::EMPLEADO->value)
+            ) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'No tienes permiso para ver este pago',
+                ], 403);
+            }
+
+            $pago = Pago::with([
+                'contrato:id,numero_contrato,monto_total_renta,estado_pago',
+            ])->findOrFail($id);
+
+            return response()->json([
+                'status' => 'success',
+                'data'   => $pago,
+            ], 200);
+        } catch (ModelNotFoundException $e) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Pago no encontrado',
+            ], 404);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Error interno del servidor',
+                'error'   => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Update the specified resource in storage.
+     */
+    public function update(Request $request, string $id)
+    {
+        //
+    }
+
+    /**
+     * Remove the specified resource from storage.
+     */
+    public function destroy(string $id)
+    {
+        //
+    }
+}
