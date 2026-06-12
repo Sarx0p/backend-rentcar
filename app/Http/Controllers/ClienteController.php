@@ -191,7 +191,6 @@ class ClienteController extends Controller
             return response()->json([
                 'status'  => 'error',
                 'message' => 'Error de validación',
-                'errors'  => $e->errors(),
             ], 422);
         } catch (\Exception $e) {
             return response()->json([

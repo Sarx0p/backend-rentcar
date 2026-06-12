@@ -285,7 +285,6 @@ class ContratoController extends Controller
             return response()->json([
                 'status'  => 'error',
                 'message' => 'Error interno del servidor',
-                'error'   => $e->getMessage(),
             ], 500);
         }
     }

@@ -74,11 +74,11 @@ class IncidenciaController extends Controller
                 'status' => 'success',
                 'data'   => $incidencias,
             ], 200);
-        } catch (\Exception $e) {
+        } catch (\Exception ) {
             return response()->json([
                 'status'  => 'error',
                 'message' => 'Error interno del servidor',
-                'error'   => $e->getMessage(),
+
             ], 500);
         }
     }
@@ -169,13 +169,13 @@ class IncidenciaController extends Controller
             return response()->json([
                 'status'  => 'error',
                 'message' => 'Error de validación',
-                'errors'  => $e->errors(),
+
             ], 422);
         } catch (\Exception $e) {
             return response()->json([
                 'status'  => 'error',
                 'message' => 'Error interno del servidor',
-                'error'   => $e->getMessage(),
+
             ], 500);
         }
     }
@@ -215,7 +215,7 @@ class IncidenciaController extends Controller
             return response()->json([
                 'status'  => 'error',
                 'message' => 'Error interno del servidor',
-                'error'   => $e->getMessage(),
+             
             ], 500);
         }
     }
