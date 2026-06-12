@@ -141,18 +141,18 @@ class PagoController extends Controller
                 'message' => 'Pago registrado con éxito',
                 'data'    => $pago,
             ], 201);
-        } catch (ModelNotFoundException $e) {
+        } catch (ModelNotFoundException ) {
             return response()->json([
                 'status'  => 'error',
                 'message' => 'Contrato no encontrado',
             ], 404);
-        } catch (ValidationException $e) {
+        } catch (ValidationException ) {
             return response()->json([
                 'status'  => 'error',
                 'message' => 'Error de validación',
-                'errors'  => $e->errors(),
+
             ], 422);
-        } catch (\Exception $e) {
+        } catch (\Exception ) {
             return response()->json([
                 'status'  => 'error',
                 'message' => 'Error interno del servidor',
@@ -195,7 +195,7 @@ class PagoController extends Controller
             return response()->json([
                 'status'  => 'error',
                 'message' => 'Error interno del servidor',
-                'error'   => $e->getMessage(),
+
             ], 500);
         }
     }

@@ -16,6 +16,7 @@ use App\Http\Controllers\PagoController;
 use App\Http\Controllers\CargoAdicionalController;
 use App\Http\Controllers\CierreRentaController;
 use App\Http\Controllers\IncidenciaController;
+use App\Http\Controllers\CancelarController;
 
 Route::get('/marcas', [MarcaController::class, 'index']);
 
@@ -61,7 +62,6 @@ Route::prefix('admin')->group(function () {
         Route::get('clientes/{id}/licencia-vigente', [ClienteController::class, 'licenciaVigente']);
 
         Route::apiResource('reservas', ReservaController::class)->except(['destroy']);
-        Route::patch('raeservas/{id}/cancelar', [ReservaController::class, 'cancelar']);
         Route::get('vehiculos', [VehiculoController::class, 'index']);
         Route::get('vehiculos/{id}', [VehiculoController::class, 'show']);
         Route::post('vehiculos', [VehiculoController::class, 'store']);
@@ -71,6 +71,7 @@ Route::prefix('admin')->group(function () {
         Route::apiResource('cargos-adicionales', CargoAdicionalController::class)->only(['index', 'show', 'store']);
         Route::apiResource('incidencias', IncidenciaController::class)->only(['index', 'show', 'store']);
         Route::apiResource('cierres-renta', CierreRentaController::class)->only(['index', 'show', 'store']);
+        Route::apiResource('cancelaciones', CancelarController::class)->only(['index', 'show', 'store']);
     });
 
 });

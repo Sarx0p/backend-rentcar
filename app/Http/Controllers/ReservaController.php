@@ -65,7 +65,7 @@ class ReservaController extends Controller
             return response()->json([
                 'status'  => 'error',
                 'message' => 'Error interno del servidor',
-                'error'   => $e->getMessage(),
+
             ], 500);
         }
     }
@@ -190,13 +190,13 @@ class ReservaController extends Controller
             return response()->json([
                 'status'  => 'error',
                 'message' => 'Error de validación',
-                'errors'  => $e->errors(),
+
             ], 422);
         } catch (\Exception $e) {
             return response()->json([
                 'status'  => 'error',
                 'message' => 'Error interno del servidor',
-                'error'   => $e->getMessage(),
+
             ], 500);
         }
     }
@@ -243,7 +243,7 @@ class ReservaController extends Controller
             return response()->json([
                 'status'  => 'error',
                 'message' => 'Error interno del servidor',
-                'error'   => $e->getMessage(),
+
             ], 500);
         }
     }
@@ -330,13 +330,11 @@ class ReservaController extends Controller
             return response()->json([
                 'status'  => 'error',
                 'message' => 'Error de validación',
-                'errors'  => $e->errors(),
             ], 422);
         } catch (\Exception $e) {
             return response()->json([
                 'status'  => 'error',
                 'message' => 'Error interno del servidor',
-                'error'   => $e->getMessage(),
             ], 500);
         }
     }
@@ -348,81 +346,5 @@ class ReservaController extends Controller
     {
         //
     }
-
-   public function cancelar(Request $request, string $id)
-    {
-        try {
-            $userAuth = auth('api')->user();
-
-            if (
-                !$userAuth->hasRole(RolEnum::ADMINISTRADOR->value) &&
-                !$userAuth->hasRole(RolEnum::EMPLEADO->value)
-            ) {
-                return response()->json([
-                    'status'  => 'error',
-                    'message' => 'No tienes permiso para cancelar reservas',
-                ], 403);
-            }
-
-            $request->validate([
-                'motivo' => 'required|string',
-            ]);
-
-            $reserva = Reserva::with('vehiculo')->findOrFail($id);
-
-            if ($reserva->estado === EstadoReservaEnum::CANCELADA->value) {
-                return response()->json([
-                    'status'  => 'error',
-                    'message' => 'Esta reserva ya fue cancelada',
-                ], 422);
-            }
-
-            DB::transaction(function () use ($request, $reserva, $userAuth) {
-
-                Cancelacion::create([
-                    'fecha_cancelacion' => now(),
-                    'motivo'            => $request->motivo,
-                    'usuario_id'        => $userAuth->id,
-                    'reserva_id'        => $reserva->id,
-                ]);
-
-                $reserva->update([
-                    'estado' => EstadoReservaEnum::CANCELADA->value,
-                ]);
-                if ($reserva->vehiculo->estado === VehiculoEstadoEnum::RESERVADO->value) {
-                    $reserva->vehiculo->update([
-                        'estado' => VehiculoEstadoEnum::DISPONIBLE->value,
-                    ]);
-                }
-            });
-
-            return response()->json([
-                'status'  => 'success',
-                'message' => 'Reserva cancelada con éxito',
-                'data'    => $reserva->fresh([
-                    'cliente:id,nombre',
-                    'vehiculo:id,placa,color,estado',
-                    'cancelacion:id,fecha_cancelacion,motivo,usuario_id,reserva_id',
-                    'cancelacion.user:id,nombre,apellido',
-                ]),
-            ], 200);
-        } catch (ModelNotFoundException $e) {
-            return response()->json([
-                'status'  => 'error',
-                'message' => 'Reserva no encontrada',
-            ], 404);
-        } catch (ValidationException $e) {
-            return response()->json([
-                'status'  => 'error',
-                'message' => 'Error de validación',
-                'errors'  => $e->errors(),
-            ], 422);
-        } catch (\Exception $e) {
-            return response()->json([
-                'status'  => 'error',
-                'message' => 'Error interno del servidor',
-                'error'   => $e->getMessage(),
-            ], 500);
-        }
-    }
+    // se optimiso y se hiso el controller enves de dejarlo como funcion
 }
