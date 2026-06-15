@@ -9,5 +9,5 @@ enum IncidenciaEstadoEnum: string
     case RESUELTA = 'RESUELTA';
     case CERRADA = 'CERRADA';
     case ANULADA = 'ANULADA';
-    
+
 }

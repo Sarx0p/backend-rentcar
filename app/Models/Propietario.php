@@ -13,6 +13,7 @@ class Propietario extends Model
         'nombre',
         'telefono',
         'tipo_propietario',
+        'estado',
     ];
 
     protected $hidden = [
