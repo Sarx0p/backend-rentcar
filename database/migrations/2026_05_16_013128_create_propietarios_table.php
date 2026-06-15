@@ -16,6 +16,7 @@ return new class extends Migration
             $table->string('nombre', 100);
             $table->string('telefono', 25);
             $table->string('tipo_propietario', 50);
+             $table->string('estado', 30)->default('ACTIVO');
             $table->timestamps();
         });
     }

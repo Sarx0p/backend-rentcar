@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Http\Request;
+
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\UsuarioController;
@@ -17,13 +18,14 @@ use App\Http\Controllers\CargoAdicionalController;
 use App\Http\Controllers\CierreRentaController;
 use App\Http\Controllers\IncidenciaController;
 use App\Http\Controllers\CancelarController;
+use App\Http\Controllers\PropietarioController;
+use App\Http\Controllers\ReporteController;
 
 Route::get('/marcas', [MarcaController::class, 'index']);
 
 Route::middleware('auth:api')->group(function () {
     Route::post('/marcas', [MarcaController::class, 'store']);
 });
-
 
 Route::get('/modelos', [ModeloController::class, 'index']);
 Route::get('/marcas/{marcaId}/modelos', [ModeloController::class, 'porMarca']);
@@ -62,20 +64,31 @@ Route::prefix('admin')->group(function () {
         Route::get('clientes/{id}/licencia-vigente', [ClienteController::class, 'licenciaVigente']);
 
         Route::apiResource('reservas', ReservaController::class)->except(['destroy']);
+        Route::get('vehiculos/disponibles', [VehiculoController::class, 'index']);
         Route::get('vehiculos', [VehiculoController::class, 'index']);
         Route::get('vehiculos/{id}', [VehiculoController::class, 'show']);
         Route::post('vehiculos', [VehiculoController::class, 'store']);
+
         Route::get('contratos/{id}/pdf', [ContratoController::class, 'generarPdf']);
         Route::apiResource('contratos', ContratoController::class)->only(['index', 'show', 'store']);
+
         Route::apiResource('pagos', PagoController::class)->only(['index', 'show', 'store']);
         Route::apiResource('cargos-adicionales', CargoAdicionalController::class)->only(['index', 'show', 'store']);
         Route::apiResource('incidencias', IncidenciaController::class)->only(['index', 'show', 'store']);
         Route::apiResource('cierres-renta', CierreRentaController::class)->only(['index', 'show', 'store']);
         Route::apiResource('cancelaciones', CancelarController::class)->only(['index', 'show', 'store']);
+        Route::apiResource('propietarios', PropietarioController::class);
+
+        Route::prefix('reportes')->group(function () {
+            Route::get('ingresos', [ReporteController::class, 'ingresos']);
+            Route::get('estado-flota', [ReporteController::class, 'estadoFlota']);
+            Route::get('licencias-por-vencer', [ReporteController::class, 'licenciasPorVencer']);
+            Route::get('reservas-canceladas', [ReporteController::class, 'reservasCanceladas']);
+        });
+
     });
 
 });
-
 
 Route::middleware('auth:api')->group(function () {
     Route::get('dashboard/resumen', [DashboardController::class, 'resumen']);
