@@ -203,14 +203,14 @@ class PropietarioController extends Controller
 
             $propietario = Propietario::findOrFail($id);
 
-            if ($propietario->estado === EstadoPropietariEnum::INACTIVO->value) {
+            if ($propietario->estado === EstadoPropietarioEnum::INACTIVO->value) {
                 return response()->json([
                     'status'  => 'error',
                     'message' => 'Este propietario ya está desactivado',
                 ], 422);
             }
 
-            $propietario->update(['estado' => EstadoPropietariEnum::INACTIVO->value]);
+            $propietario->update(['estado' => EstadoPropietarioEnum::INACTIVO->value]);
 
             return response()->json([
                 'status'  => 'success',
