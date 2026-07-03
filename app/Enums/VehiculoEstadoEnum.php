@@ -9,7 +9,8 @@ enum VehiculoEstadoEnum: string
     case RENTADO = 'RENTADO';
     case MANTENIMIENTO = 'MANTENIMIENTO';
     case FUERA_SERVICIO = 'FUERA DE SERVICIO';
-    case INACTIVO = 'INACTIVO';
+   //se quito el inactivo por la redundancia que generaba el campo se opto
+   //solo por el campo FUERA_SERVICIO donde se abarca ianctivo y fuera de servicio 
 
 
 }

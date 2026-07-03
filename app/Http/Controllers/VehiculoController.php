@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Enums\EstadoReservaEnum;
 use App\Enums\RolEnum;
 use App\Enums\VehiculoEstadoEnum;
+use App\Http\Requests\VehiculoController\StoreVehiculoRequest;
+use App\Http\Requests\VehiculoController\UpdateVehiculoRequest;
 use App\Models\Vehiculo;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -19,7 +21,6 @@ class VehiculoController extends Controller
                 ->whereNotIn('estado', [
                     VehiculoEstadoEnum::MANTENIMIENTO->value,
                     VehiculoEstadoEnum::FUERA_SERVICIO->value,
-                    VehiculoEstadoEnum::INACTIVO->value,
                     VehiculoEstadoEnum::RENTADO->value,
                 ])
                 ->when(
@@ -54,28 +55,9 @@ class VehiculoController extends Controller
         }
     }
 
-    public function store(Request $request)
+    public function store(StoreVehiculoRequest $request)
     {
         try {
-            $userAuth = auth('api')->user();
-
-            if (!$userAuth->hasRole(RolEnum::ADMINISTRADOR->value)) {
-                return response()->json([
-                    'status'  => 'error',
-                    'message' => 'No tienes permiso para realizar esta acción.',
-                ], 403);
-            }
-
-            $request->validate([
-                'anio'           => 'required|integer|min:1990|max:' . (date('Y') + 1),
-                'color'          => 'required|string|max:30',
-                'placa'          => 'required|string|max:20|unique:vehiculos,placa',
-                'estado'         => 'required|in:DISPONIBLE,RESERVADO,RENTADO,MANTENIMIENTO,FUERA DE SERVICIO,INACTIVO',
-                'propietario_id' => 'required|integer|exists:propietarios,id',
-                'categoria_id'   => 'required|integer|exists:categorias,id',
-                'modelo_id'      => 'required|integer|exists:modelos,id',
-                'seguro_id'      => 'required|integer|exists:seguros,id',
-            ]);
 
             DB::beginTransaction();
 
@@ -99,13 +81,6 @@ class VehiculoController extends Controller
                 'message' => 'Vehiculo registrado correctamente.',
                 'data'    => $vehiculo,
             ], 201);
-        } catch (ValidationException $e) {
-            DB::rollBack();
-
-            return response()->json([
-                'status'  => 'error',
-                'message' => 'Faltan campos requeridos.',
-            ], 422);
         } catch (\Exception $e) {
             DB::rollBack();
 
@@ -141,13 +116,114 @@ class VehiculoController extends Controller
         }
     }
 
-    public function update(Request $request, string $id)
+    // decidi hacer el update por la situcacion qeu aya un trabajo de pintura en vehiuclo poder tener la livertad
+    //de hacer la actualizacion en ves de tener que crear el carro
+    public function update(UpdateVehiculoRequest $request, string $id)
     {
-        //
+        try {
+            $vehiculo = Vehiculo::find($id);
+
+            if (!$vehiculo) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'Vehiculo no encontrado.',
+                ], 404);
+            }
+
+            DB::beginTransaction();
+
+            $vehiculo->update($request->only([
+                'anio',
+                'color',
+                'placa',
+                'estado',
+                'propietario_id',
+                'categoria_id',
+                'modelo_id',
+                'seguro_id',
+            ]));
+
+            DB::commit();
+
+            $vehiculo->load(['modelo.marca', 'categoria']);
+
+            return response()->json([
+                'status'  => 'success',
+                'message' => 'Vehiculo actualizado correctamente.',
+                'data'    => $vehiculo,
+            ], 200);
+        } catch (\Exception $e) {
+            DB::rollBack();
+
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Error interno del servidor.',
+            ], 500);
+        }
     }
 
     public function destroy(string $id)
     {
+        try {
+            $userAuth = auth('api')->user();
 
+            if (
+                !$userAuth->hasRole(RolEnum::ADMINISTRADOR->value) &&
+                !$userAuth->hasRole(RolEnum::EMPLEADO->value)
+            ) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'No tienes permiso para realizar esta acción.',
+                ], 403);
+            }
+
+            $vehiculo = Vehiculo::find($id);
+
+            if (!$vehiculo) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'Vehiculo no encontrado.',
+                ], 404);
+            }
+
+            if ($vehiculo->estado === VehiculoEstadoEnum::FUERA_SERVICIO->value) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'El vehículo ya se encuentra fuera de servicio.',
+                ], 422);
+            }
+
+            $tieneReservasActivas = $vehiculo->reservas()
+                ->whereNotIn('estado', [EstadoReservaEnum::CANCELADA->value])
+                ->exists();
+
+            if ($tieneReservasActivas) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'No se puede desactivar el vehículo porque tiene reservas activas asociadas.',
+                ], 422);
+            }
+
+            DB::beginTransaction();
+
+            $vehiculo->update([
+                'estado' => VehiculoEstadoEnum::FUERA_SERVICIO->value,
+            ]);
+
+            DB::commit();
+
+            return response()->json([
+                'status'  => 'success',
+                'message' => 'Vehiculo puesto fuera de servicio correctamente.',
+                'data'    => $vehiculo,
+            ], 200);
+        } catch (\Exception $e) {
+            DB::rollBack();
+
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Error interno del servidor.',
+            ], 500);
+        }
     }
 }
