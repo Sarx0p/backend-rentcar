@@ -64,10 +64,9 @@ Route::prefix('admin')->group(function () {
         Route::get('clientes/{id}/licencia-vigente', [ClienteController::class, 'licenciaVigente']);
 
         Route::apiResource('reservas', ReservaController::class)->except(['destroy']);
+
         Route::get('vehiculos/disponibles', [VehiculoController::class, 'index']);
-        Route::get('vehiculos', [VehiculoController::class, 'index']);
-        Route::get('vehiculos/{id}', [VehiculoController::class, 'show']);
-        Route::post('vehiculos', [VehiculoController::class, 'store']);
+        Route::apiResource('vehiculos', VehiculoController::class);
 
         Route::get('contratos/{id}/pdf', [ContratoController::class, 'generarPdf']);
         Route::apiResource('contratos', ContratoController::class)->only(['index', 'show', 'store']);
