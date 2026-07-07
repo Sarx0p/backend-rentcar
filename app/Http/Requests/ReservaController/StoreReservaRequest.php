@@ -33,7 +33,7 @@ class StoreReservaRequest extends FormRequest
             'fecha_fin'    => 'required|date|after:fecha_inicio',
         ];
 
-        // Regla dinámica según el tipo de reserva
+        
         if ($this->input('tipo_reserva') === TipoReservaEnum::ANTISIPADA->value) {
             $rules['fecha_inicio'] .= '|after_or_equal:tomorrow';
         } else {
@@ -70,7 +70,7 @@ class StoreReservaRequest extends FormRequest
         ], 403));
     }
 
-   
+
     protected function failedValidation(Validator $validator)
     {
         throw new HttpResponseException(response()->json([

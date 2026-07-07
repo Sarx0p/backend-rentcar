@@ -78,7 +78,7 @@ class ReservaController extends Controller
     public function store(StoreReservaRequest $request)
     {
         try {
-            // authorize() y rules() ya se resolvieron automáticamente antes de llegar aquí
+            // authorize() y rules() ya se resolvieron automáticamente 
             $userAuth = auth('api')->user();
 
             $cliente = Cliente::findOrFail($request->cliente_id);
@@ -187,7 +187,6 @@ class ReservaController extends Controller
                     'message' => 'No tienes permiso para ver esta reserva',
                 ], 403);
             }
-
             $reserva = Reserva::with([
                 'cliente:id,nombre,dui,telefono,numero_licencia,vencimiento_licencia',
                 'vehiculo:id,placa,color,anio,estado,modelo_id,categoria_id',
@@ -232,11 +231,9 @@ class ReservaController extends Controller
                     'message' => 'Solo se pueden modificar reservas en estado PENDIENTE',
                 ], 422);
             }
-
             if ($request->has('fecha_inicio') || $request->has('fecha_fin')) {
                 $inicioEvaluar = $request->fecha_inicio ?? $reserva->fecha_inicio;
                 $finEvaluar = $request->fecha_fin ?? $reserva->fecha_fin;
-
                 $traslapada = Reserva::where('vehiculo_id', $reserva->vehiculo_id)
                     ->where('id', '!=', $id)
                     ->whereNotIn('estado', [EstadoReservaEnum::CANCELADA->value])

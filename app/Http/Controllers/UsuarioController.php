@@ -5,16 +5,15 @@ namespace App\Http\Controllers;
 use App\Models\User;
 use App\Enums\RolEnum;
 use App\Enums\UsuarioEstadoEnum;
+use App\Http\Requests\UsuarioController\StoreUsuarioRequest;
+use App\Http\Requests\UsuarioController\UpdateUsuarioRequest;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Validator;
-use Illuminate\Validation\Rule;
 
 class UsuarioController extends Controller
 {
-
     public function index(Request $request)
     {
         try {
@@ -65,32 +64,10 @@ class UsuarioController extends Controller
         }
     }
 
-    public function store(Request $request)
+    public function store(StoreUsuarioRequest $request)
     {
         try {
-            if ($request->filled('rol')) {
-                $request->merge(['rol' => strtoupper($request->rol)]);
-            }
-
-            $validator = Validator::make($request->all(), [
-                'nombre'   => 'required|string|max:100',
-                'apellido' => 'required|string|max:100',
-                'correo'   => 'required|email|max:150|unique:users,correo',
-                'password' => 'required|string|min:8|max:255',
-                'rol'      => ['required', Rule::enum(RolEnum::class)],
-            ], [
-                'password.min'  => 'La contraseña debe tener al menos 8 caracteres.',
-                'correo.unique' => 'Ya existe un usuario con ese correo electrónico.',
-            ]);
-
-            if ($validator->fails()) {
-                return response()->json([
-                    'status'  => 'error',
-                    'message' => 'Error de validación.',
-                    'errors'  => $validator->errors(),
-                ], 422);
-            }
-
+           
             $rolEnum = RolEnum::tryFrom($request->rol);
 
             if ($rolEnum === RolEnum::ADMINISTRADOR) {
@@ -129,7 +106,6 @@ class UsuarioController extends Controller
         }
     }
 
-
     public function show(string $id)
     {
         try {
@@ -152,44 +128,11 @@ class UsuarioController extends Controller
         }
     }
 
-    public function update(Request $request, string $id)
+    public function update(UpdateUsuarioRequest $request, string $id)
     {
         try {
-            if ($request->filled('rol')) {
-                $request->merge(['rol' => strtoupper($request->rol)]);
-            }
-
-            if ($request->filled('estado')) {
-                $request->merge(['estado' => strtoupper($request->estado)]);
-            }
-
-            $validator = Validator::make($request->all(), [
-                'nombre'   => 'sometimes|string|max:100',
-                'apellido' => 'sometimes|string|max:100',
-                'correo'   => [
-                    'sometimes',
-                    'email',
-                    'max:150',
-                    Rule::unique('users', 'correo')->ignore($id),
-                ],
-                'password' => 'sometimes|string|min:8|max:255',
-                'estado'   => ['sometimes', Rule::enum(UsuarioEstadoEnum::class)],
-                'rol'      => ['sometimes', Rule::enum(RolEnum::class)],
-            ], [
-                'password.min'  => 'La contraseña debe tener al menos 8 caracteres.',
-                'correo.unique' => 'Ese correo ya está en uso por otro usuario.',
-            ]);
-
-            if ($validator->fails()) {
-                return response()->json([
-                    'status'  => 'error',
-                    'message' => 'Error de validación.',
-                    'errors'  => $validator->errors(),
-                ], 422);
-            }
-
+          
             $usuario = User::with('roles')->findOrFail($id);
-
 
             if ($request->filled('rol')) {
                 $rolEnum = RolEnum::tryFrom($request->rol);
@@ -204,7 +147,6 @@ class UsuarioController extends Controller
                 $usuario->syncRoles([$rolEnum->value]);
             }
 
-
             if ($request->filled('estado') && auth('api')->id() === $usuario->id) {
                 return response()->json([
                     'status'  => 'error',
@@ -212,11 +154,12 @@ class UsuarioController extends Controller
                 ], 403);
             }
 
-            if ($request->filled('nombre'))   $usuario->nombre   = $request->nombre;
-            if ($request->filled('apellido')) $usuario->apellido = $request->apellido;
-            if ($request->filled('correo'))   $usuario->correo   = $request->correo;
-            if ($request->filled('estado'))   $usuario->estado   = $request->estado;
-            if ($request->filled('password')) $usuario->password = Hash::make($request->password);
+            // Reemplaze los 5 `if` por una sola asignación masiva haciendo la exepcion de el rol y el password 
+            $usuario->fill($request->safe()->except(['password', 'rol']));
+
+            if ($request->filled('password')) {
+                $usuario->password = Hash::make($request->password);
+            }
 
             $usuario->save();
 
@@ -238,7 +181,6 @@ class UsuarioController extends Controller
         }
     }
 
-
     public function destroy(Request $request, string $id)
     {
         try {
@@ -251,10 +193,8 @@ class UsuarioController extends Controller
                 ], 403);
             }
 
-
             $nuevoEstado = strtoupper($request->get('estado', 'INACTIVO'));
 
-         
             if (!UsuarioEstadoEnum::tryFrom($nuevoEstado)) {
                 return response()->json([
                     'status'  => 'error',

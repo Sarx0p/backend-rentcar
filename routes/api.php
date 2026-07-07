@@ -20,6 +20,7 @@ use App\Http\Controllers\IncidenciaController;
 use App\Http\Controllers\CancelarController;
 use App\Http\Controllers\PropietarioController;
 use App\Http\Controllers\ReporteController;
+use App\Http\Controllers\SeguroController;
 
 Route::get('/marcas', [MarcaController::class, 'index']);
 
@@ -62,21 +63,18 @@ Route::prefix('admin')->group(function () {
     Route::middleware(['auth:api', 'role:ADMINISTRADOR|EMPLEADO'])->group(function () {
         Route::apiResource('clientes', ClienteController::class);
         Route::get('clientes/{id}/licencia-vigente', [ClienteController::class, 'licenciaVigente']);
-
         Route::apiResource('reservas', ReservaController::class)->except(['destroy']);
-
         Route::get('vehiculos/disponibles', [VehiculoController::class, 'index']);
         Route::apiResource('vehiculos', VehiculoController::class);
-
         Route::get('contratos/{id}/pdf', [ContratoController::class, 'generarPdf']);
         Route::apiResource('contratos', ContratoController::class)->only(['index', 'show', 'store']);
-
         Route::apiResource('pagos', PagoController::class)->only(['index', 'show', 'store']);
         Route::apiResource('cargos-adicionales', CargoAdicionalController::class)->only(['index', 'show', 'store']);
         Route::apiResource('incidencias', IncidenciaController::class)->only(['index', 'show', 'store']);
         Route::apiResource('cierres-renta', CierreRentaController::class)->only(['index', 'show', 'store']);
         Route::apiResource('cancelaciones', CancelarController::class)->only(['index', 'show', 'store']);
         Route::apiResource('propietarios', PropietarioController::class);
+        Route::apiResource('seguros', SeguroController::class);
 
         Route::prefix('reportes')->group(function () {
             Route::get('ingresos', [ReporteController::class, 'ingresos']);

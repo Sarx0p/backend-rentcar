@@ -5,14 +5,13 @@ namespace App\Http\Controllers;
 use App\Enums\EstadoContratoEnum;
 use App\Enums\EstadoPagoEnum;
 use App\Enums\EstadoTransaccionEnum;
-use App\Enums\MetodoPagoEnum;
 use App\Enums\RolEnum;
+use App\Http\Requests\PagoController\StorePagoRequest;
 use App\Models\Contrato;
 use App\Models\Pago;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Nette\Schema\ValidationException;
 
 class PagoController extends Controller
 {
@@ -72,27 +71,9 @@ class PagoController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(Request $request)
+    public function store(StorePagoRequest $request)
     {
         try {
-            $userAuth = auth('api')->user();
-
-            if (
-                !$userAuth->hasRole(RolEnum::ADMINISTRADOR->value) &&
-                !$userAuth->hasRole(RolEnum::EMPLEADO->value)
-            ) {
-                return response()->json([
-                    'status'  => 'error',
-                    'message' => 'No tienes permiso para registrar pagos',
-                ], 403);
-            }
-
-            $request->validate([
-                'contrato_id' => 'required|exists:contratos,id',
-                'monto'       => 'required|numeric|min:0.01',
-                'metodo_pago' => 'required|in:' . implode(',', array_column(MetodoPagoEnum::cases(), 'value')),
-                'fecha_pago'  => 'required|date',
-            ]);
 
             $contrato = Contrato::findOrFail($request->contrato_id);
 
@@ -120,7 +101,6 @@ class PagoController extends Controller
                     'fecha_pago'         => $request->fecha_pago,
                 ]);
 
-
                 $totalPagado = $contrato->pagos()
                     ->where('estado_transaccion', EstadoTransaccionEnum::CONFIRMADO->value)
                     ->sum('monto');
@@ -133,26 +113,19 @@ class PagoController extends Controller
 
                 return $pago;
             });
-
+            
             $pago->load('contrato:id,numero_contrato,monto_total_renta,estado_pago');
-
             return response()->json([
                 'status'  => 'success',
                 'message' => 'Pago registrado con éxito',
                 'data'    => $pago,
             ], 201);
-        } catch (ModelNotFoundException ) {
+        } catch (ModelNotFoundException) {
             return response()->json([
                 'status'  => 'error',
                 'message' => 'Contrato no encontrado',
             ], 404);
-        } catch (ValidationException ) {
-            return response()->json([
-                'status'  => 'error',
-                'message' => 'Error de validación',
-
-            ], 422);
-        } catch (\Exception ) {
+        } catch (\Exception) {
             return response()->json([
                 'status'  => 'error',
                 'message' => 'Error interno del servidor',
