@@ -4,12 +4,12 @@ namespace App\Http\Controllers;
 
 use App\Enums\EstadoPropietarioEnum;
 use App\Enums\RolEnum;
-use App\Enums\TipoPropietarioEnum;
+use App\Http\Requests\PropietarioController\StorePropietarioRequest;
+use App\Http\Requests\PropietarioController\UpdatePropietarioRequest;
 use App\Models\Propietario;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\ValidationException;
 
 class PropietarioController extends Controller
 {
@@ -51,27 +51,14 @@ class PropietarioController extends Controller
             ], 500);
         }
     }
+
     /**
      * Store a newly created resource in storage.
      */
-    public function store(Request $request)
+    public function store(StorePropietarioRequest $request)
     {
         try {
-            $userAuth = auth('api')->user();
-
-            if (!$userAuth->hasRole(RolEnum::ADMINISTRADOR->value)) {
-                return response()->json([
-                    'status'  => 'error',
-                    'message' => 'No tienes permiso para registrar propietarios',
-                ], 403);
-            }
-
-            $request->validate([
-                'nombre'           => 'required|string|max:100',
-                'telefono'         => 'required|string|max:25',
-                'tipo_propietario' => 'required|in:' . implode(',', array_column(TipoPropietarioEnum::cases(), 'value')),
-            ]);
-
+           
             $propietario = DB::transaction(function () use ($request) {
                 return Propietario::create([
                     'nombre'           => $request->nombre,
@@ -86,12 +73,6 @@ class PropietarioController extends Controller
                 'message' => 'Propietario registrado correctamente',
                 'data'    => $propietario,
             ], 201);
-        } catch (ValidationException $e) {
-            return response()->json([
-                'status'  => 'error',
-                'message' => 'Error de validación',
-
-            ], 422);
         } catch (\Exception $e) {
             return response()->json([
                 'status'  => 'error',
@@ -140,25 +121,11 @@ class PropietarioController extends Controller
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, string $id)
+    public function update(UpdatePropietarioRequest $request, string $id)
     {
         try {
-            $userAuth = auth('api')->user();
-
-            if (!$userAuth->hasRole(RolEnum::ADMINISTRADOR->value)) {
-                return response()->json([
-                    'status'  => 'error',
-                    'message' => 'No tienes permiso para actualizar propietarios',
-                ], 403);
-            }
-
+           
             $propietario = Propietario::findOrFail($id);
-
-            $request->validate([
-                'nombre'           => 'sometimes|string|max:100',
-                'telefono'         => 'sometimes|string|max:25',
-                'tipo_propietario' => 'sometimes|in:' . implode(',', array_column(TipoPropietarioEnum::cases(), 'value')),
-            ]);
 
             $propietario->update($request->only(['nombre', 'telefono', 'tipo_propietario']));
 
@@ -172,12 +139,6 @@ class PropietarioController extends Controller
                 'status'  => 'error',
                 'message' => 'Propietario no encontrado',
             ], 404);
-        } catch (ValidationException $e) {
-            return response()->json([
-                'status'  => 'error',
-                'message' => 'Error de validación',
-
-            ], 422);
         } catch (\Exception $e) {
             return response()->json([
                 'status'  => 'error',
