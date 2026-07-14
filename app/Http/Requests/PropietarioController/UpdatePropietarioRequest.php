@@ -5,6 +5,7 @@ namespace App\Http\Requests\PropietarioController;
 use App\Enums\RolEnum;
 use App\Enums\TipoPropietarioEnum;
 use App\Models\Propietario;
+use Illuminate\Validation\Rule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Http\Exceptions\HttpResponseException;
@@ -15,19 +16,20 @@ class UpdatePropietarioRequest extends FormRequest
     {
         $user = auth('api')->user();
 
-        return $user->hasRole(RolEnum::ADMINISTRADOR->value)||$user->hasRole(RolEnum::EMPLEADO->value);
+        return $user->hasRole(RolEnum::ADMINISTRADOR->value);
     }
 
     public function rules(): array
     {
+        $id = $this->route('propietario');
+
         return [
             'nombre'           => 'sometimes|string|max:100',
-            'telefono'         => 'sometimes|string|max:25',
+            'telefono'         => ['sometimes', 'string', 'max:25', Rule::unique('propietarios', 'telefono')->ignore($id)],
             'tipo_propietario' => 'sometimes|in:' . implode(',', array_column(TipoPropietarioEnum::cases(), 'value')),
         ];
     }
-
-   
+    
     public function withValidator(Validator $validator): void
     {
         $validator->after(function ($validator) {
@@ -53,6 +55,7 @@ class UpdatePropietarioRequest extends FormRequest
     public function messages(): array
     {
         return [
+            'telefono.unique'     => 'Ya existe otro propietario registrado con ese número de teléfono.',
             'tipo_propietario.in' => 'El tipo de propietario no es válido.',
         ];
     }
