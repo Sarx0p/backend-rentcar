@@ -14,12 +14,10 @@ class Reserva extends Model
         'fecha_solicitud',
         'fecha_inicio',
         'fecha_fin',
-        'tipo_reserva',
         'estado',
         'cliente_id',
         'vehiculo_id',
         'usuario_id',
-       
     ];
 
     protected $hidden = [

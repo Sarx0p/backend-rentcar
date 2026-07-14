@@ -26,29 +26,29 @@
     <div class="campo-row">
         <div class="campo" style="width:100%">
             <span class="campo-label">Nombre: </span>
-            <span class="campo-valor" style="min-width:400px">{{ $contrato->reserva->cliente->nombre }}</span>
+            <span class="campo-valor" style="min-width:400px">{{ $contrato->cliente->nombre }}</span>
         </div>
     </div>
 
     <div class="campo-row">
         <div class="campo" style="width:40%">
             <span class="campo-label">Número de DUI: </span>
-            <span class="campo-valor">{{ $contrato->reserva->cliente->dui }}</span>
+            <span class="campo-valor">{{ $contrato->cliente->dui }}</span>
         </div>
         <div class="campo" style="width:60%">
             <span class="campo-label">Número de licencia: </span>
-            <span class="campo-valor">{{ $contrato->reserva->cliente->numero_licencia }}</span>
+            <span class="campo-valor">{{ $contrato->cliente->numero_licencia }}</span>
         </div>
     </div>
 
     <div class="campo-row">
         <div class="campo" style="width:40%">
             <span class="campo-label">Departamento: </span>
-            <span class="campo-valor">{{ $contrato->reserva->cliente->departamento }}</span>
+            <span class="campo-valor">{{ $contrato->cliente->departamento }}</span>
         </div>
         <div class="campo" style="width:60%">
             <span class="campo-label">Municipio: </span>
-            <span class="campo-valor">{{ $contrato->reserva->cliente->municipio }}</span>
+            <span class="campo-valor">{{ $contrato->cliente->municipio }}</span>
         </div>
     </div>
 
@@ -58,30 +58,30 @@
     <div class="campo-row">
         <div class="campo" style="width:33%">
             <span class="campo-label">Marca: </span>
-            <span class="campo-valor">{{ $contrato->reserva->vehiculo->modelo->marca->nombre }}</span>
+            <span class="campo-valor">{{ $contrato->vehiculo->modelo->marca->nombre }}</span>
         </div>
         <div class="campo" style="width:33%">
             <span class="campo-label">Tipo: </span>
-            <span class="campo-valor">{{ $contrato->reserva->vehiculo->categoria->nombre }}</span>
+            <span class="campo-valor">{{ $contrato->vehiculo->categoria->nombre }}</span>
         </div>
         <div class="campo" style="width:33%">
             <span class="campo-label">Placa: </span>
-            <span class="campo-valor">{{ $contrato->reserva->vehiculo->placa }}</span>
+            <span class="campo-valor">{{ $contrato->vehiculo->placa }}</span>
         </div>
     </div>
 
     <div class="campo-row">
         <div class="campo" style="width:33%">
             <span class="campo-label">Color: </span>
-            <span class="campo-valor">{{ $contrato->reserva->vehiculo->color }}</span>
+            <span class="campo-valor">{{ $contrato->vehiculo->color }}</span>
         </div>
         <div class="campo" style="width:33%">
             <span class="campo-label">Modelo: </span>
-            <span class="campo-valor">{{ $contrato->reserva->vehiculo->modelo->nombre }}</span>
+            <span class="campo-valor">{{ $contrato->vehiculo->modelo->nombre }}</span>
         </div>
         <div class="campo" style="width:33%">
             <span class="campo-label">Año: </span>
-            <span class="campo-valor">{{ $contrato->reserva->vehiculo->anio }}</span>
+            <span class="campo-valor">{{ $contrato->vehiculo->anio }}</span>
         </div>
     </div>
 
@@ -168,7 +168,7 @@
     <div class="firma-col">
         <div style="text-align:center; margin-bottom: 8px;">NOMBRE DEL CLIENTE</div>
         <div style="text-align:center; font-weight: bold; margin-bottom: 4px;">
-            {{ $contrato->reserva->cliente->nombre }}
+            {{ $contrato->cliente->nombre }}
         </div>
         <div style="border-top: 1px solid #000;"></div>
 

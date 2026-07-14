@@ -15,14 +15,14 @@ class StorePropietarioRequest extends FormRequest
     {
         $user = auth('api')->user();
 
-        return $user->hasRole(RolEnum::ADMINISTRADOR->value)||$user->hasRole(RolEnum::EMPLEADO->value);
+        return $user->hasRole(RolEnum::ADMINISTRADOR->value);
     }
 
     public function rules(): array
     {
         return [
             'nombre'           => 'required|string|max:100',
-            'telefono'         => 'required|string|max:25',
+            'telefono'         => 'required|string|max:25|unique:propietarios,telefono',
             'tipo_propietario' => 'required|in:' . implode(',', array_column(TipoPropietarioEnum::cases(), 'value')),
         ];
     }
@@ -53,6 +53,7 @@ class StorePropietarioRequest extends FormRequest
         return [
             'nombre.required'           => 'El nombre es obligatorio.',
             'telefono.required'         => 'El teléfono es obligatorio.',
+            'telefono.unique'           => 'Ya existe un propietario registrado con ese número de teléfono.',
             'tipo_propietario.required' => 'El tipo de propietario es obligatorio.',
             'tipo_propietario.in'       => 'El tipo de propietario no es válido.',
         ];

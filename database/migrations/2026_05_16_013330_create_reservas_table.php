@@ -16,7 +16,6 @@ return new class extends Migration
             $table->dateTime('fecha_solicitud');
             $table->date('fecha_inicio');
             $table->date('fecha_fin');
-            $table->string('tipo_reserva', 50);
             $table->string('estado', 30);
             $table->foreignId('cliente_id')->constrained('clientes');
             $table->foreignId('vehiculo_id')->constrained('vehiculos');

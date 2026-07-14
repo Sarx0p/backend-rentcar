@@ -13,6 +13,9 @@ class Contrato extends Model
 
     protected $fillable = [
         'numero_contrato',
+        'cliente_id',
+        'vehiculo_id',
+        'reserva_id',
         'fecha_hora_entrega',
         'fecha_hora_devolucion',
         'dias_acordados',
@@ -24,7 +27,6 @@ class Contrato extends Model
         'estado_contrato',
         'estado_pago',
         'observaciones',
-        'reserva_id',
         'usuario_id',
     ];
 
@@ -42,10 +44,21 @@ class Contrato extends Model
         'monto_total_renta'     => 'decimal:2',
     ];
 
+    public function cliente(): BelongsTo
+    {
+        return $this->belongsTo(Cliente::class, 'cliente_id');
+    }
+
+    public function vehiculo(): BelongsTo
+    {
+        return $this->belongsTo(Vehiculo::class, 'vehiculo_id');
+    }
+
     public function reserva(): BelongsTo
     {
         return $this->belongsTo(Reserva::class, 'reserva_id');
     }
+
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class, 'usuario_id');

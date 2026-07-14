@@ -15,6 +15,17 @@ class SeguroController extends Controller
     public function index()
     {
         try {
+            $userAuth = auth('api')->user();
+
+            if (
+                !$userAuth->hasRole(RolEnum::ADMINISTRADOR->value) &&
+                !$userAuth->hasRole(RolEnum::EMPLEADO->value)
+            ) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'No tienes permiso para ver las reservas',
+                ], 403);
+            }
             $seguros = Seguro::with(['vehiculo.propietario'])
                 ->where('estado', SeguroEstadoEnum::VIGENTE->value)
                 ->orderBy('fecha_vencimiento', 'asc')
@@ -97,6 +108,17 @@ class SeguroController extends Controller
     public function show(string $id)
     {
         try {
+            $userAuth = auth('api')->user();
+
+            if (
+                !$userAuth->hasRole(RolEnum::ADMINISTRADOR->value) &&
+                !$userAuth->hasRole(RolEnum::EMPLEADO->value)
+            ) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'No tienes permiso para ver las reservas',
+                ], 403);
+            }
             $seguro = Seguro::with(['vehiculo.propietario'])->find($id);
 
             if (!$seguro) {

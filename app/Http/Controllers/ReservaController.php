@@ -5,17 +5,14 @@ namespace App\Http\Controllers;
 use App\Enums\RolEnum;
 use App\Enums\VehiculoEstadoEnum;
 use App\Enums\EstadoReservaEnum;
-use App\Enums\TipoReservaEnum;
 use App\Http\Requests\ReservaController\StoreReservaRequest;
 use App\Http\Requests\ReservaController\UpdateReservaRequest;
 use App\Models\Reserva;
 use App\Models\Vehiculo;
 use App\Models\Cliente;
-use App\Models\Cancelacion;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\ValidationException;
 
 class ReservaController extends Controller
 {
@@ -46,8 +43,7 @@ class ReservaController extends Controller
                 'user:id,nombre,apellido',
             ])
                 ->when($request->search, function ($query, $search) {
-                    $query->where('tipo_reserva', 'like', '%' . $search . '%')
-                        ->orWhere('estado', 'like', '%' . $search . '%')
+                    $query->where('estado', 'like', '%' . $search . '%')
                         ->orWhereHas('cliente', function ($q) use ($search) {
                             $q->where('nombre', 'like', '%' . $search . '%')
                                 ->orWhere('dui', 'like', '%' . $search . '%');
@@ -67,7 +63,6 @@ class ReservaController extends Controller
             return response()->json([
                 'status'  => 'error',
                 'message' => 'Error interno del servidor',
-
             ], 500);
         }
     }
@@ -78,7 +73,7 @@ class ReservaController extends Controller
     public function store(StoreReservaRequest $request)
     {
         try {
-            // authorize() y rules() ya se resolvieron automáticamente 
+            // authorize() y rules() ya se resolvieron automáticamente
             $userAuth = auth('api')->user();
 
             $cliente = Cliente::findOrFail($request->cliente_id);
@@ -127,7 +122,6 @@ class ReservaController extends Controller
                     'fecha_solicitud' => now(),
                     'fecha_inicio'    => $request->fecha_inicio,
                     'fecha_fin'       => $request->fecha_fin,
-                    'tipo_reserva'    => $request->tipo_reserva,
                     'estado'          => EstadoReservaEnum::PENDIENTE->value,
                     'cliente_id'      => $request->cliente_id,
                     'vehiculo_id'     => $request->vehiculo_id,
@@ -187,6 +181,7 @@ class ReservaController extends Controller
                     'message' => 'No tienes permiso para ver esta reserva',
                 ], 403);
             }
+
             $reserva = Reserva::with([
                 'cliente:id,nombre,dui,telefono,numero_licencia,vencimiento_licencia',
                 'vehiculo:id,placa,color,anio,estado,modelo_id,categoria_id',
@@ -211,7 +206,6 @@ class ReservaController extends Controller
             return response()->json([
                 'status'  => 'error',
                 'message' => 'Error interno del servidor',
-
             ], 500);
         }
     }
@@ -222,7 +216,6 @@ class ReservaController extends Controller
     public function update(UpdateReservaRequest $request, string $id)
     {
         try {
-
             $reserva = Reserva::findOrFail($id);
 
             if ($reserva->estado !== EstadoReservaEnum::PENDIENTE->value) {
@@ -231,9 +224,11 @@ class ReservaController extends Controller
                     'message' => 'Solo se pueden modificar reservas en estado PENDIENTE',
                 ], 422);
             }
+
             if ($request->has('fecha_inicio') || $request->has('fecha_fin')) {
                 $inicioEvaluar = $request->fecha_inicio ?? $reserva->fecha_inicio;
                 $finEvaluar = $request->fecha_fin ?? $reserva->fecha_fin;
+
                 $traslapada = Reserva::where('vehiculo_id', $reserva->vehiculo_id)
                     ->where('id', '!=', $id)
                     ->whereNotIn('estado', [EstadoReservaEnum::CANCELADA->value])
@@ -250,7 +245,7 @@ class ReservaController extends Controller
                 }
             }
 
-            $reserva->update($request->only(['fecha_inicio', 'fecha_fin', 'tipo_reserva']));
+            $reserva->update($request->only(['fecha_inicio', 'fecha_fin']));
 
             return response()->json([
                 'status'  => 'success',
@@ -280,5 +275,4 @@ class ReservaController extends Controller
     {
         //
     }
-    // se optimiso y se hiso el controller enves de dejarlo como funcion
 }

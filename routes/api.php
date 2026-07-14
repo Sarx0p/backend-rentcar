@@ -67,6 +67,7 @@ Route::prefix('admin')->group(function () {
         Route::get('vehiculos/disponibles', [VehiculoController::class, 'index']);
         Route::apiResource('vehiculos', VehiculoController::class);
         Route::get('contratos/{id}/pdf', [ContratoController::class, 'generarPdf']);
+        Route::post('contratos/directo', [ContratoController::class, 'storeDirecto']);
         Route::apiResource('contratos', ContratoController::class)->only(['index', 'show', 'store']);
         Route::apiResource('pagos', PagoController::class)->only(['index', 'show', 'store']);
         Route::apiResource('cargos-adicionales', CargoAdicionalController::class)->only(['index', 'show', 'store']);

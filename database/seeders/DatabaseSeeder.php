@@ -23,6 +23,8 @@ class DatabaseSeeder extends Seeder
             'correo'   => 'test@gmail.com',
             'password' => bcrypt('12345678'),
             'estado'   => 'ACTIVO',
-        ])->assignRole('ADMINISTRADOR');  
+        ])->assignRole('ADMINISTRADOR');
+
+        
     }
 }
