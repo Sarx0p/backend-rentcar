@@ -84,8 +84,6 @@ class Contrato extends Model
         return $this->hasMany(Incidencia::class, 'contrato_id');
     }
 
-    public function historiales(): HasMany
-    {
-        return $this->hasMany(HistorialCliente::class, 'contrato_id');
-    }
+
+    
 }

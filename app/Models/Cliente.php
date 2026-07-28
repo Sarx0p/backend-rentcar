@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Cliente extends Model
 {
@@ -16,8 +17,7 @@ class Cliente extends Model
         'numero_licencia',
         'vencimiento_licencia',
         'telefono',
-        'departamento',
-        'municipio',
+        'municipio_id',
     ];
 
     protected $hidden = [
@@ -34,8 +34,10 @@ class Cliente extends Model
     {
         return $this->hasMany(Reserva::class, 'cliente_id');
     }
-    public function historiales(): HasMany
+
+    public function municipio(): BelongsTo
     {
-        return $this->hasMany(HistorialCliente::class, 'cliente_id');
+        return $this->belongsTo(Municipio::class, 'municipio_id');
     }
+    //se quito con redundancia
 }

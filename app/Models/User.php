@@ -49,11 +49,7 @@ class User extends Authenticatable implements JWTSubject
         return [];
     }
 
-    public function historialesCliente(): HasMany
-    {
-        return $this->hasMany(HistorialCliente::class, 'usuario_id');
-    }
-
+    //se quito por la redundansia
     public function cancelaciones(): HasMany
     {
         return $this->hasMany(Cancelacion::class, 'usuario_id');
@@ -62,5 +58,9 @@ class User extends Authenticatable implements JWTSubject
     public function reservas(): HasMany
     {
         return $this->hasMany(Reserva::class, 'usuario_id');
+    }
+    public function incidencias(): HasMany
+    {
+        return $this->hasMany(Incidencia::class, 'usuario_id');
     }
 }

@@ -13,13 +13,18 @@ return new class extends Migration
     {
         Schema::create('incidencias', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('contrato_id')->constrained('contratos');
+            $table->foreignId('vehiculo_id')->constrained('vehiculos');
+            $table->foreignId('contrato_id')->nullable()->constrained('contratos');
+            $table->foreignId('usuario_id')->constrained('users');
+
             $table->string('tipo_incidencia', 50);
-            $table->text('descripcion')->nullable();
-            $table->decimal('costo', 8, 2);
-            $table->date('fecha');
             $table->string('responsable_tipo', 50);
             $table->string('estado_incidencia', 30);
+
+            $table->string('descripcion', 500)->nullable();
+            $table->date('fecha');
+            $table->decimal('costo', 8, 2)->nullable();
+
             $table->timestamps();
         });
     }

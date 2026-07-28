@@ -66,4 +66,8 @@ class Vehiculo extends Model
     {
         return $this->hasMany(Contrato::class, 'vehiculo_id');
     }
+    public function incidencias(): HasMany
+    {
+        return $this->hasMany(Incidencia::class, 'vehiculo_id');
+    }
 }

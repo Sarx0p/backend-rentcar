@@ -18,6 +18,7 @@ use App\Http\Controllers\CargoAdicionalController;
 use App\Http\Controllers\CierreRentaController;
 use App\Http\Controllers\IncidenciaController;
 use App\Http\Controllers\CancelarController;
+use App\Http\Controllers\DepartamentoController;
 use App\Http\Controllers\PropietarioController;
 use App\Http\Controllers\ReporteController;
 use App\Http\Controllers\SeguroController;
@@ -51,7 +52,6 @@ Route::prefix('auth')->group(function () {
         Route::post('logout',  [AuthController::class, 'logout']);
         Route::post('refresh', [AuthController::class, 'refresh']);
     });
-
 });
 
 Route::prefix('admin')->group(function () {
@@ -71,11 +71,13 @@ Route::prefix('admin')->group(function () {
         Route::apiResource('contratos', ContratoController::class)->only(['index', 'show', 'store']);
         Route::apiResource('pagos', PagoController::class)->only(['index', 'show', 'store']);
         Route::apiResource('cargos-adicionales', CargoAdicionalController::class)->only(['index', 'show', 'store']);
-        Route::apiResource('incidencias', IncidenciaController::class)->only(['index', 'show', 'store']);
+        Route::apiResource('incidencias', IncidenciaController::class)->only(['index', 'show', 'store', 'update', 'destroy']);
         Route::apiResource('cierres-renta', CierreRentaController::class)->only(['index', 'show', 'store']);
         Route::apiResource('cancelaciones', CancelarController::class)->only(['index', 'show', 'store']);
         Route::apiResource('propietarios', PropietarioController::class);
         Route::apiResource('seguros', SeguroController::class);
+        Route::get('/departamentos', [DepartamentoController::class, 'index']);
+        Route::get('/departamentos/{departamentoId}/municipios', [DepartamentoController::class, 'porDepartamento']);
 
         Route::prefix('reportes')->group(function () {
             Route::get('ingresos', [ReporteController::class, 'ingresos']);
@@ -83,9 +85,7 @@ Route::prefix('admin')->group(function () {
             Route::get('licencias-por-vencer', [ReporteController::class, 'licenciasPorVencer']);
             Route::get('reservas-canceladas', [ReporteController::class, 'reservasCanceladas']);
         });
-
     });
-
 });
 
 Route::middleware('auth:api')->group(function () {
