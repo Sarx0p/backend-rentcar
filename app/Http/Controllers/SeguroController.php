@@ -4,11 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Enums\RolEnum;
 use App\Enums\SeguroEstadoEnum;
+use App\Http\Requests\SeguroController\StoreSeguroRequest;
+use App\Http\Requests\SeguroController\UpdateSeguroRequest;
 use App\Models\Seguro;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\Rule;
-use Illuminate\Validation\ValidationException;
 
 class SeguroController extends Controller
 {
@@ -26,6 +26,7 @@ class SeguroController extends Controller
                     'message' => 'No tienes permiso para ver las reservas',
                 ], 403);
             }
+
             $seguros = Seguro::with(['vehiculo.propietario'])
                 ->where('estado', SeguroEstadoEnum::VIGENTE->value)
                 ->orderBy('fecha_vencimiento', 'asc')
@@ -46,27 +47,9 @@ class SeguroController extends Controller
         }
     }
 
-    public function store(Request $request)
+    public function store(StoreSeguroRequest $request)
     {
         try {
-            $userAuth = auth('api')->user();
-
-            if (!$userAuth->hasRole(RolEnum::ADMINISTRADOR->value)) {
-                return response()->json([
-                    'status'  => 'error',
-                    'message' => 'No tienes permiso para realizar esta acción.',
-                ], 403);
-            }
-
-            $request->validate([
-                'vehiculo_id'       => 'required|integer|exists:vehiculos,id',
-                'aseguradora'       => 'required|string|max:150',
-                'numero_poliza'     => 'required|string|max:50|unique:seguros,numero_poliza',
-                'fecha_inicio'      => 'required|date',
-                'fecha_vencimiento' => 'required|date|after:fecha_inicio',
-                'cobertura'         => 'nullable|string',
-            ]);
-
             DB::beginTransaction();
 
             $seguro = Seguro::create([
@@ -88,13 +71,6 @@ class SeguroController extends Controller
                 'message' => 'Seguro registrado correctamente.',
                 'data'    => $seguro,
             ], 201);
-        } catch (ValidationException $e) {
-            DB::rollBack();
-
-            return response()->json([
-                'status'  => 'error',
-                'message' => 'Faltan campos requeridos.',
-            ], 422);
         } catch (\Exception $e) {
             DB::rollBack();
 
@@ -119,6 +95,7 @@ class SeguroController extends Controller
                     'message' => 'No tienes permiso para ver las reservas',
                 ], 403);
             }
+
             $seguro = Seguro::with(['vehiculo.propietario'])->find($id);
 
             if (!$seguro) {
@@ -140,18 +117,9 @@ class SeguroController extends Controller
         }
     }
 
-    public function update(Request $request, string $id)
+    public function update(UpdateSeguroRequest $request, string $id)
     {
         try {
-            $userAuth = auth('api')->user();
-
-            if (!$userAuth->hasRole(RolEnum::ADMINISTRADOR->value)) {
-                return response()->json([
-                    'status'  => 'error',
-                    'message' => 'No tienes permiso para realizar esta acción.',
-                ], 403);
-            }
-
             $seguro = Seguro::find($id);
 
             if (!$seguro) {
@@ -167,18 +135,6 @@ class SeguroController extends Controller
                     'message' => 'No se puede editar un seguro cancelado.',
                 ], 409);
             }
-
-            $request->validate([
-                'vehiculo_id'       => 'sometimes|required|integer|exists:vehiculos,id',
-                'aseguradora'       => 'sometimes|required|string|max:150',
-                'numero_poliza'     => [
-                    'sometimes', 'required', 'string', 'max:50',
-                    Rule::unique('seguros', 'numero_poliza')->ignore($seguro->id),
-                ],
-                'fecha_inicio'      => 'sometimes|required|date',
-                'fecha_vencimiento' => 'sometimes|required|date|after:fecha_inicio',
-                'cobertura'         => 'nullable|string',
-            ]);
 
             DB::beginTransaction();
 
@@ -200,13 +156,6 @@ class SeguroController extends Controller
                 'message' => 'Seguro actualizado correctamente.',
                 'data'    => $seguro,
             ], 200);
-        } catch (ValidationException $e) {
-            DB::rollBack();
-
-            return response()->json([
-                'status'  => 'error',
-                'message' => 'Faltan campos requeridos.',
-            ], 422);
         } catch (\Exception $e) {
             DB::rollBack();
 

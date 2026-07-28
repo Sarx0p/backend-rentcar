@@ -39,7 +39,8 @@ class ContratoController extends Controller
             }
 
             $contratos = Contrato::with([
-                'cliente:id,nombre,dui,telefono,departamento,municipio,numero_licencia',
+                'cliente:id,nombre,dui,telefono,municipio_id,numero_licencia',
+                'cliente.municipio.departamento',
                 'vehiculo:id,placa,color,anio,estado,modelo_id,categoria_id',
                 'vehiculo.modelo:id,nombre,marca_id',
                 'vehiculo.modelo.marca:id,nombre',
@@ -131,7 +132,8 @@ class ContratoController extends Controller
             });
 
             $contrato->load([
-                'cliente:id,nombre,dui,telefono,departamento,municipio,numero_licencia',
+                'cliente:id,nombre,dui,telefono,municipio_id,numero_licencia',
+                'cliente.municipio.departamento',
                 'vehiculo:id,placa,color,anio,estado,modelo_id,categoria_id',
                 'vehiculo.modelo:id,nombre,marca_id',
                 'vehiculo.modelo.marca:id,nombre',
@@ -157,6 +159,7 @@ class ContratoController extends Controller
             ], 500);
         }
     }
+
     public function storeDirecto(StoreContratoDirectoRequest $request)
     {
         try {
@@ -211,7 +214,8 @@ class ContratoController extends Controller
             });
 
             $contrato->load([
-                'cliente:id,nombre,dui,telefono,departamento,municipio,numero_licencia',
+                'cliente:id,nombre,dui,telefono,municipio_id,numero_licencia',
+                'cliente.municipio.departamento',
                 'vehiculo:id,placa,color,anio,estado,modelo_id,categoria_id',
                 'vehiculo.modelo:id,nombre,marca_id',
                 'vehiculo.modelo.marca:id,nombre',
@@ -256,7 +260,8 @@ class ContratoController extends Controller
             }
 
             $contrato = Contrato::with([
-                'cliente:id,nombre,dui,telefono,departamento,municipio,numero_licencia',
+                'cliente:id,nombre,dui,telefono,municipio_id,numero_licencia',
+                'cliente.municipio.departamento',
                 'vehiculo:id,placa,color,anio,estado,modelo_id,categoria_id',
                 'vehiculo.modelo:id,nombre,marca_id',
                 'vehiculo.modelo.marca:id,nombre',
@@ -297,11 +302,12 @@ class ContratoController extends Controller
     {
         //
     }
+
     public function generarPdf(string $id)
     {
         try {
             $contrato = Contrato::with([
-                'cliente',
+                'cliente.municipio.departamento',
                 'vehiculo.modelo.marca',
                 'vehiculo.categoria',
                 'user',
@@ -327,6 +333,7 @@ class ContratoController extends Controller
             ], 500);
         }
     }
+
     private function generarNumeroContrato(): string
     {
         $ultimoContrato = Contrato::latest()->first();

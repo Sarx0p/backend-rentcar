@@ -15,6 +15,8 @@ class DatabaseSeeder extends Seeder
     {
         $this->call([
             RolSeeder::class,
+            DepartamentoSeeder::class, 
+            MunicipioSeeder::class,
         ]);
 
         User::factory()->create([
@@ -25,6 +27,6 @@ class DatabaseSeeder extends Seeder
             'estado'   => 'ACTIVO',
         ])->assignRole('ADMINISTRADOR');
 
-        
+
     }
 }

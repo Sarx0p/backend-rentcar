@@ -19,8 +19,7 @@ return new class extends Migration
             $table->string('numero_licencia', 30)->unique();
             $table->date('vencimiento_licencia');
             $table->string('telefono', 25);
-            $table->string('departamento', 50);
-            $table->string('municipio', 50);
+            $table->foreignId('municipio_id')->constrained('municipios');
             $table->timestamps();
         });
     }

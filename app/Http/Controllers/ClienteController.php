@@ -3,10 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Enums\RolEnum;
+use App\Http\Requests\ClienteController\StoreClienteRequest;
+use App\Http\Requests\ClienteController\UpdateClienteRequest;
 use App\Models\Cliente;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
-use Illuminate\Validation\ValidationException;
 
 class ClienteController extends Controller
 {
@@ -28,14 +29,15 @@ class ClienteController extends Controller
                 ], 403);
             }
 
-            $clientes = Cliente::when($request->search, function ($query, $search) {
-                $query->where('nombre', 'like', '%' . $search . '%')
-                      ->orWhere('dui', 'like', '%' . $search . '%')
-                      ->orWhere('numero_licencia', 'like', '%' . $search . '%')
-                      ->orWhere('telefono', 'like', '%' . $search . '%');
-            })
-            ->latest()
-            ->paginate(10);
+            $clientes = Cliente::with('municipio:id,nombre,departamento_id', 'municipio.departamento:id,nombre')
+                ->when($request->search, function ($query, $search) {
+                    $query->where('nombre', 'like', '%' . $search . '%')
+                          ->orWhere('dui', 'like', '%' . $search . '%')
+                          ->orWhere('numero_licencia', 'like', '%' . $search . '%')
+                          ->orWhere('telefono', 'like', '%' . $search . '%');
+                })
+                ->latest()
+                ->paginate(10);
 
             return response()->json([
                 'status' => 'success',
@@ -52,45 +54,19 @@ class ClienteController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(Request $request)
+    public function store(StoreClienteRequest $request)
     {
         try {
-            $userAuth = auth('api')->user();
+            // authorize() y rules() ya se resolvieron automáticamente
+            $cliente = Cliente::create($request->validated());
 
-            if (
-                !$userAuth->hasRole(RolEnum::ADMINISTRADOR->value) &&
-                !$userAuth->hasRole(RolEnum::EMPLEADO->value)
-            ) {
-                return response()->json([
-                    'status'  => 'error',
-                    'message' => 'No tienes permiso para registrar clientes',
-                ], 403);
-            }
-
-            $request->validate([
-                'nombre'               => 'required|string|max:100',
-                'dui'                  => 'required|string|max:20|unique:clientes,dui',
-                'nacimiento_dui'       => 'required|date',
-                'numero_licencia'      => 'required|string|max:30|unique:clientes,numero_licencia',
-                'vencimiento_licencia' => 'required|date|after:today',
-                'telefono'             => 'required|string|max:25',
-                'departamento'         => 'required|string|max:50',
-                'municipio'            => 'required|string|max:50',
-            ]);
-
-            $cliente = Cliente::create($request->all());
+            $cliente->load('municipio:id,nombre,departamento_id', 'municipio.departamento:id,nombre');
 
             return response()->json([
                 'status'  => 'success',
                 'message' => 'Cliente registrado con éxito',
                 'data'    => $cliente,
             ], 201);
-        } catch (ValidationException $e) {
-            return response()->json([
-                'status'  => 'error',
-                'message' => 'Error de validación',
-                'errors'  => $e->errors(),
-            ], 422);
         } catch (\Exception $e) {
             return response()->json([
                 'status'  => 'error',
@@ -118,6 +94,8 @@ class ClienteController extends Controller
             }
 
             $cliente = Cliente::with([
+                'municipio:id,nombre,departamento_id',
+                'municipio.departamento:id,nombre',
                 'reservas' => function ($query) {
                     $query->select('id', 'cliente_id', 'vehiculo_id', 'fecha_inicio', 'fecha_fin', 'estado')
                         ->latest();
@@ -147,35 +125,15 @@ class ClienteController extends Controller
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, string $id)
+    public function update(UpdateClienteRequest $request, string $id)
     {
         try {
-            $userAuth = auth('api')->user();
-
-            if (
-                !$userAuth->hasRole(RolEnum::ADMINISTRADOR->value) &&
-                !$userAuth->hasRole(RolEnum::EMPLEADO->value)
-            ) {
-                return response()->json([
-                    'status'  => 'error',
-                    'message' => 'No tienes permiso para actualizar clientes',
-                ], 403);
-            }
-
+            // authorize() y rules() ya se resolvieron automáticamente
             $cliente = Cliente::findOrFail($id);
 
-            $request->validate([
-                'nombre'               => 'sometimes|string|max:100',
-                'dui'                  => 'sometimes|string|max:20|unique:clientes,dui,' . $id,
-                'nacimiento_dui'       => 'sometimes|date',
-                'numero_licencia'      => 'sometimes|string|max:30|unique:clientes,numero_licencia,' . $id,
-                'vencimiento_licencia' => 'sometimes|date|after:today',
-                'telefono'             => 'sometimes|string|max:25',
-                'departamento'         => 'sometimes|string|max:50',
-                'municipio'            => 'sometimes|string|max:50',
-            ]);
+            $cliente->update($request->validated());
 
-            $cliente->update($request->all());
+            $cliente->load('municipio:id,nombre,departamento_id', 'municipio.departamento:id,nombre');
 
             return response()->json([
                 'status'  => 'success',
@@ -187,11 +145,6 @@ class ClienteController extends Controller
                 'status'  => 'error',
                 'message' => 'Cliente no encontrado',
             ], 404);
-        } catch (ValidationException $e) {
-            return response()->json([
-                'status'  => 'error',
-                'message' => 'Error de validación',
-            ], 422);
         } catch (\Exception $e) {
             return response()->json([
                 'status'  => 'error',
@@ -203,7 +156,11 @@ class ClienteController extends Controller
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(string $id) {}
+    public function destroy(string $id)
+    {
+        //
+    }
+
     public function licenciaVigente(string $id)
     {
         try {

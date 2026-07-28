@@ -3,19 +3,15 @@
 namespace App\Http\Controllers;
 
 use App\Enums\RolEnum;
-use App\Enums\EstadoContratoEnum;
-use App\Enums\CargoAdicionalEstadoEnum;
-use App\Enums\CargoAdicionalTipoEnum;
 use App\Enums\IncidenciaEstadoEnum;
-use App\Enums\TipoIncidenciaEnum;
 use App\Enums\IncidenciaTipoResponsableEnum;
-use App\Models\Contrato;
+use App\Enums\VehiculoEstadoEnum;
+use App\Http\Requests\IncidenciaController\StoreIncidenciaRequest;
+use App\Http\Requests\IncidenciaController\UpdateIncidenciaRequest;
 use App\Models\Incidencia;
-use App\Models\CargoAdicional;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\ValidationException;
 
 class IncidenciaController extends Controller
 {
@@ -27,7 +23,6 @@ class IncidenciaController extends Controller
         try {
             $userAuth = auth('api')->user();
 
-
             if (
                 !$userAuth->hasRole(RolEnum::ADMINISTRADOR->value) &&
                 !$userAuth->hasRole(RolEnum::EMPLEADO->value)
@@ -38,35 +33,37 @@ class IncidenciaController extends Controller
                 ], 403);
             }
 
-
             $incidencias = Incidencia::with([
-                'contrato:id,numero_contrato,monto_total_renta,estado_pago',
+                'vehiculo:id,placa,color,estado',
+                'contrato:id,numero_contrato,monto_total_renta,cliente_id',
+                'contrato.cliente:id,nombre',
+                'usuario:id,nombre,apellido',
             ])
-
                 ->when($request->search, function ($query, $search) {
                     $query->where(function ($subQuery) use ($search) {
                         $subQuery->where('tipo_incidencia', 'like', '%' . $search . '%')
                             ->orWhere('descripcion', 'like', '%' . $search . '%')
-                            ->orWhereHas('contrato', function ($q) use ($search) {
-                                $q->where('numero_contrato', 'like', '%' . $search . '%');
+                            ->orWhereHas('vehiculo', function ($q) use ($search) {
+                                $q->where('placa', 'like', '%' . $search . '%');
                             })
-                            ->orWhereHas('contrato.reserva.cliente', function ($q) use ($search) {
+                            ->orWhereHas('contrato.cliente', function ($q) use ($search) {
                                 $q->where('nombre', 'like', '%' . $search . '%')
                                     ->orWhere('dui', 'like', '%' . $search . '%');
                             });
                     });
                 })
-
                 ->when($request->tipo_incidencia, function ($query, $tipo) {
                     $query->where('tipo_incidencia', $tipo);
+                })
+                ->when($request->responsable_tipo, function ($query, $responsable) {
+                    $query->where('responsable_tipo', $responsable);
                 })
                 ->when($request->estado_incidencia, function ($query, $estado) {
                     $query->where('estado_incidencia', $estado);
                 })
-                ->when($request->contrato_id, function ($query, $contratoId) {
-                    $query->where('contrato_id', $contratoId);
+                ->when($request->vehiculo_id, function ($query, $vehiculoId) {
+                    $query->where('vehiculo_id', $vehiculoId);
                 })
-
                 ->latest()
                 ->paginate(10);
 
@@ -74,11 +71,10 @@ class IncidenciaController extends Controller
                 'status' => 'success',
                 'data'   => $incidencias,
             ], 200);
-        } catch (\Exception ) {
+        } catch (\Exception $e) {
             return response()->json([
                 'status'  => 'error',
                 'message' => 'Error interno del servidor',
-
             ], 500);
         }
     }
@@ -86,74 +82,51 @@ class IncidenciaController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-
-    public function store(Request $request)
+    public function store(StoreIncidenciaRequest $request)
     {
         try {
-            $userAuth = auth('api')->user();
-
-            if (
-                !$userAuth->hasRole(RolEnum::ADMINISTRADOR->value) &&
-                !$userAuth->hasRole(RolEnum::EMPLEADO->value)
-            ) {
-                return response()->json([
-                    'status'  => 'error',
-                    'message' => 'No tienes permiso para registrar incidencias',
-                ], 403);
-            }
-
-            $request->validate([
-                'contrato_id'      => 'required|exists:contratos,id',
-                'tipo_incidencia'  => 'required|in:' . implode(',', array_column(TipoIncidenciaEnum::cases(), 'value')),
-                'descripcion'      => 'sometimes|string|nullable',
-                'costo'            => 'required|numeric|min:0',
-                'fecha'            => 'required|date',
-                'responsable_tipo' => 'required|in:' . implode(',', array_column(IncidenciaTipoResponsableEnum::cases(), 'value')),
-            ]);
-
-            $contrato = Contrato::findOrFail($request->contrato_id);
-
-            if ($contrato->estado_contrato !== EstadoContratoEnum::ACTIVO->value) {
-                return response()->json([
-                    'status'  => 'error',
-                    'message' => 'Solo se pueden registrar incidencias en contratos ACTIVOS',
-                ], 422);
-            }
-
-            $incidencia = DB::transaction(function () use ($request, $contrato) {
-
+            // authorize(), rules() y withValidator() ya se resolvieron automáticamente
+            $incidencia = DB::transaction(function () use ($request) {
                 $incidencia = Incidencia::create([
-                    'contrato_id'       => $contrato->id,
+                    'vehiculo_id'       => $request->vehiculo_id,
+                    'contrato_id'       => $request->contrato_id,
+                    'usuario_id'        => auth('api')->id(),
                     'tipo_incidencia'   => $request->tipo_incidencia,
-                    'descripcion'       => $request->descripcion ?? null,
-                    'costo'             => $request->costo,
-                    'fecha'             => $request->fecha,
                     'responsable_tipo'  => $request->responsable_tipo,
                     'estado_incidencia' => IncidenciaEstadoEnum::REPORTADA->value,
+                    'descripcion'       => $request->descripcion,
+                    'fecha'             => $request->fecha,
+                    'costo'             => $request->costo,
                 ]);
 
-                if ($request->costo > 0) {
-                    CargoAdicional::create([
-                        'contrato_id'    => $contrato->id,
-                        'tipo_cargo'     => CargoAdicionalTipoEnum::DANIO->value,
-                        'descripcion'    => 'Cargo por incidencia: ' . $request->tipo_incidencia,
-                        'monto'          => $request->costo,
-                        'fecha_registro' => now(),
-                        'estado_cargo'   => CargoAdicionalEstadoEnum::PENDIENTE->value,
-                    ]);
-
-                    $montoBase   = ($contrato->dias_acordados * $contrato->precio_por_dia) - $contrato->monto_descuento;
-                    $totalCargos = $contrato->cargosAdicionales()->sum('monto');
-
+                // Caso: responsabilidad del CLIENTE → el costo se suma al contrato
+                if (
+                    $request->responsable_tipo === IncidenciaTipoResponsableEnum::CLIENTE->value
+                    && $request->filled('costo')
+                    && $incidencia->contrato
+                ) {
+                    $contrato = $incidencia->contrato;
                     $contrato->update([
-                        'monto_total_renta' => $montoBase + $totalCargos,
+                        'monto_total_renta' => $contrato->monto_total_renta + $request->costo,
+                    ]);
+                }
+
+                // Caso: responsabilidad del NEGOCIO → el vehículo pasa a mantenimiento
+                if ($request->responsable_tipo === IncidenciaTipoResponsableEnum::NEGOCIO->value) {
+                    $incidencia->vehiculo->update([
+                        'estado' => VehiculoEstadoEnum::MANTENIMIENTO->value,
                     ]);
                 }
 
                 return $incidencia;
             });
 
-            $incidencia->load('contrato:id,numero_contrato,monto_total_renta,estado_pago');
+            $incidencia->load([
+                'vehiculo:id,placa,color,estado',
+                'contrato:id,numero_contrato,monto_total_renta,cliente_id',
+                'contrato.cliente:id,nombre',
+                'usuario:id,nombre,apellido',
+            ]);
 
             return response()->json([
                 'status'  => 'success',
@@ -163,19 +136,12 @@ class IncidenciaController extends Controller
         } catch (ModelNotFoundException $e) {
             return response()->json([
                 'status'  => 'error',
-                'message' => 'Contrato no encontrado',
+                'message' => 'Vehículo o contrato no encontrado',
             ], 404);
-        } catch (ValidationException $e) {
-            return response()->json([
-                'status'  => 'error',
-                'message' => 'Error de validación',
-
-            ], 422);
         } catch (\Exception $e) {
             return response()->json([
                 'status'  => 'error',
                 'message' => 'Error interno del servidor',
-
             ], 500);
         }
     }
@@ -199,7 +165,10 @@ class IncidenciaController extends Controller
             }
 
             $incidencia = Incidencia::with([
-                'contrato:id,numero_contrato,monto_total_renta,estado_pago',
+                'vehiculo:id,placa,color,estado',
+                'contrato:id,numero_contrato,monto_total_renta,cliente_id',
+                'contrato.cliente:id,nombre',
+                'usuario:id,nombre,apellido',
             ])->findOrFail($id);
 
             return response()->json([
@@ -215,7 +184,6 @@ class IncidenciaController extends Controller
             return response()->json([
                 'status'  => 'error',
                 'message' => 'Error interno del servidor',
-             
             ], 500);
         }
     }
@@ -223,16 +191,151 @@ class IncidenciaController extends Controller
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, string $id)
+    public function update(UpdateIncidenciaRequest $request, string $id)
     {
-        //
+        try {
+            // authorize(), rules() y withValidator() ya se resolvieron automáticamente
+            $incidencia = Incidencia::with(['contrato', 'vehiculo'])->findOrFail($id);
+
+            DB::transaction(function () use ($request, $incidencia) {
+                $costoAnterior       = $incidencia->costo;
+                $responsableAnterior = $incidencia->responsable_tipo;
+
+                $incidencia->update($request->only([
+                    'tipo_incidencia',
+                    'responsable_tipo',
+                    'estado_incidencia',
+                    'descripcion',
+                    'fecha',
+                    'costo',
+                ]));
+
+                $incidencia->refresh();
+
+                $responsableNuevo = $incidencia->responsable_tipo;
+                $costoNuevo       = $incidencia->costo;
+
+                if (
+                    $responsableNuevo === IncidenciaTipoResponsableEnum::CLIENTE->value
+                    && $incidencia->contrato
+                    && $costoNuevo != $costoAnterior
+                ) {
+                    $contrato = $incidencia->contrato;
+
+                    $montoAnteriorAplicado = $responsableAnterior === IncidenciaTipoResponsableEnum::CLIENTE->value
+                        ? $costoAnterior
+                        : 0;
+
+                    $diferencia = ($costoNuevo ?? 0) - $montoAnteriorAplicado;
+
+                    $contrato->update([
+                        'monto_total_renta' => $contrato->monto_total_renta + $diferencia,
+                    ]);
+                }
+
+                if (
+                    $responsableAnterior === IncidenciaTipoResponsableEnum::CLIENTE->value
+                    && $responsableNuevo !== IncidenciaTipoResponsableEnum::CLIENTE->value
+                    && $incidencia->contrato
+                ) {
+                    $contrato = $incidencia->contrato;
+                    $contrato->update([
+                        'monto_total_renta' => $contrato->monto_total_renta - ($costoAnterior ?? 0),
+                    ]);
+                }
+
+                if (
+                    $responsableNuevo === IncidenciaTipoResponsableEnum::NEGOCIO->value
+                    && $responsableAnterior !== IncidenciaTipoResponsableEnum::NEGOCIO->value
+                ) {
+                    $incidencia->vehiculo->update([
+                        'estado' => VehiculoEstadoEnum::MANTENIMIENTO->value,
+                    ]);
+                }
+            });
+
+            return response()->json([
+                'status'  => 'success',
+                'message' => 'Incidencia actualizada con éxito',
+                'data'    => $incidencia->load([
+                    'vehiculo:id,placa,color,estado',
+                    'contrato:id,numero_contrato,monto_total_renta,cliente_id',
+                    'contrato.cliente:id,nombre',
+                    'usuario:id,nombre,apellido',
+                ]),
+            ], 200);
+        } catch (ModelNotFoundException $e) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Incidencia no encontrada',
+            ], 404);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Error interno del servidor',
+            ], 500);
+        }
     }
 
     /**
-     * Remove the specified resource from storage.
+     * Remove the specified resource from storage 
      */
     public function destroy(string $id)
     {
-        //
+        try {
+            $userAuth = auth('api')->user();
+
+            if (!$userAuth->hasRole(RolEnum::ADMINISTRADOR->value)) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'No tienes permiso para anular una incidencia',
+                ], 403);
+            }
+
+            $incidencia = Incidencia::with(['contrato', 'vehiculo'])->findOrFail($id);
+
+            if ($incidencia->estado_incidencia === IncidenciaEstadoEnum::ANULADA->value) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'La incidencia ya fue anulada anteriormente',
+                ], 409);
+            }
+
+            DB::transaction(function () use ($incidencia) {
+                // Revertir el cobro al contrato si el responsable era CLIENTE
+                if (
+                    $incidencia->responsable_tipo === IncidenciaTipoResponsableEnum::CLIENTE->value
+                    && $incidencia->contrato
+                    && $incidencia->costo
+                ) {
+                    $incidencia->contrato->update([
+                        'monto_total_renta' => $incidencia->contrato->monto_total_renta - $incidencia->costo,
+                    ]);
+                }
+
+                $incidencia->update([
+                    'estado_incidencia' => IncidenciaEstadoEnum::ANULADA->value,
+                ]);
+            });
+
+            return response()->json([
+                'status'  => 'success',
+                'message' => 'Incidencia anulada correctamente',
+                'data'    => $incidencia->fresh([
+                    'vehiculo:id,placa,color,estado',
+                    'contrato:id,numero_contrato,monto_total_renta,cliente_id',
+                ]),
+            ], 200);
+        } catch (ModelNotFoundException $e) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Incidencia no encontrada',
+            ], 404);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Error interno del servidor',
+            ], 500);
+        }
     }
 }

@@ -6,6 +6,6 @@ enum CargoAdicionalEstadoEnum: string
 {
     case PENDIENTE = 'PENDIENTE';
     case APLICADO = 'APLICADO';
-    case CONDONADO = 'CONDONADO';
     case ANULADO = 'ANULADO';
 }
+//sew quito el estado condonado por que no me paresio logico

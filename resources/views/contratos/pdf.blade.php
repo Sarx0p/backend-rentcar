@@ -44,11 +44,11 @@
     <div class="campo-row">
         <div class="campo" style="width:40%">
             <span class="campo-label">Departamento: </span>
-            <span class="campo-valor">{{ $contrato->cliente->departamento }}</span>
+            <span class="campo-valor">{{ $contrato->cliente->municipio->departamento->nombre }}</span>
         </div>
         <div class="campo" style="width:60%">
             <span class="campo-label">Municipio: </span>
-            <span class="campo-valor">{{ $contrato->cliente->municipio }}</span>
+            <span class="campo-valor">{{ $contrato->cliente->municipio->nombre }}</span>
         </div>
     </div>
 

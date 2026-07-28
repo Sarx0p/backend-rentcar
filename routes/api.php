@@ -71,7 +71,7 @@ Route::prefix('admin')->group(function () {
         Route::apiResource('contratos', ContratoController::class)->only(['index', 'show', 'store']);
         Route::apiResource('pagos', PagoController::class)->only(['index', 'show', 'store']);
         Route::apiResource('cargos-adicionales', CargoAdicionalController::class)->only(['index', 'show', 'store']);
-        Route::apiResource('incidencias', IncidenciaController::class)->only(['index', 'show', 'store']);
+        Route::apiResource('incidencias', IncidenciaController::class)->only(['index', 'show', 'store','update','destroy']);
         Route::apiResource('cierres-renta', CierreRentaController::class)->only(['index', 'show', 'store']);
         Route::apiResource('cancelaciones', CancelarController::class)->only(['index', 'show', 'store']);
         Route::apiResource('propietarios', PropietarioController::class);
