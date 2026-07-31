@@ -10,13 +10,13 @@ use App\Enums\EstadoPagoEnum;
 use App\Enums\EstadoReservaEnum;
 use App\Enums\VehiculoEstadoEnum;
 use App\Enums\CierreRentaEstadoEnum;
+use App\Http\Requests\CierreRentaController\StoreCierreRentaRequest;
 use App\Models\CargoAdicional;
 use App\Models\Contrato;
 use App\Models\CierreRenta;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\ValidationException;
 
 class CierreRentaController extends Controller
 {
@@ -47,7 +47,7 @@ class CierreRentaController extends Controller
                         ->orWhereHas('contrato', function ($q) use ($search) {
                             $q->where('numero_contrato', 'like', '%' . $search . '%');
                         })
-                        ->orWhereHas('contrato.reserva.cliente', function ($q) use ($search) {
+                        ->orWhereHas('contrato.cliente', function ($q) use ($search) {
                             $q->where('nombre', 'like', '%' . $search . '%')
                                 ->orWhere('dui', 'like', '%' . $search . '%');
                         });
@@ -66,7 +66,6 @@ class CierreRentaController extends Controller
             return response()->json([
                 'status'  => 'error',
                 'message' => 'Error interno del servidor',
-                
             ], 500);
         }
     }
@@ -74,34 +73,11 @@ class CierreRentaController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(Request $request)
+    public function store(StoreCierreRentaRequest $request)
     {
         try {
-            $userAuth = auth('api')->user();
-
-            if (
-                !$userAuth->hasRole(RolEnum::ADMINISTRADOR->value) &&
-                !$userAuth->hasRole(RolEnum::EMPLEADO->value)
-            ) {
-                return response()->json([
-                    'status'  => 'error',
-                    'message' => 'No tienes permiso para cerrar una renta',
-                ], 403);
-            }
-
-            $request->validate([
-                'contrato_id'                 => 'required|exists:contratos,id',
-                'fecha_hora_recepcion'        => 'required|date',
-                'nivel_combustible_recepcion' => 'required|string|max:50',
-                'estado_vehiculo_recepcion'   => 'required|string|max:100',
-                'observaciones'               => 'sometimes|string|nullable',
-                'aplicar_cargo_retraso'       => 'sometimes|boolean',
-                'monto_retraso'               => 'required_if:aplicar_cargo_retraso,true|numeric|min:0.01',
-            ]);
-
-            $contrato = Contrato::with([
-                'reserva.vehiculo',
-            ])->findOrFail($request->contrato_id);
+            // authorize() y rules() ya se resolvieron automáticamente
+            $contrato = Contrato::with(['vehiculo', 'reserva'])->findOrFail($request->contrato_id);
 
             if ($contrato->estado_contrato !== EstadoContratoEnum::ACTIVO->value) {
                 return response()->json([
@@ -124,7 +100,7 @@ class CierreRentaController extends Controller
                 ], 422);
             }
 
-            $cierre = DB::transaction(function () use ($request, $contrato, $userAuth) {
+            $cierre = DB::transaction(function () use ($request, $contrato) {
 
                 // Calcular horas de retraso con margen de 2 horas
                 $fechaDevolucionAcordada = $contrato->fecha_hora_devolucion;
@@ -135,7 +111,6 @@ class CierreRentaController extends Controller
                     ? max(0, $fechaDevolucionAcordada->diffInHours($fechaRecepcionReal, false))
                     : 0;
 
-
                 if ($horasRetraso > 0 && $request->aplicar_cargo_retraso) {
                     CargoAdicional::create([
                         'contrato_id'    => $contrato->id,
@@ -143,7 +118,7 @@ class CierreRentaController extends Controller
                         'descripcion'    => 'Cargo por retraso de ' . $horasRetraso . ' horas',
                         'monto'          => $request->monto_retraso,
                         'fecha_registro' => now(),
-                        'estado_cargo'   => CargoAdicionalEstadoEnum::PENDIENTE->value,
+                        'estado_cargo'   => CargoAdicionalEstadoEnum::APLICADO->value,
                     ]);
 
                     $montoBase   = ($contrato->dias_acordados * $contrato->precio_por_dia) - $contrato->monto_descuento;
@@ -155,26 +130,27 @@ class CierreRentaController extends Controller
                     ]);
                 }
 
-
                 $cierre = CierreRenta::create([
                     'contrato_id'                 => $contrato->id,
-                    'usuario_id'                  => $userAuth->id,
+                    'usuario_id'                  => auth('api')->id(),
                     'fecha_hora_recepcion'        => $request->fecha_hora_recepcion,
                     'nivel_combustible_recepcion' => $request->nivel_combustible_recepcion,
                     'estado_vehiculo_recepcion'   => $request->estado_vehiculo_recepcion,
-                    'observaciones'               => $request->observaciones ?? null,
+                    'observaciones'               => $request->observaciones,
                     'horas_retraso'               => $horasRetraso,
                     'monto_extras'                => $contrato->cargosAdicionales()->sum('monto'),
                     'estado'                      => CierreRentaEstadoEnum::FINALIZADO->value,
                 ]);
 
-                $contrato->reserva->vehiculo->update([
+                $contrato->vehiculo->update([
                     'estado' => VehiculoEstadoEnum::DISPONIBLE->value,
                 ]);
 
-                $contrato->reserva->update([
-                    'estado' => EstadoReservaEnum::CONCLUIDA->value,
-                ]);
+                if ($contrato->reserva) {
+                    $contrato->reserva->update([
+                        'estado' => EstadoReservaEnum::CONCLUIDA->value,
+                    ]);
+                }
 
                 $contrato->update([
                     'estado_contrato' => EstadoContratoEnum::FINALIZADO->value,
@@ -198,20 +174,14 @@ class CierreRentaController extends Controller
                 'status'  => 'error',
                 'message' => 'Contrato no encontrado',
             ], 404);
-        } catch (ValidationException $e) {
-            return response()->json([
-                'status'  => 'error',
-                'message' => 'Error de validación',
-
-            ], 422);
         } catch (\Exception $e) {
             return response()->json([
                 'status'  => 'error',
                 'message' => 'Error interno del servidor',
-
             ], 500);
         }
     }
+
     /**
      * Display the specified resource.
      */
@@ -232,10 +202,10 @@ class CierreRentaController extends Controller
 
             $cierre = CierreRenta::with([
                 'contrato:id,numero_contrato,monto_total_renta,estado_pago',
-                'contrato.reserva.cliente:id,nombre,dui,telefono',
-                'contrato.reserva.vehiculo:id,placa,color,anio,modelo_id',
-                'contrato.reserva.vehiculo.modelo:id,nombre,marca_id',
-                'contrato.reserva.vehiculo.modelo.marca:id,nombre',
+                'contrato.cliente:id,nombre,dui,telefono',
+                'contrato.vehiculo:id,placa,color,anio,modelo_id',
+                'contrato.vehiculo.modelo:id,nombre,marca_id',
+                'contrato.vehiculo.modelo.marca:id,nombre',
                 'contrato.cargosAdicionales',
                 'contrato.incidencias',
                 'user:id,nombre,apellido',
@@ -254,7 +224,6 @@ class CierreRentaController extends Controller
             return response()->json([
                 'status'  => 'error',
                 'message' => 'Error interno del servidor',
-
             ], 500);
         }
     }

@@ -14,6 +14,7 @@ use App\Http\Controllers\CategoriaController;
 use App\Http\Controllers\ContratoController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\PagoController;
+use App\Http\Controllers\MantenimientoController;
 use App\Http\Controllers\CargoAdicionalController;
 use App\Http\Controllers\CierreRentaController;
 use App\Http\Controllers\IncidenciaController;
@@ -77,6 +78,7 @@ Route::prefix('admin')->group(function () {
         Route::apiResource('propietarios', PropietarioController::class);
         Route::apiResource('seguros', SeguroController::class);
         Route::get('/departamentos', [DepartamentoController::class, 'index']);
+        Route::apiResource('mantenimientos', MantenimientoController::class);
         Route::get('/departamentos/{departamentoId}/municipios', [DepartamentoController::class, 'porDepartamento']);
 
         Route::prefix('reportes')->group(function () {
