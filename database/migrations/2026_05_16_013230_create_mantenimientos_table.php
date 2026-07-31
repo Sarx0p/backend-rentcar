@@ -14,12 +14,11 @@ return new class extends Migration
         Schema::create('mantenimientos', function (Blueprint $table) {
             $table->id();
             $table->foreignId('vehiculo_id')->constrained('vehiculos');
-            $table->string('tipo_mantenimiento', 100);
-            $table->text('descripcion')->nullable();
-            $table->decimal('costo', 8, 2);
-            $table->date('fecha_inicio');
-            $table->date('fecha_fin')->nullable();
-            $table->string('proveedor', 100);
+            $table->string('tipo_mantenimiento', 30);
+            $table->string('descripcion', 250)->nullable();
+            $table->decimal('costo', 10, 2);
+            $table->date('fecha');
+            $table->string('lugar', 150);
             $table->string('estado', 30);
             $table->timestamps();
         });

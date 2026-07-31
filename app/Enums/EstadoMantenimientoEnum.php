@@ -4,8 +4,8 @@ namespace App\Enums;
 
 enum EstadoMantenimientoEnum: string
 {
-    case PROGRAMADO = 'PROGRAMADO';
-    case EN_PROCESO = 'EN PROCESO';
-    case FINALIZADO = 'FINALIZADO';
+    case ACTIVO = 'ACTIVO';     // el vehículo está en mantenimiento AHORA esto quita tanto proseso para mi pareser inutiles
     case CANCELADO = 'CANCELADO';
+    case FINALIZADO = 'FINALIZADO';
 }
+

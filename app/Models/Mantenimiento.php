@@ -14,7 +14,7 @@ class Mantenimiento extends Model
         'descripcion',
         'costo',
         'fecha',
-        'proveedor',
+        'lugar',
         'estado',
         'vehiculo_id',
     ];
