@@ -10,7 +10,6 @@ use App\Http\Requests\VehiculoController\UpdateVehiculoRequest;
 use App\Models\Vehiculo;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\ValidationException;
 
 class VehiculoController extends Controller
 {
@@ -58,18 +57,18 @@ class VehiculoController extends Controller
     public function store(StoreVehiculoRequest $request)
     {
         try {
-
             DB::beginTransaction();
 
             $vehiculo = Vehiculo::create([
-                'anio'           => $request->anio,
-                'color'          => $request->color,
-                'placa'          => $request->placa,
-                'estado'         => $request->estado,
-                'propietario_id' => $request->propietario_id,
-                'categoria_id'   => $request->categoria_id,
-                'modelo_id'      => $request->modelo_id,
-                'seguro_id'      => $request->seguro_id,
+                'anio'                => $request->anio,
+                'color'               => $request->color,
+                'placa'               => $request->placa,
+                'capacidad_pasajeros' => $request->capacidad_pasajeros,
+                'estado'              => $request->estado,
+                'observaciones'       => $request->observaciones,
+                'propietario_id'      => $request->propietario_id,
+                'categoria_id'        => $request->categoria_id,
+                'modelo_id'           => $request->modelo_id,
             ]);
 
             DB::commit();
@@ -136,11 +135,12 @@ class VehiculoController extends Controller
                 'anio',
                 'color',
                 'placa',
+                'capacidad_pasajeros',
                 'estado',
+                'observaciones',
                 'propietario_id',
                 'categoria_id',
                 'modelo_id',
-                'seguro_id',
             ]));
 
             DB::commit();

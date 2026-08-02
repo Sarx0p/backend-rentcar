@@ -92,7 +92,7 @@ class SeguroController extends Controller
             ) {
                 return response()->json([
                     'status'  => 'error',
-                    'message' => 'No tienes permiso para ver las reservas',
+                    'message' => 'No tienes permiso para ver los seguros',// error de sintaxis
                 ], 403);
             }
 

@@ -16,7 +16,9 @@ return new class extends Migration
             $table->string('placa', 20)->unique();
             $table->string('color', 30);
             $table->integer('anio');
+            $table->unsignedTinyInteger('capacidad_pasajeros');
             $table->string('estado', 50);
+            $table->string('observaciones', 400)->nullable();
             $table->foreignId('modelo_id')->constrained('modelos');
             $table->foreignId('categoria_id')->constrained('categorias');
             $table->foreignId('propietario_id')->constrained('propietarios');
