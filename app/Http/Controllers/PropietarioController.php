@@ -58,7 +58,7 @@ class PropietarioController extends Controller
     public function store(StorePropietarioRequest $request)
     {
         try {
-           
+
             $propietario = DB::transaction(function () use ($request) {
                 return Propietario::create([
                     'nombre'           => $request->nombre,
@@ -124,7 +124,7 @@ class PropietarioController extends Controller
     public function update(UpdatePropietarioRequest $request, string $id)
     {
         try {
-           
+
             $propietario = Propietario::findOrFail($id);
 
             $propietario->update($request->only(['nombre', 'telefono', 'tipo_propietario']));
@@ -168,6 +168,15 @@ class PropietarioController extends Controller
                 return response()->json([
                     'status'  => 'error',
                     'message' => 'Este propietario ya está desactivado',
+                ], 422);
+            }
+
+            $tieneVehiculos = $propietario->vehiculos()->exists();
+
+            if ($tieneVehiculos) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'No se puede desactivar el propietario porque tiene vehículos asociados',
                 ], 422);
             }
 
