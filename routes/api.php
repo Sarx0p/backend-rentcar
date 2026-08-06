@@ -65,7 +65,7 @@ Route::prefix('admin')->group(function () {
         Route::apiResource('clientes', ClienteController::class);
         Route::get('clientes/{id}/licencia-vigente', [ClienteController::class, 'licenciaVigente']);
         Route::apiResource('reservas', ReservaController::class)->except(['destroy']);
-        Route::get('vehiculos/disponibles', [VehiculoController::class, 'index']);
+        // SE QUITO POR LA OPTIMISACION DE EL INDEX DE VEHIUCLOS DONDE QEUDABA LA RUTA INUTILIZADA
         Route::apiResource('vehiculos', VehiculoController::class);
         Route::get('contratos/{id}/pdf', [ContratoController::class, 'generarPdf']);
         Route::post('contratos/directo', [ContratoController::class, 'storeDirecto']);

@@ -15,13 +15,12 @@ class VehiculoController extends Controller
 {
     public function index(Request $request)
     {
+        
         try {
             $vehiculos = Vehiculo::with(['modelo.marca', 'categoria'])
-                ->whereNotIn('estado', [
-                    VehiculoEstadoEnum::MANTENIMIENTO->value,
-                    VehiculoEstadoEnum::FUERA_SERVICIO->value,
-                    VehiculoEstadoEnum::RENTADO->value,
-                ])
+                ->when($request->filled('estado'), function ($query) use ($request) {
+                    $query->where('estado', $request->estado);
+                })
                 ->when(
                     $request->filled('fecha_inicio') && $request->filled('fecha_fin'),
                     function ($query) use ($request) {

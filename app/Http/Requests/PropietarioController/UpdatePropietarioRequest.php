@@ -4,6 +4,7 @@ namespace App\Http\Requests\PropietarioController;
 
 use App\Enums\RolEnum;
 use App\Enums\TipoPropietarioEnum;
+use App\Enums\EstadoPropietarioEnum;
 use App\Models\Propietario;
 use Illuminate\Validation\Rule;
 use Illuminate\Foundation\Http\FormRequest;
@@ -29,7 +30,7 @@ class UpdatePropietarioRequest extends FormRequest
             'tipo_propietario' => 'sometimes|in:' . implode(',', array_column(TipoPropietarioEnum::cases(), 'value')),
         ];
     }
-    
+
     public function withValidator(Validator $validator): void
     {
         $validator->after(function ($validator) {
@@ -40,13 +41,14 @@ class UpdatePropietarioRequest extends FormRequest
             $idActual = $this->route('propietario');
 
             $existeOtroDueno = Propietario::where('tipo_propietario', TipoPropietarioEnum::PROPIO->value)
+                ->where('estado', EstadoPropietarioEnum::ACTIVO->value)
                 ->where('id', '!=', $idActual)
                 ->exists();
 
             if ($existeOtroDueno) {
                 $validator->errors()->add(
                     'tipo_propietario',
-                    'Ya existe otro propietario registrado como PROPIO (dueño del negocio). No se puede duplicar.'
+                    'Ya existe otro propietario ACTIVO registrado como PROPIO. No se puede duplicar.'
                 );
             }
         });

@@ -117,8 +117,13 @@ class ReservaController extends Controller
                 ], 422);
             }
 
-            $reserva = DB::transaction(function () use ($request, $vehiculo, $userAuth) {
-                $reserva = Reserva::create([
+            // El vehículo NO cambia de estado aquí: sigue en DISPONIBLE.
+            // Las fechas reservadas quedan registradas en la tabla `reservas`;
+            // la disponibilidad real para un rango de fechas se calcula
+            // consultando traslapes contra esa tabla (ver Vehiculo::disponibles()),
+            // no leyendo el campo `estado` del vehículo.
+            $reserva = DB::transaction(function () use ($request, $userAuth) {
+                return Reserva::create([
                     'fecha_solicitud' => now(),
                     'fecha_inicio'    => $request->fecha_inicio,
                     'fecha_fin'       => $request->fecha_fin,
@@ -127,14 +132,6 @@ class ReservaController extends Controller
                     'vehiculo_id'     => $request->vehiculo_id,
                     'usuario_id'      => $userAuth->id,
                 ]);
-
-                if ($vehiculo->estado === VehiculoEstadoEnum::DISPONIBLE->value) {
-                    $vehiculo->update([
-                        'estado' => VehiculoEstadoEnum::RESERVADO->value,
-                    ]);
-                }
-
-                return $reserva;
             });
 
             $reserva->load([

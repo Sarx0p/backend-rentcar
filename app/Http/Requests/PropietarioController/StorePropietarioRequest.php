@@ -4,6 +4,7 @@ namespace App\Http\Requests\PropietarioController;
 
 use App\Enums\RolEnum;
 use App\Enums\TipoPropietarioEnum;
+use App\Enums\EstadoPropietarioEnum;
 use App\Models\Propietario;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Contracts\Validation\Validator;
@@ -28,7 +29,8 @@ class StorePropietarioRequest extends FormRequest
     }
 
     /**
-     * Validación adicional: solo puede existir un propietario tipo PROPIO.
+     * Validación adicional: solo puede existir un propietario ACTIVO tipo PROPIO.
+     * Si el anterior está INACTIVO, sí se permite crear uno nuevo.
      */
     public function withValidator(Validator $validator): void
     {
@@ -37,12 +39,14 @@ class StorePropietarioRequest extends FormRequest
                 return;
             }
 
-            $existeDueno = Propietario::where('tipo_propietario', TipoPropietarioEnum::PROPIO->value)->exists();
+            $existeDueno = Propietario::where('tipo_propietario', TipoPropietarioEnum::PROPIO->value)
+                ->where('estado', EstadoPropietarioEnum::ACTIVO->value)
+                ->exists();
 
             if ($existeDueno) {
                 $validator->errors()->add(
                     'tipo_propietario',
-                    'Ya existe un propietario registrado como PROPIO (dueño del negocio). No se puede duplicar.'
+                    'Ya existe un propietario ACTIVO registrado como PROPIO (dueño del negocio). No se puede duplicar.'
                 );
             }
         });
