@@ -23,7 +23,7 @@ class StoreContratoRequest extends FormRequest
             'reserva_id'                => 'required|exists:reservas,id',
             'fecha_hora_entrega'        => 'required|date',
             'fecha_hora_devolucion'     => 'required|date|after:fecha_hora_entrega',
-            'precio_por_dia'            => 'required|numeric|min:0',
+            'precio_por_dia'            => 'required|numeric|min:0.1',
             'nivel_combustible_entrega' => 'required|string|max:50',
             'monto_descuento'           => 'sometimes|numeric|min:0',
             'observaciones_entrega'     => 'sometimes|nullable|string|max:500',
@@ -40,6 +40,7 @@ class StoreContratoRequest extends FormRequest
             'fecha_hora_devolucion.required'     => 'La fecha y hora de devolución son obligatorias.',
             'fecha_hora_devolucion.after'        => 'La devolución debe ser posterior a la entrega.',
             'precio_por_dia.required'            => 'El precio por día es obligatorio.',
+            'precio_por_dia.min'                 => 'El precio por día tiene que ser mayor que 0.',
             'nivel_combustible_entrega.required' => 'El nivel de combustible de entrega es obligatorio.',
         ];
     }

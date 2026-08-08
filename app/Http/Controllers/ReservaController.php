@@ -39,7 +39,7 @@ class ReservaController extends Controller
                 'vehiculo:id,placa,color,anio,estado,modelo_id,categoria_id',
                 'vehiculo.modelo:id,nombre,marca_id',
                 'vehiculo.modelo.marca:id,nombre',
-                'vehiculo.categoria:id,nombre',
+                'vehiculo.categoria:id,nombre,precio_dia', // corrgido
                 'user:id,nombre,apellido',
             ])
                 ->when($request->search, function ($query, $search) {
@@ -139,7 +139,7 @@ class ReservaController extends Controller
                 'vehiculo:id,placa,color,anio,estado,modelo_id,categoria_id',
                 'vehiculo.modelo:id,nombre,marca_id',
                 'vehiculo.modelo.marca:id,nombre',
-                'vehiculo.categoria:id,nombre',
+                'vehiculo.categoria:id,nombre,precio_dia', // corregido
                 'user:id,nombre,apellido',
             ]);
 
@@ -184,7 +184,7 @@ class ReservaController extends Controller
                 'vehiculo:id,placa,color,anio,estado,modelo_id,categoria_id',
                 'vehiculo.modelo:id,nombre,marca_id',
                 'vehiculo.modelo.marca:id,nombre',
-                'vehiculo.categoria:id,nombre',
+                'vehiculo.categoria:id,nombre,precio_dia', //  corregido
                 'user:id,nombre,apellido',
                 'cancelacion:id,fecha_cancelacion,motivo,usuario_id',
                 'cancelacion.user:id,nombre,apellido',
