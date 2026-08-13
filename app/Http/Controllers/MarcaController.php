@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Enums\RolEnum;
 use App\Models\Marca;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -16,7 +17,7 @@ class MarcaController extends Controller
     public function index()
     {
         try{
-            $marcas = Marca::orderBy('nombre')->get();   
+            $marcas = Marca::orderBy('nombre')->get();
 
             if($marcas->isEmpty()){
                 return response()->json([
@@ -94,7 +95,30 @@ class MarcaController extends Controller
      */
     public function show(string $id)
     {
-        //
+        try{
+            $marcas = Marca::findOrField($id);
+
+            return response()->json([
+                "status" => "succes",
+                "data" => $marcas
+            ],200);
+
+
+        }
+        catch(ModelNotFoundException){
+            return response()->json([
+                "status" => "errors",
+                "message" => "No se encontraron marcas"
+            ],404);
+
+        }
+        catch(\Exception $e){
+            return response()->json([
+                "status" => "errors",
+                "message" => "Error interno de el servidor"
+            ],500);
+
+        }
     }
 
     /**
@@ -102,7 +126,41 @@ class MarcaController extends Controller
      */
     public function update(Request $request, string $id)
     {
-        //
+         try{
+            $userAuth = auth('api')->user();
+
+            if(!$userAuth->hasRole(RolEnum::ADMINISTRADOR->value)){
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'No tienes permiso para realizar esta acción.',
+                ],403);
+            }
+
+           $marcas = Marca::findOrFail($id);
+
+           $marcas->update($request->only(["nombre"]));
+
+           return response()->json([
+            "message" => "Marca actualizada correctamente",
+            "data" => $marcas
+           ],201);
+
+
+
+        }catch(ModelNotFoundException){
+            return response()->json([
+                "status" => "errors",
+                "message" => "propietario no encontrado "
+            ],404);
+
+        }catch (\Exception $e) {
+            DB::rollBack();
+
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Error interno del servidor.',
+            ],500);
+        }
     }
 
     /**
@@ -110,6 +168,12 @@ class MarcaController extends Controller
      */
     public function destroy(string $id)
     {
-        //
+        try{
+
+        }catch(\Exception $e){
+            return response()->json([
+
+            ])
+        }
     }
 }

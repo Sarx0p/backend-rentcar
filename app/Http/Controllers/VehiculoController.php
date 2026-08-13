@@ -15,7 +15,7 @@ class VehiculoController extends Controller
 {
     public function index(Request $request)
     {
-        
+
         try {
             $vehiculos = Vehiculo::with(['modelo.marca', 'categoria'])
                 ->when($request->filled('estado'), function ($query) use ($request) {
@@ -189,6 +189,13 @@ class VehiculoController extends Controller
                 return response()->json([
                     'status'  => 'error',
                     'message' => 'El vehículo ya se encuentra fuera de servicio.',
+                ], 422);
+            }
+
+            if ($vehiculo->estado === VehiculoEstadoEnum::RENTADO->value) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'El vehículo tiene que estar disponible para poder desactivarse.',
                 ], 422);
             }
 

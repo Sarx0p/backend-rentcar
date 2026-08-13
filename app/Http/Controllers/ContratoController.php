@@ -97,6 +97,17 @@ class ContratoController extends Controller
                 ], 422);
             }
 
+            $tieneContratoActivo = Contrato::where('cliente_id', $reserva->cliente_id)
+                ->where('estado_contrato', EstadoContratoEnum::ACTIVO->value)
+                ->exists();
+
+            if ($tieneContratoActivo) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'Este cliente ya tiene un contrato activo. No se puede generar otro hasta cerrarlo.',
+                ], 422);
+            }
+
             $contrato = DB::transaction(function () use ($request, $reserva) {
                 $inicio = \Carbon\Carbon::parse($request->fecha_hora_entrega);
                 $fin    = \Carbon\Carbon::parse($request->fecha_hora_devolucion);
@@ -170,6 +181,17 @@ class ContratoController extends Controller
                 return response()->json([
                     'status'  => 'error',
                     'message' => 'El cliente tiene la licencia vencida, no puede rentar un vehículo',
+                ], 422);
+            }
+
+            $tieneContratoActivo = Contrato::where('cliente_id', $cliente->id)
+                ->where('estado_contrato', EstadoContratoEnum::ACTIVO->value)
+                ->exists();
+
+            if ($tieneContratoActivo) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'Este cliente ya tiene un contrato activo. No se puede generar otro hasta cerrarlo.',
                 ], 422);
             }
 

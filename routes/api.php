@@ -25,9 +25,11 @@ use App\Http\Controllers\ReporteController;
 use App\Http\Controllers\SeguroController;
 
 Route::get('/marcas', [MarcaController::class, 'index']);
+Route::get('/marcas/{id}', [MarcaController::class, 'index']);
 
 Route::middleware('auth:api')->group(function () {
     Route::post('/marcas', [MarcaController::class, 'store']);
+    Route::put('/marcas/{id}', [MarcaController::class, 'update']);
 });
 
 Route::get('/modelos', [ModeloController::class, 'index']);
@@ -86,6 +88,11 @@ Route::prefix('admin')->group(function () {
             Route::get('estado-flota', [ReporteController::class, 'estadoFlota']);
             Route::get('licencias-por-vencer', [ReporteController::class, 'licenciasPorVencer']);
             Route::get('reservas-canceladas', [ReporteController::class, 'reservasCanceladas']);
+            Route::get('desempeno-general', [ReporteController::class, 'desempenoGeneral']);
+            Route::get('ingresos-por-vehiculo', [ReporteController::class, 'ingresosPorVehiculo']);
+            Route::get('gastos-por-vehiculo', [ReporteController::class, 'gastosPorVehiculo']);
+            Route::get('resultado-neto-por-vehiculo', [ReporteController::class, 'resultadoNetoPorVehiculo']);
+            Route::get('saldos-pendientes', [ReporteController::class, 'saldosPendientes']);
         });
     });
 });
