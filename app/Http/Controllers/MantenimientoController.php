@@ -100,15 +100,27 @@ class MantenimientoController extends Controller
                 ], 422);
             }
 
+
+            $mantenimientoReciente = Mantenimiento::where('vehiculo_id', $request->vehiculo_id)
+                ->where('created_at', '>=', now()->subMinute())
+                ->exists();
+
+            if ($mantenimientoReciente) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'Se registró un mantenimiento para este vehículo recientemente. Por favor espera un momento.',
+                ], 422);
+            }
+
             $mantenimiento = DB::transaction(function () use ($request, $vehiculo) {
                 $mantenimiento = Mantenimiento::create([
-                    'vehiculo_id'         => $request->vehiculo_id,
-                    'tipo_mantenimiento'  => $request->tipo_mantenimiento,
-                    'descripcion'         => $request->descripcion,
-                    'costo'               => $request->costo,
-                    'fecha'               => $request->fecha,
-                    'lugar'               => $request->lugar,
-                    'estado'              => EstadoMantenimientoEnum::ACTIVO->value,
+                    'vehiculo_id'        => $request->vehiculo_id,
+                    'tipo_mantenimiento' => $request->tipo_mantenimiento,
+                    'descripcion'        => $request->descripcion,
+                    'costo'              => $request->costo,
+                    'fecha'              => now(),
+                    'lugar'              => $request->lugar,
+                    'estado'             => EstadoMantenimientoEnum::ACTIVO->value,
                 ]);
 
                 $vehiculo->update([
@@ -184,6 +196,17 @@ class MantenimientoController extends Controller
         try {
             $mantenimiento = Mantenimiento::with('vehiculo')->findOrFail($id);
 
+            // Validación de inmutabilidad para registros ya cerrados o anulados
+            if (in_array($mantenimiento->estado, [
+                EstadoMantenimientoEnum::FINALIZADO->value,
+                EstadoMantenimientoEnum::CANCELADO->value,
+            ])) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => "No se puede modificar un mantenimiento con estado {$mantenimiento->estado}",
+                ], 422);
+            }
+
             if (
                 $request->has('estado') &&
                 $request->estado === EstadoMantenimientoEnum::ACTIVO->value &&
@@ -198,6 +221,13 @@ class MantenimientoController extends Controller
                         'message' => "No se puede reactivar el mantenimiento porque el vehículo está actualmente {$mantenimiento->vehiculo->estado}",
                     ], 422);
                 }
+
+                if ($mantenimiento->vehiculo->estado === VehiculoEstadoEnum::MANTENIMIENTO->value) {
+                    return response()->json([
+                        'status'  => 'error',
+                        'message' => 'El vehículo ya se encuentra en otro mantenimiento activo actualmente',
+                    ], 422);
+                }
             }
 
             DB::transaction(function () use ($request, $mantenimiento) {
@@ -207,7 +237,6 @@ class MantenimientoController extends Controller
                     'tipo_mantenimiento',
                     'descripcion',
                     'costo',
-                    'fecha',
                     'lugar',
                     'estado',
                 ]));
@@ -280,6 +309,13 @@ class MantenimientoController extends Controller
                 return response()->json([
                     'status'  => 'error',
                     'message' => 'Este mantenimiento ya se encuentra anulado',
+                ], 422);
+            }
+
+            if ($mantenimiento->estado === EstadoMantenimientoEnum::FINALIZADO->value) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'No se puede anular un mantenimiento que ya ha sido finalizado',
                 ], 422);
             }
 
