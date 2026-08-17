@@ -3,6 +3,7 @@
 namespace App\Http\Requests\ClienteController;
 
 use App\Enums\RolEnum;
+use App\Rules\DuiValido;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Http\Exceptions\HttpResponseException;
@@ -21,7 +22,7 @@ class StoreClienteRequest extends FormRequest
     {
         return [
             'nombre'               => 'required|string|max:100',
-            'dui'                  => 'required|string|max:20|unique:clientes,dui',
+            'dui'                  => ['required', 'string', 'max:20', 'unique:clientes,dui', new DuiValido()],
             'nacimiento_dui'       => 'required|date',
             'numero_licencia'      => 'required|string|max:30|unique:clientes,numero_licencia',
             'vencimiento_licencia' => 'required|date|after:today',

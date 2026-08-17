@@ -111,12 +111,7 @@ class IncidenciaController extends Controller
                     ]);
                 }
 
-                // Caso: responsabilidad del NEGOCIO → el vehículo pasa a mantenimiento
-                if ($request->responsable_tipo === IncidenciaTipoResponsableEnum::NEGOCIO->value) {
-                    $incidencia->vehiculo->update([
-                        'estado' => VehiculoEstadoEnum::MANTENIMIENTO->value,
-                    ]);
-                }
+            
 
                 return $incidencia;
             });
@@ -244,14 +239,7 @@ class IncidenciaController extends Controller
                     ]);
                 }
 
-                if (
-                    $responsableNuevo === IncidenciaTipoResponsableEnum::NEGOCIO->value
-                    && $responsableAnterior !== IncidenciaTipoResponsableEnum::NEGOCIO->value
-                ) {
-                    $incidencia->vehiculo->update([
-                        'estado' => VehiculoEstadoEnum::MANTENIMIENTO->value,
-                    ]);
-                }
+                // AQUI SE ELIMINÓ EL BLOQUE QUE CAMBIABA A MANTENIMIENTO, tal como indicó Claude.
             });
 
             return response()->json([
@@ -278,7 +266,7 @@ class IncidenciaController extends Controller
     }
 
     /**
-     * Remove the specified resource from storage 
+     * Remove the specified resource from storage
      */
     public function destroy(string $id)
     {

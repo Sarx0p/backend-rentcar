@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Enums\RolEnum;
 use App\Enums\VehiculoEstadoEnum;
 use App\Enums\EstadoReservaEnum;
+use App\Enums\IncidenciaEstadoEnum;
+use App\Models\Incidencia;
 use App\Http\Requests\ReservaController\StoreReservaRequest;
 use App\Http\Requests\ReservaController\UpdateReservaRequest;
 use App\Models\Reserva;
@@ -73,7 +75,6 @@ class ReservaController extends Controller
     public function store(StoreReservaRequest $request)
     {
         try {
-            // authorize() y rules() ya se resolvieron automáticamente
             $userAuth = auth('api')->user();
 
             $cliente = Cliente::findOrFail($request->cliente_id);
@@ -117,11 +118,10 @@ class ReservaController extends Controller
                 ], 422);
             }
 
-            // El vehículo NO cambia de estado aquí: sigue en DISPONIBLE.
-            // Las fechas reservadas quedan registradas en la tabla `reservas`;
-            // la disponibilidad real para un rango de fechas se calcula
-            // consultando traslapes contra esa tabla (ver Vehiculo::disponibles()),
-            // no leyendo el campo `estado` del vehículo.
+            $incidenciasPendientes = Incidencia::where('vehiculo_id', $vehiculo->id)
+                ->where('estado_incidencia', IncidenciaEstadoEnum::REPORTADA->value)
+                ->get(['id', 'tipo_incidencia', 'descripcion', 'fecha']);
+
             $reserva = DB::transaction(function () use ($request, $userAuth) {
                 return Reserva::create([
                     'fecha_solicitud' => now(),
@@ -139,13 +139,17 @@ class ReservaController extends Controller
                 'vehiculo:id,placa,color,anio,estado,modelo_id,categoria_id',
                 'vehiculo.modelo:id,nombre,marca_id',
                 'vehiculo.modelo.marca:id,nombre',
-                'vehiculo.categoria:id,nombre,precio_dia', // corregido
+                'vehiculo.categoria:id,nombre,precio_dia',
                 'user:id,nombre,apellido',
             ]);
 
             return response()->json([
                 'status'  => 'success',
                 'message' => 'Reserva creada con éxito',
+                'advertencia' => $incidenciasPendientes->isNotEmpty()
+                    ? 'Este vehículo tiene incidencias pendientes sin resolver.'
+                    : null,
+                'incidencias_pendientes' => $incidenciasPendientes,
                 'data'    => $reserva,
             ], 201);
         } catch (ModelNotFoundException $e) {

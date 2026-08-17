@@ -172,8 +172,9 @@ class MarcaController extends Controller
 
         }catch(\Exception $e){
             return response()->json([
-
-            ])
+                "ststus" => "Errors",
+                "message" => "Error interno de el servidor"
+            ]);
         }
     }
 }

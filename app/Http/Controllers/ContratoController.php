@@ -7,6 +7,7 @@ use App\Enums\EstadoContratoEnum;
 use App\Enums\EstadoPagoEnum;
 use App\Enums\EstadoReservaEnum;
 use App\Enums\VehiculoEstadoEnum;
+use App\Enums\IncidenciaEstadoEnum;
 use App\Http\Requests\ContratoController\StoreContratoRequest;
 use App\Http\Requests\ContratoController\StoreContratoDirectoRequest;
 use App\Models\Contrato;
@@ -75,12 +76,11 @@ class ContratoController extends Controller
     }
 
     /**
-     * Store a newly created resource in storage — desde una reserva anticipada.
+     * Store a newly created resource in storage — desde una reserva existente.
      */
     public function store(StoreContratoRequest $request)
     {
         try {
-            // authorize() y rules() ya se resolvieron automáticamente
             $reserva = Reserva::with(['vehiculo', 'cliente'])->findOrFail($request->reserva_id);
 
             if ($reserva->estado !== EstadoReservaEnum::PENDIENTE->value) {
@@ -97,6 +97,31 @@ class ContratoController extends Controller
                 ], 422);
             }
 
+            $vehiculo = $reserva->vehiculo;
+
+            if ($vehiculo->estado !== VehiculoEstadoEnum::DISPONIBLE->value) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'El vehículo no está disponible, estado actual: ' . $vehiculo->estado,
+                ], 422);
+            }
+
+            $contratoTraslapado = Contrato::where('vehiculo_id', $vehiculo->id)
+                ->where('estado_contrato', EstadoContratoEnum::ACTIVO->value)
+                ->where(function ($query) use ($request) {
+                    $query->where('fecha_hora_entrega', '<', $request->fecha_hora_devolucion)
+                        ->where('fecha_hora_devolucion', '>', $request->fecha_hora_entrega);
+                })
+                ->exists();
+
+            if ($contratoTraslapado) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'El vehículo ya tiene un contrato activo que se traslapa con esas fechas',
+                ], 422);
+            }
+
+            // Validar que el cliente no tenga otro contrato activo
             $tieneContratoActivo = Contrato::where('cliente_id', $reserva->cliente_id)
                 ->where('estado_contrato', EstadoContratoEnum::ACTIVO->value)
                 ->exists();
@@ -108,7 +133,7 @@ class ContratoController extends Controller
                 ], 422);
             }
 
-            $contrato = DB::transaction(function () use ($request, $reserva) {
+            $contrato = DB::transaction(function () use ($request, $reserva, $vehiculo) {
                 $inicio = \Carbon\Carbon::parse($request->fecha_hora_entrega);
                 $fin    = \Carbon\Carbon::parse($request->fecha_hora_devolucion);
                 $dias   = max(1, $inicio->diffInDays($fin));
@@ -116,10 +141,28 @@ class ContratoController extends Controller
                 $descuento  = $request->monto_descuento ?? 0;
                 $montoTotal = ($dias * $request->precio_por_dia) - $descuento;
 
+                // Obtener incidencias pendientes (REPORTADA) del vehículo
+                $incidenciasPendientes = $vehiculo->incidencias()
+                    ->where('estado_incidencia', IncidenciaEstadoEnum::REPORTADA->value)
+                    ->get(['tipo_incidencia', 'descripcion', 'fecha']);
+
+                // Construir texto de incidencias
+                $textoIncidencias = $incidenciasPendientes->isNotEmpty()
+                    ? 'Incidencias previas registradas: ' .
+                    $incidenciasPendientes->map(function ($inc) {
+                        return "[{$inc->tipo_incidencia}] {$inc->descripcion} ({$inc->fecha->format('d/m/Y')})";
+                    })->implode(' | ')
+                    : null;
+
+                // Concatenar observaciones del usuario con el texto de incidencias
+                $observacionesFinal = trim(
+                    ($request->observaciones_entrega ?? '') . ' ' . ($textoIncidencias ?? '')
+                );
+
                 $contrato = Contrato::create([
                     'numero_contrato'           => $this->generarNumeroContrato(),
                     'cliente_id'                => $reserva->cliente_id,
-                    'vehiculo_id'               => $reserva->vehiculo_id,
+                    'vehiculo_id'               => $vehiculo->id,
                     'reserva_id'                => $reserva->id,
                     'fecha_hora_entrega'        => $request->fecha_hora_entrega,
                     'fecha_hora_devolucion'     => $request->fecha_hora_devolucion,
@@ -128,7 +171,7 @@ class ContratoController extends Controller
                     'monto_descuento'           => $descuento,
                     'monto_total_renta'         => $montoTotal,
                     'nivel_combustible_entrega' => $request->nivel_combustible_entrega,
-                    'observaciones_entrega'     => $request->observaciones_entrega,
+                    'observaciones_entrega'     => $observacionesFinal ?: null,
                     'observaciones'             => $request->observaciones,
                     'estado_contrato'           => EstadoContratoEnum::ACTIVO->value,
                     'estado_pago'               => EstadoPagoEnum::PENDIENTE->value,
@@ -136,8 +179,7 @@ class ContratoController extends Controller
                 ]);
 
                 $reserva->update(['estado' => EstadoReservaEnum::CONFIRMADA->value]);
-
-                $reserva->vehiculo->update(['estado' => VehiculoEstadoEnum::RENTADO->value]);
+                $vehiculo->update(['estado' => VehiculoEstadoEnum::RENTADO->value]);
 
                 return $contrato;
             });
@@ -174,7 +216,6 @@ class ContratoController extends Controller
     public function storeDirecto(StoreContratoDirectoRequest $request)
     {
         try {
-            // authorize() y rules() ya se resolvieron automáticamente
             $cliente = Cliente::findOrFail($request->cliente_id);
 
             if ($cliente->vencimiento_licencia->isPast()) {
@@ -204,17 +245,50 @@ class ContratoController extends Controller
                 ], 422);
             }
 
-            $contrato = DB::transaction(function () use ($request, $vehiculo) {
-                $fechaEntrega    = now();
-                $fechaDevolucion = $fechaEntrega->copy()->addDays($request->dias_acordados);
+            // Calcular fechas del nuevo contrato
+            $fechaEntrega    = now();
+            $fechaDevolucion = $fechaEntrega->copy()->addDays($request->dias_acordados);
 
+            // Validar traslape de fechas con contratos activos del mismo vehículo
+            $contratoTraslapado = Contrato::where('vehiculo_id', $vehiculo->id)
+                ->where('estado_contrato', EstadoContratoEnum::ACTIVO->value)
+                ->where(function ($query) use ($fechaEntrega, $fechaDevolucion) {
+                    $query->where('fecha_hora_entrega', '<', $fechaDevolucion)
+                        ->where('fecha_hora_devolucion', '>', $fechaEntrega);
+                })
+                ->exists();
+
+            if ($contratoTraslapado) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'El vehículo ya tiene un contrato activo que se traslapa con esas fechas',
+                ], 422);
+            }
+
+            // Obtener incidencias pendientes ANTES de la transacción
+            $incidenciasPendientes = $vehiculo->incidencias()
+                ->where('estado_incidencia', IncidenciaEstadoEnum::REPORTADA->value)
+                ->get(['id', 'tipo_incidencia', 'descripcion', 'fecha']);
+
+            $contrato = DB::transaction(function () use ($request, $vehiculo, $fechaEntrega, $fechaDevolucion, $incidenciasPendientes) {
                 $descuento  = $request->monto_descuento ?? 0;
                 $montoTotal = ($request->dias_acordados * $request->precio_por_dia) - $descuento;
+
+                $textoIncidencias = $incidenciasPendientes->isNotEmpty()
+                    ? 'Incidencias previas registradas: ' .
+                    $incidenciasPendientes->map(function ($inc) {
+                        return "[{$inc->tipo_incidencia}] {$inc->descripcion} ({$inc->fecha->format('d/m/Y')})";
+                    })->implode(' | ')
+                    : null;
+
+                $observacionesFinal = trim(
+                    ($request->observaciones_entrega ?? '') . ' ' . ($textoIncidencias ?? '')
+                );
 
                 $contrato = Contrato::create([
                     'numero_contrato'           => $this->generarNumeroContrato(),
                     'cliente_id'                => $request->cliente_id,
-                    'vehiculo_id'               => $request->vehiculo_id,
+                    'vehiculo_id'               => $vehiculo->id,
                     'reserva_id'                => null,
                     'fecha_hora_entrega'        => $fechaEntrega,
                     'fecha_hora_devolucion'     => $fechaDevolucion,
@@ -223,7 +297,7 @@ class ContratoController extends Controller
                     'monto_descuento'           => $descuento,
                     'monto_total_renta'         => $montoTotal,
                     'nivel_combustible_entrega' => $request->nivel_combustible_entrega,
-                    'observaciones_entrega'     => $request->observaciones_entrega,
+                    'observaciones_entrega'     => $observacionesFinal ?: null,
                     'observaciones'             => $request->observaciones,
                     'estado_contrato'           => EstadoContratoEnum::ACTIVO->value,
                     'estado_pago'               => EstadoPagoEnum::PENDIENTE->value,
@@ -248,6 +322,10 @@ class ContratoController extends Controller
             return response()->json([
                 'status'  => 'success',
                 'message' => 'Contrato directo creado con éxito',
+                'advertencia' => $incidenciasPendientes->isNotEmpty()
+                    ? 'Este vehículo tiene incidencias pendientes sin resolver.'
+                    : null,
+                'incidencias_pendientes' => $incidenciasPendientes,
                 'data'    => $contrato,
             ], 201);
         } catch (ModelNotFoundException $e) {
