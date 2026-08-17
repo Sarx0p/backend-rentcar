@@ -3,6 +3,7 @@
 namespace App\Http\Requests\ClienteController;
 
 use App\Enums\RolEnum;
+use App\Rules\DuiValido;
 use Illuminate\Validation\Rule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Contracts\Validation\Validator;
@@ -24,7 +25,7 @@ class UpdateClienteRequest extends FormRequest
 
         return [
             'nombre'               => 'sometimes|string|max:100',
-            'dui'                  => ['sometimes', 'string', 'max:20', Rule::unique('clientes', 'dui')->ignore($id)],
+            'dui'                  => ['sometimes', 'string', 'max:20', Rule::unique('clientes', 'dui')->ignore($id), new DuiValido()],
             'nacimiento_dui'       => 'sometimes|date',
             'numero_licencia'      => ['sometimes', 'string', 'max:30', Rule::unique('clientes', 'numero_licencia')->ignore($id)],
             'vencimiento_licencia' => 'sometimes|date|after:today',
