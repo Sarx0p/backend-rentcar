@@ -3,7 +3,6 @@
 namespace Database\Seeders;
 
 use App\Models\User;
-// use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
 class DatabaseSeeder extends Seeder
@@ -15,18 +14,22 @@ class DatabaseSeeder extends Seeder
     {
         $this->call([
             RolSeeder::class,
-            DepartamentoSeeder::class, 
+            DepartamentoSeeder::class,
             MunicipioSeeder::class,
         ]);
 
-        User::factory()->create([
-            'nombre'   => 'Test',
-            'apellido' => 'User',
-            'correo'   => 'test@gmail.com',
-            'password' => bcrypt('12345678'),
-            'estado'   => 'ACTIVO',
-        ])->assignRole('ADMINISTRADOR');
+        User::updateOrCreate(
+            ['correo' => 'test@gmail.com'],
+            [
+                'nombre' => 'Test',
+                'apellido' => 'User',
+                'password' => bcrypt('12345678'),
+                'estado' => 'ACTIVO',
+            ]
+        )->syncRoles(['ADMINISTRADOR']);
 
-
+        $this->call([
+            DatosPruebaSeeder::class,
+        ]);
     }
 }
