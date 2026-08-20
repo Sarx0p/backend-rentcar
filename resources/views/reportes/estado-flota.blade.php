@@ -2,12 +2,14 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    @include('contratos.CSS.estilos-reporte')
+    <title>Reporte de Estado de la Flota</title>
+    @include('contratos.CSS.CSS-de-todos-los-repostes')
 </head>
 <body>
+
     <div class="header">
         <div class="header-logo">
-            <strong style="font-size:13px;">El Guayabo</strong><br>
+            <strong>El Guayabo</strong><br>
             <small>RENT CAR</small>
         </div>
         <div class="header-title">
@@ -15,13 +17,17 @@
             <h2>TRANSPORTE Y RENTA DE VEHÍCULOS</h2>
             <p>Cel.: 6006-8390</p>
         </div>
-        <div class="numero-contrato">
-            REV-02
-        </div>
     </div>
 
-    <div class="seccion-titulo">REPORTE DE ESTADO DE LA FLOTA</div>
-    <p style="margin-bottom:8px;">Fecha: {{ now()->format('d/m/Y') }}</p>
+    <div class="reporte-titulo">Reporte de Estado de la Flota</div>
+    <div class="reporte-rango">Fecha: {{ now()->format('d/m/Y') }}</div>
+
+    <div class="cards-container">
+        <div class="card">
+            <div class="card-label">Total de Vehículos</div>
+            <div class="card-value">{{ $totalVehiculos }}</div>
+        </div>
+    </div>
 
     <div class="seccion-titulo">Resumen por estado</div>
     <table>
@@ -40,7 +46,6 @@
             @endforeach
         </tbody>
     </table>
-    <p class="total">Total de vehículos: {{ $totalVehiculos }}</p>
 
     <div class="seccion-titulo">Detalle de vehículos</div>
     <table>
@@ -71,5 +76,6 @@
     </table>
 
     <div class="nota-final">Reporte generado automáticamente por el sistema.</div>
+
 </body>
 </html>

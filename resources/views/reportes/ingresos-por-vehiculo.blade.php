@@ -1,34 +1,77 @@
 <!DOCTYPE html>
-<html>
-<head><meta charset="UTF-8"><style>
-body{font-family:sans-serif;font-size:12px;}
-h1{font-size:18px;}
-table{width:100%;border-collapse:collapse;margin-top:15px;}
-td,th{border:1px solid #333;padding:6px;text-align:left;}
-.total{font-weight:bold;background:#f0f0f0;}
-</style></head>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Ingresos por Vehículo</title>
+    @include('contratos.CSS.CSS-de-todos-los-repostes')
+</head>
 <body>
-    <h1>Ingresos por Vehículo</h1>
-    <p>Del {{ $fechaInicio }} al {{ $fechaFin }}</p>
+
+    <div class="header">
+        <div class="header-logo">
+            <strong>El Guayabo</strong><br>
+            <small>RENT CAR</small>
+        </div>
+        <div class="header-title">
+            <h1>RENTACARS "EL GUAYABO"</h1>
+            <h2>TRANSPORTE Y RENTA DE VEHÍCULOS</h2>
+            <p>Cel.: 6006-8390</p>
+        </div>
+    </div>
+
+    <div class="reporte-titulo">Ingresos por Vehículo</div>
+    <div class="reporte-rango">
+        Del {{ $fechaInicio }} al {{ $fechaFin }}
+
+        @if(!empty($propietario))
+            <br>Propietario: <strong>{{ $propietario->nombre }}</strong>
+        @elseif(!empty(trim($propietarioBusqueda ?? '')))
+            <br>Filtro propietario: <strong>{{ $propietarioBusqueda }}</strong>
+        @else
+            <br>Todos los propietarios
+        @endif
+    </div>
 
     <table>
         <thead>
-            <tr><th>Placa</th><th>Marca / Modelo</th><th>N° Rentas</th><th>Ingresos</th></tr>
+            <tr>
+                <th>Placa</th>
+                <th>Propietario</th>
+                <th>Marca / Modelo</th>
+                <th class="right">N° Rentas</th>
+                <th class="right">Ingresos</th>
+            </tr>
         </thead>
         <tbody>
-            @foreach($vehiculos as $item)
+            @forelse($vehiculos as $item)
             <tr>
                 <td>{{ $item['vehiculo']->placa }}</td>
-                <td>{{ $item['vehiculo']->modelo->marca->nombre ?? '' }} {{ $item['vehiculo']->modelo->nombre ?? '' }}</td>
-                <td>{{ $item['num_rentas'] }}</td>
-                <td>${{ number_format($item['ingresos'], 2) }}</td>
+                <td>
+                    {{ optional($item['vehiculo']->propietario)->nombre }}
+                </td>
+                <td>
+                    {{ optional(optional($item['vehiculo']->modelo)->marca)->nombre }}
+                    {{ optional($item['vehiculo']->modelo)->nombre }}
+                </td>
+                <td class="right">{{ $item['num_rentas'] }}</td>
+                <td class="right">${{ number_format($item['ingresos'], 2) }}</td>
             </tr>
-            @endforeach
-            <tr class="total">
-                <td colspan="3">Total general</td>
-                <td>${{ number_format($totalGeneral, 2) }}</td>
+            @empty
+            <tr>
+                <td colspan="5" style="text-align:center;">No se encontraron resultados para este filtro.</td>
             </tr>
+            @endforelse
+
+            @if($vehiculos->isNotEmpty())
+            <tr class="total-destacado">
+                <td colspan="4">Total general</td>
+                <td class="right">${{ number_format($totalGeneral, 2) }}</td>
+            </tr>
+            @endif
         </tbody>
     </table>
+
+    <div class="nota-final">Reporte generado automáticamente por el sistema.</div>
+
 </body>
 </html>
