@@ -26,7 +26,7 @@ class UpdateClienteRequest extends FormRequest
         return [
             'nombre'               => 'sometimes|string|max:100',
             'dui'                  => ['sometimes', 'string', 'max:20', Rule::unique('clientes', 'dui')->ignore($id), new DuiValido()],
-            'nacimiento_dui'       => 'sometimes|date',
+            'vencimiento_dui'      => 'sometimes|date|after:today',
             'numero_licencia'      => ['sometimes', 'string', 'max:30', Rule::unique('clientes', 'numero_licencia')->ignore($id)],
             'vencimiento_licencia' => 'sometimes|date|after:today',
             'telefono'             => 'sometimes|string|max:25',
@@ -39,6 +39,7 @@ class UpdateClienteRequest extends FormRequest
         return [
             'dui.unique'                  => 'Ya existe otro cliente registrado con ese DUI.',
             'numero_licencia.unique'      => 'Ya existe otro cliente registrado con ese número de licencia.',
+            'vencimiento_dui.after'       => 'El DUI debe estar vigente (posterior a hoy).',
             'vencimiento_licencia.after'  => 'La licencia debe estar vigente (posterior a hoy).',
             'municipio_id.exists'         => 'El municipio seleccionado no existe.',
         ];
