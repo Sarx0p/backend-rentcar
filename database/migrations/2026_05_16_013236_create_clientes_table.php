@@ -18,7 +18,7 @@ return new class extends Migration
             $table->date('nacimiento_dui');
             $table->string('numero_licencia', 30)->unique();
             $table->date('vencimiento_licencia');
-            $table->string('telefono', 25);
+            $table->string('telefono', 25)->unique();
             $table->foreignId('municipio_id')->constrained('municipios');
             $table->timestamps();
         });

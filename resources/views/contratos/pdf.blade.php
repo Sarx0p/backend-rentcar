@@ -6,7 +6,6 @@
 </head>
 <body>
 
-
     <div class="header">
         <div class="header-logo">
             <strong style="font-size:13px;">El Guayabo</strong><br>
@@ -21,7 +20,6 @@
             N° {{ $contrato->numero_contrato }}
         </div>
     </div>
-
 
     <div class="campo-row">
         <div class="campo" style="width:100%">
@@ -51,7 +49,6 @@
             <span class="campo-valor">{{ $contrato->cliente->municipio->nombre }}</span>
         </div>
     </div>
-
 
     <div class="seccion-titulo">DATOS DEL VEHÍCULO</div>
 
@@ -122,7 +119,6 @@
         </div>
     </div>
 
-
     <div class="dibujos-combustible">
         <div class="dibujos">
             &nbsp;
@@ -140,7 +136,7 @@
                 <tr>
                     @foreach(['E', '1/4', '1/2', '3/4', 'F'] as $nivel)
                     <td style="padding: 4px 8px; border: 1px solid #000; text-align:center;">
-                        @if($contrato->nivel_combustible_entrega === $nivel) x @endif
+                        @if($contrato->nivel_combustible_entrega == $nivel) x @endif
                     </td>
                     @endforeach
                 </tr>
@@ -163,30 +159,26 @@
         </div>
     </div>
 
-
-   <div class="firmas">
-    <div class="firma-col">
-        <div style="text-align:center; margin-bottom: 8px;">NOMBRE DEL CLIENTE</div>
-        <div style="text-align:center; font-weight: bold; margin-bottom: 4px;">
-            {{ $contrato->cliente->nombre }}
+    <div class="firmas">
+        <div class="firma-col">
+            <div style="text-align:center; font-size: 12px; margin-bottom: 8px;">NOMBRE DEL CLIENTE</div>
+            <div style="text-align:center; font-weight: bold; font-size: 13px; height: 32px; display: flex; align-items: center; justify-content: center; margin-bottom: 4px;">
+                {{ $contrato->cliente->nombre }}
+            </div>
+            <div style="border-top: 1px solid #000;"></div>
+            <div style="text-align:center; font-size: 12px; margin-top: 12px; margin-bottom: 40px;">FIRMA DEL CLIENTE</div>
+            <div style="border-top: 1px solid #000;"></div>
         </div>
-        <div style="border-top: 1px solid #000;"></div>
-
-        <div style="text-align:center; margin-top: 8px; margin-bottom: 40px;">FIRMA DEL CLIENTE</div>
-        <div style="border-top: 1px solid #000;"></div>
-    </div>
-
-    <div class="firma-col">
-        <div style="text-align:center; margin-bottom: 8px;">NOMBRE DEL ARRENDANTE</div>
-        <div style="text-align:center; font-weight: bold; margin-bottom: 4px;">
-            {{ $contrato->user->nombre }} {{ $contrato->user->apellido }}
+        <div class="firma-col">
+            <div style="text-align:center; font-size: 12px; margin-bottom: 8px;">NOMBRE DEL ARRENDANTE</div>
+            <div style="text-align:center; font-weight: bold; font-size: 13px; height: 32px; display: flex; align-items: center; justify-content: center; margin-bottom: 4px;">
+                {{ $contrato->user->nombre }} {{ $contrato->user->apellido }}
+            </div>
+            <div style="border-top: 1px solid #000;"></div>
+            <div style="text-align:center; font-size: 12px; margin-top: 12px; margin-bottom: 40px;">FIRMA DEL ARRENDANTE</div>
+            <div style="border-top: 1px solid #000;"></div>
         </div>
-        <div style="border-top: 1px solid #000;"></div>
-
-        <div style="text-align:center; margin-top: 8px; margin-bottom: 40px;">FIRMA DEL ARRENDANTE</div>
-        <div style="border-top: 1px solid #000;"></div>
     </div>
-</div>
 
     <div class="nota-final">
         NOTA: EL CONDUCTOR EN ESTADO DE EBRIEDAD SE HACE RESPONSABLE POR DAÑOS AL VEHÍCULO

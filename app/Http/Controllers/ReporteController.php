@@ -37,7 +37,7 @@ class ReporteController extends Controller
         return $permitido;
     }
 
-  
+
 
     public function ingresos(Request $request)
     {
@@ -192,7 +192,7 @@ class ReporteController extends Controller
         }
     }
 
-    // ============ NUEVOS ============
+
 
     /**
      * Desempeño general: resumen ejecutivo del negocio.
@@ -258,9 +258,7 @@ class ReporteController extends Controller
         }
     }
 
-    /**
-     * Ingresos por vehículo: suma de pagos confirmados agrupados por vehículo.
-     */
+    //este es el metodo que filtra los ingresos de los vehiculos por las fechas y por propietario
     public function ingresosPorVehiculo(Request $request)
     {
         try {
@@ -274,7 +272,18 @@ class ReporteController extends Controller
             $fechaInicio = $request->fecha_inicio ?? now()->startOfMonth()->format('Y-m-d');
             $fechaFin    = $request->fecha_fin ?? now()->endOfMonth()->format('Y-m-d');
 
-            $vehiculos = Vehiculo::with(['modelo.marca'])
+            $propietarioBusqueda = trim((string) (
+                $request->input('propietario')
+                ?? $request->input('propietarios')
+                ?? ''
+            ));
+
+            $vehiculos = Vehiculo::with(['modelo.marca', 'propietario'])
+                ->when($propietarioBusqueda !== '', function ($query) use ($propietarioBusqueda) {
+                    $query->whereHas('propietario', function ($q) use ($propietarioBusqueda) {
+                        $q->where('nombre', 'like', "%{$propietarioBusqueda}%");
+                    });
+                })
                 ->get()
                 ->map(function ($vehiculo) use ($fechaInicio, $fechaFin) {
                     $ingresos = Pago::whereHas('contrato', function ($q) use ($vehiculo) {
@@ -291,9 +300,9 @@ class ReporteController extends Controller
                         ->count();
 
                     return [
-                        'vehiculo'    => $vehiculo,
-                        'ingresos'    => $ingresos,
-                        'num_rentas'  => $rentas,
+                        'vehiculo'   => $vehiculo,
+                        'ingresos'   => $ingresos,
+                        'num_rentas' => $rentas,
                     ];
                 })
                 ->sortByDesc('ingresos')
@@ -301,17 +310,28 @@ class ReporteController extends Controller
 
             $totalGeneral = $vehiculos->sum('ingresos');
 
+            $propietario = null;
+            if ($propietarioBusqueda !== '' && $vehiculos->isNotEmpty()) {
+                $propietario = optional($vehiculos->first()['vehiculo'])->propietario;
+            }
+
             $pdf = Pdf::loadView('reportes.ingresos-por-vehiculo', [
-                'vehiculos'    => $vehiculos,
-                'totalGeneral' => $totalGeneral,
-                'fechaInicio'  => $fechaInicio,
-                'fechaFin'     => $fechaFin,
+                'vehiculos'           => $vehiculos,
+                'totalGeneral'        => $totalGeneral,
+                'fechaInicio'         => $fechaInicio,
+                'fechaFin'            => $fechaFin,
+                'propietario'         => $propietario,
+                'propietarioBusqueda' => $propietarioBusqueda,
             ]);
 
             $pdf->setPaper('letter', 'portrait');
 
             return $pdf->stream('reporte-ingresos-por-vehiculo.pdf');
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
+            \Log::error('Error en reporte ingresos por vehiculo', [
+                'exception' => $e,
+            ]);
+
             return response()->json([
                 'status'  => 'error',
                 'message' => 'Error interno del servidor',
