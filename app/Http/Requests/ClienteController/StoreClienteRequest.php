@@ -23,7 +23,7 @@ class StoreClienteRequest extends FormRequest
         return [
             'nombre'               => 'required|string|max:100',
             'dui'                  => ['required', 'string', 'max:20', 'unique:clientes,dui', new DuiValido()],
-            'nacimiento_dui'       => 'required|date',
+            'vencimiento_dui'      => 'required|date|after:today',
             'numero_licencia'      => 'required|string|max:30|unique:clientes,numero_licencia',
             'vencimiento_licencia' => 'required|date|after:today',
             'telefono'             => 'required|string|max:25',
@@ -37,7 +37,8 @@ class StoreClienteRequest extends FormRequest
             'nombre.required'               => 'El nombre es obligatorio.',
             'dui.required'                   => 'El DUI es obligatorio.',
             'dui.unique'                     => 'Ya existe un cliente registrado con ese DUI.',
-            'nacimiento_dui.required'        => 'La fecha del DUI es obligatoria.',
+            'vencimiento_dui.required'       => 'La fecha de vencimiento del DUI es obligatoria.',
+            'vencimiento_dui.after'          => 'El DUI debe estar vigente (posterior a hoy).',
             'numero_licencia.required'       => 'El número de licencia es obligatorio.',
             'numero_licencia.unique'         => 'Ya existe un cliente registrado con ese número de licencia.',
             'vencimiento_licencia.required'  => 'La fecha de vencimiento de la licencia es obligatoria.',

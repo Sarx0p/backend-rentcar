@@ -190,7 +190,7 @@ class DatosPruebaSeeder extends Seeder
                 ['dui' => sprintf('045000%02d-%d', $numero, $numero % 10)],
                 [
                     'nombre' => $nombre,
-                    'nacimiento_dui' => now()->subYears(25 + ($index % 18))->subDays($index * 13)->toDateString(),
+                    'vencimiento_dui' => now()->addYears(1 + ($index % 5))->toDateString(),
                     'numero_licencia' => sprintf('%08d', 10000000 + $numero),
                     'vencimiento_licencia' => now()->addYears(2 + ($index % 4))->toDateString(),
                     'telefono' => sprintf('+503 72%02d-%04d', $index + 10, 1000 + $index),
@@ -226,5 +226,4 @@ class DatosPruebaSeeder extends Seeder
         }
     }
 }
-
 
