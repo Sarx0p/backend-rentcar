@@ -2,12 +2,14 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    @include('contratos.CSS.estilos-reporte')
+    <title>Reporte de Ingresos</title>
+    @include('contratos.CSS.CSS-de-todos-los-repostes')
 </head>
 <body>
+
     <div class="header">
         <div class="header-logo">
-            <strong style="font-size:13px;">El Guayabo</strong><br>
+            <strong>El Guayabo</strong><br>
             <small>RENT CAR</small>
         </div>
         <div class="header-title">
@@ -15,15 +17,11 @@
             <h2>TRANSPORTE Y RENTA DE VEHÍCULOS</h2>
             <p>Cel.: 6006-8390</p>
         </div>
-        <div class="numero-contrato">
-            REV-01
-        </div>
     </div>
 
-    <div class="seccion-titulo">REPORTE DE INGRESOS</div>
-    <p style="margin-bottom:8px;">Período: {{ $fechaInicio }} al {{ $fechaFin }}</p>
+    <div class="reporte-titulo">Reporte de Ingresos</div>
+    <div class="reporte-rango">Período: {{ $fechaInicio }} al {{ $fechaFin }}</div>
 
-    <div class="seccion-titulo">Detalle de Transacciones</div>
     <table>
         <thead>
             <tr>
@@ -42,10 +40,14 @@
                 <td class="right">${{ number_format($pago->monto, 2) }}</td>
             </tr>
             @endforeach
+            <tr class="total-destacado">
+                <td colspan="3">Total General</td>
+                <td class="right">${{ number_format($totalIngresos, 2) }}</td>
+            </tr>
         </tbody>
     </table>
-    <p class="total">Total General: ${{ number_format($totalIngresos, 2) }}</p>
 
     <div class="nota-final">Reporte generado automáticamente por el sistema.</div>
+
 </body>
 </html>
