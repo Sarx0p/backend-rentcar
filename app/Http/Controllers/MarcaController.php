@@ -7,6 +7,7 @@ use App\Models\Marca;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class MarcaController extends Controller
@@ -55,7 +56,7 @@ class MarcaController extends Controller
             }
 
             $request->validate([
-                'nombre' => 'required|string|max:80|unique:marcas,nombre',
+                'nombre' => 'required|string|min:2|max:80|unique:marcas,nombre',
             ]);
 
             DB::beginTransaction();
@@ -73,11 +74,10 @@ class MarcaController extends Controller
             ],201);
 
         } catch (ValidationException $e) {
-            DB::rollBack();
-
             return response()->json([
                 'status'  => 'error',
                 'message' => 'Faltan campos requeridos.',
+                'errors'  => $e->errors(),
             ],422);
 
         } catch (\Exception $e) {
@@ -136,6 +136,10 @@ class MarcaController extends Controller
                 ],403);
             }
 
+           $request->validate([
+               'nombre' => ['required', 'string', 'min:2', 'max:80', Rule::unique('marcas', 'nombre')->ignore($id)],
+           ]);
+
            $marcas = Marca::findOrFail($id);
 
            $marcas->update($request->only(["nombre"]));
@@ -146,6 +150,13 @@ class MarcaController extends Controller
            ],201);
 
 
+
+        } catch (ValidationException $e) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Faltan campos requeridos.',
+                'errors'  => $e->errors(),
+            ], 422);
 
         }catch(ModelNotFoundException){
             return response()->json([
