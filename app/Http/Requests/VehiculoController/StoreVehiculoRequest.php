@@ -26,7 +26,7 @@ class StoreVehiculoRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'anio'                => 'required|integer|min:1990|max:' . (date('Y') + 1),
+            'anio'                => 'required|integer|min:1980|max:2050',
             'color'               => 'required|string|max:30',
             'placa'               => 'required|string|max:20|unique:vehiculos,placa',
             'capacidad_pasajeros' => 'required|integer|min:1|max:255',
@@ -46,8 +46,8 @@ class StoreVehiculoRequest extends FormRequest
         return [
             'anio.required'                => 'El año es obligatorio.',
             'anio.integer'                 => 'El año debe ser un número entero.',
-            'anio.min'                     => 'El año no puede ser menor a 1990.',
-            'anio.max'                     => 'El año no puede ser mayor al próximo año.',
+            'anio.min'                     => 'El año no puede ser menor a 1980.',
+            'anio.max'                     => 'El año no puede ser mayor a 2050.',
             'color.required'               => 'El color es obligatorio.',
             'placa.required'               => 'La placa es obligatoria.',
             'placa.unique'                 => 'Ya existe un vehículo registrado con esa placa.',

@@ -8,6 +8,7 @@ use App\Models\Marca;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class ModeloController extends Controller
@@ -91,7 +92,13 @@ class ModeloController extends Controller
             }
 
             $request->validate([
-                'nombre'   => 'required|string|max:100',
+                'nombre'   => [
+                    'required',
+                    'string',
+                    'min:2',
+                    'max:100',
+                    Rule::unique('modelos', 'nombre')->where(fn ($query) => $query->where('marca_id', $request->marca_id)),
+                ],
                 'marca_id' => 'required|integer|exists:marcas,id',
             ]);
 
@@ -112,11 +119,10 @@ class ModeloController extends Controller
                 'data'    => $modelo,
             ], 201);
         } catch (ValidationException $e) {
-            DB::rollBack();
-
             return response()->json([
                 'status'  => 'error',
                 'message' => 'Faltan campos requeridos.',
+                'errors'  => $e->errors(),
             ], 422);
         } catch (\Exception $e) {
             DB::rollBack();
@@ -170,17 +176,36 @@ class ModeloController extends Controller
 
             $modelo = Modelo::findOrFail($id);
 
+            $request->validate([
+                'nombre'   => [
+                    'required',
+                    'string',
+                    'min:2',
+                    'max:100',
+                    Rule::unique('modelos', 'nombre')
+                        ->where(fn ($query) => $query->where('marca_id', $request->marca_id ?? $modelo->marca_id))
+                        ->ignore($modelo->id),
+                ],
+                'marca_id' => 'sometimes|integer|exists:marcas,id',
+            ]);
+
             DB::beginTransaction();
 
-            $modelo->update($request->only(['nombre']));
+            $modelo->update($request->only(['nombre', 'marca_id']));
 
             DB::commit();
 
             return response()->json([
                 'status'  => 'success',
                 'message' => 'Modelo actualizado correctamente.',
-                'data'    => $modelo,
+                'data'    => $modelo->load('marca'),
             ], 200);
+        } catch (ValidationException $e) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Faltan campos requeridos.',
+                'errors'  => $e->errors(),
+            ], 422);
         } catch (ModelNotFoundException $e) {
             return response()->json([
                 'status'  => 'error',

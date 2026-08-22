@@ -37,6 +37,7 @@ Route::get('/marcas/{marcaId}/modelos', [ModeloController::class, 'porMarca']);
 
 Route::middleware('auth:api')->group(function () {
     Route::post('/modelos', [ModeloController::class, 'store']);
+    Route::put('/modelos/{id}', [ModeloController::class, 'update']);
 });
 
 Route::get('categorias', [CategoriaController::class, 'index']);
@@ -44,6 +45,8 @@ Route::get('categorias/{id}', [CategoriaController::class, 'show']);
 
 Route::group(['middleware' => ['auth:api']], function () {
     Route::post('categorias', [CategoriaController::class, 'store']);
+    Route::put('categorias/{id}', [CategoriaController::class, 'update']);
+    Route::delete('categorias/{id}', [CategoriaController::class, 'destroy']);
 });
 
 Route::prefix('auth')->group(function () {

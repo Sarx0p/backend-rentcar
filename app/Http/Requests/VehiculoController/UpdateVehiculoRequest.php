@@ -29,7 +29,7 @@ class UpdateVehiculoRequest extends FormRequest
         $id = $this->route('vehiculo');
 
         return [
-            'anio'                => 'sometimes|integer|min:1990|max:' . (date('Y') + 1),
+            'anio'                => 'sometimes|integer|min:1980|max:2050',
             'color'               => 'sometimes|string|max:30',
             'placa'               => ['sometimes', 'string', 'max:20', Rule::unique('vehiculos', 'placa')->ignore($id)],
             'capacidad_pasajeros' => 'sometimes|integer|min:1|max:255',
@@ -48,8 +48,8 @@ class UpdateVehiculoRequest extends FormRequest
     {
         return [
             'anio.integer'           => 'El año debe ser un número entero.',
-            'anio.min'               => 'El año no puede ser menor a 1990.',
-            'anio.max'               => 'El año no puede ser mayor al próximo año.',
+            'anio.min'               => 'El año no puede ser menor a 1980.',
+            'anio.max'               => 'El año no puede ser mayor a 2050.',
             'placa.unique'           => 'Ya existe un vehículo registrado con esa placa.',
             'estado.in'              => 'El estado no es válido.',
             'propietario_id.exists'  => 'El propietario seleccionado no existe.',

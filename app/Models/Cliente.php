@@ -13,7 +13,7 @@ class Cliente extends Model
     protected $fillable = [
         'nombre',
         'dui',
-        'nacimiento_dui',
+        'vencimiento_dui',
         'numero_licencia',
         'vencimiento_licencia',
         'telefono',
@@ -26,7 +26,7 @@ class Cliente extends Model
     ];
 
     protected $casts = [
-        'nacimiento_dui'       => 'date',
+        'vencimiento_dui'      => 'date',
         'vencimiento_licencia' => 'date',
     ];
 
