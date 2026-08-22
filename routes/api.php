@@ -1,7 +1,6 @@
 <?php
 
 use Illuminate\Http\Request;
-
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\UsuarioController;
@@ -23,6 +22,7 @@ use App\Http\Controllers\DepartamentoController;
 use App\Http\Controllers\PropietarioController;
 use App\Http\Controllers\ReporteController;
 use App\Http\Controllers\SeguroController;
+use App\Http\Controllers\HistorialController;
 
 Route::get('/marcas', [MarcaController::class, 'index']);
 Route::get('/marcas/{id}', [MarcaController::class, 'index']);
@@ -82,6 +82,15 @@ Route::prefix('admin')->group(function () {
         Route::get('/departamentos', [DepartamentoController::class, 'index']);
         Route::apiResource('mantenimientos', MantenimientoController::class);
         Route::get('/departamentos/{departamentoId}/municipios', [DepartamentoController::class, 'porDepartamento']);
+
+
+
+        Route::prefix('clientes/{cliente}/historial')->group(function () {
+            Route::get('/resumen', [HistorialController::class, 'resumen']);
+            Route::get('/reservas', [HistorialController::class, 'reservas']);
+            Route::get('/contratos', [HistorialController::class, 'contratos']);
+            Route::get('/incidencias', [HistorialController::class, 'incidencias']);
+        });
 
         Route::prefix('reportes')->group(function () {
             Route::get('ingresos', [ReporteController::class, 'ingresos']);
