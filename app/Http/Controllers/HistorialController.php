@@ -9,9 +9,7 @@ use Illuminate\Http\Request;
 
 class HistorialController extends Controller
 {
-    /**
-     * Resumen del cliente: Datos generales y contadores laterales
-     */
+   
     public function resumen(string $clienteId)
     {
         try {
@@ -20,7 +18,6 @@ class HistorialController extends Controller
             $totalReservas = $cliente->reservas()->count();
             $totalContratos = $cliente->contratos()->count();
 
-            // Obtiene IDs de contratos del cliente para contar sus incidencias
             $contratosIds = $cliente->contratos()->pluck('id');
             $totalIncidencias = Incidencia::whereIn('contrato_id', $contratosIds)->count();
 
@@ -44,18 +41,15 @@ class HistorialController extends Controller
                 'status'  => 'error',
                 'message' => 'Cliente no encontrado',
             ], 404);
-        } catch (\Throwable $e) {
+        } catch (\Exception $e) {
             return response()->json([
                 'status'  => 'error',
                 'message' => 'Error interno del servidor',
-                'debug'   => $e->getMessage(),
             ], 500);
         }
     }
 
-    /**
-     * Pestaña 1: Reservas del cliente
-     */
+   
     public function reservas(Request $request, string $clienteId)
     {
         try {
@@ -63,6 +57,13 @@ class HistorialController extends Controller
 
             $reservas = $cliente->reservas()
                 ->with(['vehiculo'])
+                ->when($request->filled('estado'), function ($query) use ($request) {
+                    $query->where('estado', $request->estado);
+                })
+                ->when($request->filled('fecha_inicio') && $request->filled('fecha_fin'), function ($query) use ($request) {
+                    $query->whereDate('fecha_inicio', '>=', $request->fecha_inicio)
+                        ->whereDate('fecha_fin', '<=', $request->fecha_fin);
+                })
                 ->latest()
                 ->paginate(10);
 
@@ -76,18 +77,15 @@ class HistorialController extends Controller
                 'status'  => 'error',
                 'message' => 'Cliente no encontrado',
             ], 404);
-        } catch (\Throwable $e) {
+        } catch (\Exception $e) {
             return response()->json([
                 'status'  => 'error',
                 'message' => 'Error interno del servidor',
-                'debug'   => $e->getMessage(),
             ], 500);
         }
     }
 
-    /**
-     * Pestaña 2: Contratos del cliente
-     */
+    
     public function contratos(Request $request, string $clienteId)
     {
         try {
@@ -95,6 +93,13 @@ class HistorialController extends Controller
 
             $contratos = $cliente->contratos()
                 ->with(['vehiculo'])
+                ->when($request->filled('estado'), function ($query) use ($request) {
+                    $query->where('estado_contrato', $request->estado);
+                })
+                ->when($request->filled('fecha_inicio') && $request->filled('fecha_fin'), function ($query) use ($request) {
+                    $query->whereDate('fecha_hora_entrega', '>=', $request->fecha_inicio)
+                        ->whereDate('fecha_hora_devolucion', '<=', $request->fecha_fin);
+                })
                 ->latest()
                 ->paginate(10);
 
@@ -108,18 +113,15 @@ class HistorialController extends Controller
                 'status'  => 'error',
                 'message' => 'Cliente no encontrado',
             ], 404);
-        } catch (\Throwable $e) {
+        } catch (\Exception $e) {
             return response()->json([
                 'status'  => 'error',
                 'message' => 'Error interno del servidor',
-                'debug'   => $e->getMessage(),
             ], 500);
         }
     }
 
-    /**
-     * Pestaña 3: Incidencias del cliente (a través de sus contratos)
-     */
+    
     public function incidencias(Request $request, string $clienteId)
     {
         try {
@@ -129,6 +131,13 @@ class HistorialController extends Controller
 
             $incidencias = Incidencia::whereIn('contrato_id', $contratosIds)
                 ->with(['vehiculo', 'contrato', 'usuario'])
+                ->when($request->filled('estado'), function ($query) use ($request) {
+                    $query->where('estado_incidencia', $request->estado);
+                })
+                ->when($request->filled('fecha_inicio') && $request->filled('fecha_fin'), function ($query) use ($request) {
+                    $query->whereDate('fecha', '>=', $request->fecha_inicio)
+                        ->whereDate('fecha', '<=', $request->fecha_fin);
+                })
                 ->latest()
                 ->paginate(10);
 
@@ -142,11 +151,10 @@ class HistorialController extends Controller
                 'status'  => 'error',
                 'message' => 'Cliente no encontrado',
             ], 404);
-        } catch (\Throwable $e) {
+        } catch (\Exception $e) {
             return response()->json([
                 'status'  => 'error',
                 'message' => 'Error interno del servidor',
-                'debug'   => $e->getMessage(),
             ], 500);
         }
     }
