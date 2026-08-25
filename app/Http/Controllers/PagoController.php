@@ -91,6 +91,19 @@ class PagoController extends Controller
                 ], 422);
             }
 
+            $totalPagadoActual = $contrato->pagos()
+                ->where('estado_transaccion', EstadoTransaccionEnum::CONFIRMADO->value)
+                ->sum('monto');
+
+            $saldoPendiente = $contrato->monto_total_renta - $totalPagadoActual;
+
+            if ($request->monto > $saldoPendiente) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'El monto del pago excede el saldo pendiente del contrato. Saldo pendiente: $' . number_format($saldoPendiente, 2),
+                ], 422);
+            }
+
             $pago = DB::transaction(function () use ($request, $contrato) {
 
                 $pago = Pago::create([
@@ -113,7 +126,7 @@ class PagoController extends Controller
 
                 return $pago;
             });
-            
+
             $pago->load('contrato:id,numero_contrato,monto_total_renta,estado_pago');
             return response()->json([
                 'status'  => 'success',
@@ -189,3 +202,4 @@ class PagoController extends Controller
         //
     }
 }
+

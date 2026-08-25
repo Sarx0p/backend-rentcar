@@ -3,7 +3,6 @@
 namespace App\Http\Requests\VehiculoController;
 
 use App\Enums\RolEnum;
-use App\Enums\VehiculoEstadoEnum;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Http\Exceptions\HttpResponseException;
@@ -30,7 +29,6 @@ class StoreVehiculoRequest extends FormRequest
             'color'               => 'required|string|max:30',
             'placa'               => 'required|string|max:20|unique:vehiculos,placa',
             'capacidad_pasajeros' => 'required|integer|min:1|max:255',
-            'estado'              => 'required|in:' . implode(',', array_column(VehiculoEstadoEnum::cases(), 'value')),
             'observaciones'       => 'sometimes|nullable|string|max:400',
             'propietario_id'      => 'required|integer|exists:propietarios,id',
             'categoria_id'        => 'required|integer|exists:categorias,id',
@@ -52,8 +50,6 @@ class StoreVehiculoRequest extends FormRequest
             'placa.required'               => 'La placa es obligatoria.',
             'placa.unique'                 => 'Ya existe un vehículo registrado con esa placa.',
             'capacidad_pasajeros.required' => 'La capacidad de pasajeros es obligatoria.',
-            'estado.required'              => 'El estado es obligatorio.',
-            'estado.in'                    => 'El estado no es válido.',
             'propietario_id.required'      => 'Debe seleccionar un propietario.',
             'propietario_id.exists'        => 'El propietario seleccionado no existe.',
             'categoria_id.required'        => 'Debe seleccionar una categoría.',

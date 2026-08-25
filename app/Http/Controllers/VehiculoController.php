@@ -21,6 +21,18 @@ class VehiculoController extends Controller
                 ->when($request->filled('estado'), function ($query) use ($request) {
                     $query->where('estado', $request->estado);
                 })
+                ->when($request->filled('search'), function ($query) use ($request) {
+                    $search = $request->search;
+                    $query->where(function ($subQuery) use ($search) {
+                        $subQuery->where('placa', 'like', '%' . $search . '%')
+                            ->orWhereHas('modelo', function ($q) use ($search) {
+                                $q->where('nombre', 'like', '%' . $search . '%');
+                            })
+                            ->orWhereHas('modelo.marca', function ($q) use ($search) {
+                                $q->where('nombre', 'like', '%' . $search . '%');
+                            });
+                    });
+                })
                 ->when(
                     $request->filled('fecha_inicio') && $request->filled('fecha_fin'),
                     function ($query) use ($request) {
@@ -32,14 +44,7 @@ class VehiculoController extends Controller
                     }
                 )
                 ->orderBy('id')
-                ->get();
-
-            if ($vehiculos->isEmpty()) {
-                return response()->json([
-                    'status'  => 'error',
-                    'message' => 'No hay vehículos disponibles.',
-                ], 404);
-            }
+                ->paginate(15);
 
             return response()->json([
                 'status' => 'success',
@@ -56,6 +61,13 @@ class VehiculoController extends Controller
     public function store(StoreVehiculoRequest $request)
     {
         try {
+            if ($request->has('estado')) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'El estado del vehículo no se puede establecer manualmente al crearlo.',
+                ], 422);
+            }
+
             DB::beginTransaction();
 
             $vehiculo = Vehiculo::create([
@@ -63,7 +75,7 @@ class VehiculoController extends Controller
                 'color'               => $request->color,
                 'placa'               => $request->placa,
                 'capacidad_pasajeros' => $request->capacidad_pasajeros,
-                'estado'              => $request->estado,
+                'estado'              => VehiculoEstadoEnum::DISPONIBLE->value,
                 'observaciones'       => $request->observaciones,
                 'propietario_id'      => $request->propietario_id,
                 'categoria_id'        => $request->categoria_id,
@@ -128,6 +140,13 @@ class VehiculoController extends Controller
                 ], 404);
             }
 
+            if ($request->has('estado')) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'El estado del vehículo no se puede modificar directamente. Cambia por contratos, reservas, mantenimiento o cierres.',
+                ], 422);
+            }
+
             DB::beginTransaction();
 
             $vehiculo->update($request->only([
@@ -135,7 +154,6 @@ class VehiculoController extends Controller
                 'color',
                 'placa',
                 'capacidad_pasajeros',
-                'estado',
                 'observaciones',
                 'propietario_id',
                 'categoria_id',
