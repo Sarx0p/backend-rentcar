@@ -56,6 +56,13 @@ class VehiculoController extends Controller
     public function store(StoreVehiculoRequest $request)
     {
         try {
+            if ($request->has('estado')) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'El estado del vehículo no se puede establecer manualmente al crearlo.',
+                ], 422);
+            }
+
             DB::beginTransaction();
 
             $vehiculo = Vehiculo::create([
@@ -63,7 +70,7 @@ class VehiculoController extends Controller
                 'color'               => $request->color,
                 'placa'               => $request->placa,
                 'capacidad_pasajeros' => $request->capacidad_pasajeros,
-                'estado'              => $request->estado,
+                'estado'              => VehiculoEstadoEnum::DISPONIBLE->value,
                 'observaciones'       => $request->observaciones,
                 'propietario_id'      => $request->propietario_id,
                 'categoria_id'        => $request->categoria_id,
@@ -128,6 +135,13 @@ class VehiculoController extends Controller
                 ], 404);
             }
 
+            if ($request->has('estado')) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'El estado del vehículo no se puede modificar directamente. Cambia por contratos, reservas, mantenimiento o cierres.',
+                ], 422);
+            }
+
             DB::beginTransaction();
 
             $vehiculo->update($request->only([
@@ -135,7 +149,6 @@ class VehiculoController extends Controller
                 'color',
                 'placa',
                 'capacidad_pasajeros',
-                'estado',
                 'observaciones',
                 'propietario_id',
                 'categoria_id',

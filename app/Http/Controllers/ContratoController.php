@@ -265,6 +265,22 @@ class ContratoController extends Controller
                 ], 422);
             }
 
+            // NUEVO: validar que no choque con una reserva futura del mismo vehículo
+            $reservaTraslapada = Reserva::where('vehiculo_id', $vehiculo->id)
+                ->whereIn('estado', [EstadoReservaEnum::PENDIENTE->value, EstadoReservaEnum::CONFIRMADA->value])
+                ->where(function ($query) use ($fechaEntrega, $fechaDevolucion) {
+                    $query->where('fecha_inicio', '<', $fechaDevolucion)
+                        ->where('fecha_fin', '>', $fechaEntrega);
+                })
+                ->exists();
+
+            if ($reservaTraslapada) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'El vehículo tiene una reserva que se traslapa con estas fechas. No se puede generar un contrato directo.',
+                ], 422);
+            }
+
             // Obtener incidencias pendientes ANTES de la transacción
             $incidenciasPendientes = $vehiculo->incidencias()
                 ->where('estado_incidencia', IncidenciaEstadoEnum::REPORTADA->value)

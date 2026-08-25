@@ -100,7 +100,7 @@ class CierreRentaController extends Controller
                 ], 422);
             }
 
-            $cierre = DB::transaction(function () use ($request, $contrato) {
+            $resultado = DB::transaction(function () use ($request, $contrato) {
 
                 // Calcular horas de retraso con margen de 2 horas
                 $fechaDevolucionAcordada = $contrato->fecha_hora_devolucion;
@@ -128,6 +128,12 @@ class CierreRentaController extends Controller
                         'monto_total_renta' => $montoBase + $totalCargos,
                         'estado_pago'       => EstadoPagoEnum::PENDIENTE->value,
                     ]);
+
+                    // NUEVO: el cargo queda registrado, pero no se finaliza el cierre en este mismo intento
+                    return [
+                        'bloqueado' => true,
+                        'mensaje'   => 'Se generó un cargo por retraso de $' . number_format($request->monto_retraso, 2) . '. Debe registrarse el pago de ese cargo antes de poder finalizar el cierre.',
+                    ];
                 }
 
                 $cierre = CierreRenta::create([
@@ -156,9 +162,20 @@ class CierreRentaController extends Controller
                     'estado_contrato' => EstadoContratoEnum::FINALIZADO->value,
                 ]);
 
-                return $cierre;
+                return [
+                    'bloqueado' => false,
+                    'cierre'    => $cierre,
+                ];
             });
 
+            if ($resultado['bloqueado']) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => $resultado['mensaje'],
+                ], 422);
+            }
+
+            $cierre = $resultado['cierre'];
             $cierre->load([
                 'contrato:id,numero_contrato,monto_total_renta,estado_pago',
                 'user:id,nombre,apellido',
