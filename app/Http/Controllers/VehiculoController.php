@@ -21,6 +21,18 @@ class VehiculoController extends Controller
                 ->when($request->filled('estado'), function ($query) use ($request) {
                     $query->where('estado', $request->estado);
                 })
+                ->when($request->filled('search'), function ($query) use ($request) {
+                    $search = $request->search;
+                    $query->where(function ($subQuery) use ($search) {
+                        $subQuery->where('placa', 'like', '%' . $search . '%')
+                            ->orWhereHas('modelo', function ($q) use ($search) {
+                                $q->where('nombre', 'like', '%' . $search . '%');
+                            })
+                            ->orWhereHas('modelo.marca', function ($q) use ($search) {
+                                $q->where('nombre', 'like', '%' . $search . '%');
+                            });
+                    });
+                })
                 ->when(
                     $request->filled('fecha_inicio') && $request->filled('fecha_fin'),
                     function ($query) use ($request) {
@@ -32,14 +44,7 @@ class VehiculoController extends Controller
                     }
                 )
                 ->orderBy('id')
-                ->get();
-
-            if ($vehiculos->isEmpty()) {
-                return response()->json([
-                    'status'  => 'error',
-                    'message' => 'No hay vehículos disponibles.',
-                ], 404);
-            }
+                ->paginate(15);
 
             return response()->json([
                 'status' => 'success',
