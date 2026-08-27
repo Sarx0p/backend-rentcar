@@ -15,7 +15,6 @@ class VehiculoController extends Controller
 {
     public function index(Request $request)
     {
-
         try {
             $vehiculos = Vehiculo::with(['modelo.marca', 'categoria'])
                 ->when($request->filled('estado'), function ($query) use ($request) {
@@ -30,6 +29,11 @@ class VehiculoController extends Controller
                             })
                             ->orWhereHas('modelo.marca', function ($q) use ($search) {
                                 $q->where('nombre', 'like', '%' . $search . '%');
+                            })
+                            ->orWhereHas('modelo', function ($q) use ($search) {
+                                $q->whereHas('marca', function ($qMarca) use ($search) {
+                                    $qMarca->whereRaw("CONCAT(marcas.nombre, ' ', modelos.nombre) LIKE ?", ['%' . $search . '%']);
+                                });
                             });
                     });
                 })
@@ -39,7 +43,7 @@ class VehiculoController extends Controller
                         $query->whereDoesntHave('reservas', function ($q) use ($request) {
                             $q->whereNotIn('estado', [EstadoReservaEnum::CANCELADA->value])
                                 ->whereDate('fecha_inicio', '<', $request->fecha_fin)
-                                ->whereDate('fecha_fin',    '>', $request->fecha_inicio);
+                                ->whereDate('fecha_fin', '>', $request->fecha_inicio);
                         });
                     }
                 )
