@@ -197,9 +197,91 @@ class PagoController extends Controller
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(string $id)
+    public function destroy(Request $request, string $id)
     {
-        //
+        try {
+            $userAuth = auth('api')->user();
+
+            if (
+                !$userAuth->hasRole(RolEnum::ADMINISTRADOR->value) &&
+                !$userAuth->hasRole(RolEnum::EMPLEADO->value)
+            ) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'No tienes permiso para cancelar pagos',
+                ], 403);
+            }
+
+            $request->validate([
+                'motivo_cancelacion' => 'required|string|max:500',
+            ]);
+
+            $pago = Pago::with('contrato')->find($id);
+
+            if (!$pago) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'Pago no encontrado',
+                ], 404);
+            }
+
+            if ($pago->estado_transaccion === EstadoTransaccionEnum::CANCELADO->value) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'Este pago ya se encuentra cancelado',
+                ], 422);
+            }
+
+            if ($pago->contrato && $pago->contrato->estado_contrato === EstadoContratoEnum::FINALIZADO->value) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'No se puede cancelar un pago de un contrato ya finalizado',
+                ], 422);
+            }
+
+            DB::transaction(function () use ($pago, $request) {
+                $eraConfirmado = $pago->estado_transaccion === EstadoTransaccionEnum::CONFIRMADO->value;
+
+                $pago->update([
+                    'estado_transaccion' => EstadoTransaccionEnum::CANCELADO->value,
+                    'motivo_cancelacion' => $request->motivo_cancelacion,
+                ]);
+
+                // Si el pago cancelado SÍ estaba confirmado, el estado_pago del contrato
+                // quedó desactualizado (se calculó contando ese monto). Hay que recalcularlo.
+                if ($eraConfirmado && $pago->contrato) {
+                    $contrato = $pago->contrato;
+
+                    $totalPagadoActual = $contrato->pagos()
+                        ->where('estado_transaccion', EstadoTransaccionEnum::CONFIRMADO->value)
+                        ->sum('monto');
+
+                    if ($totalPagadoActual <= 0) {
+                        $nuevoEstadoPago = EstadoPagoEnum::PENDIENTE->value;
+                    } elseif ($totalPagadoActual < $contrato->monto_total_renta) {
+                        $nuevoEstadoPago = EstadoPagoEnum::PARCIAL->value;
+                    } else {
+                        $nuevoEstadoPago = EstadoPagoEnum::PAGADO->value;
+                    }
+
+                    $contrato->update([
+                        'estado_pago' => $nuevoEstadoPago,
+                    ]);
+                }
+            });
+
+            $pago->load('contrato:id,numero_contrato,monto_total_renta,estado_pago');
+
+            return response()->json([
+                'status'  => 'success',
+                'message' => 'Pago cancelado correctamente',
+                'data'    => $pago,
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Error interno del servidor',
+            ], 500);
+        }
     }
 }
-

@@ -19,6 +19,7 @@ return new class extends Migration
             $table->unsignedTinyInteger('capacidad_pasajeros');
             $table->string('estado', 50);
             $table->string('observaciones', 400)->nullable();
+            $table->string('motivo_restauracion', 500)->nullable();
             $table->foreignId('modelo_id')->constrained('modelos');
             $table->foreignId('categoria_id')->constrained('categorias');
             $table->foreignId('propietario_id')->constrained('propietarios');

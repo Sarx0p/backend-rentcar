@@ -15,6 +15,7 @@ class Pago extends Model
         'metodo_pago',
         'estado_transaccion',
         'fecha_pago',
+        'motivo_cancelacion',
     ];
 
     protected $hidden = [

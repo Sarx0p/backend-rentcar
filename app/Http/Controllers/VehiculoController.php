@@ -47,6 +47,16 @@ class VehiculoController extends Controller
                         });
                     }
                 )
+                ->orderByRaw("
+                CASE estado
+                    WHEN 'DISPONIBLE' THEN 1
+                    WHEN 'RESERVADO' THEN 2
+                    WHEN 'RENTADO' THEN 3
+                    WHEN 'MANTENIMIENTO' THEN 4
+                    WHEN 'FUERA DE SERVICIO' THEN 5
+                    ELSE 99
+                END
+            ")
                 ->orderBy('id')
                 ->paginate(15);
 
@@ -251,6 +261,64 @@ class VehiculoController extends Controller
             return response()->json([
                 'status'  => 'error',
                 'message' => 'Error interno del servidor.',
+            ], 500);
+        }
+    }
+
+    public function restaurar(Request $request, string $id)
+    {
+        try {
+            $user = auth("api")->user();
+
+            if (
+                !$user->hasRole(RolEnum::ADMINISTRADOR->value) &&
+                !$user->hasRole(RolEnum::EMPLEADO->value)
+
+            ) {
+                return response()->json([
+                    "status" => "Errors",
+                    "message" => "no tienes permiso para restaurar un vehiculo"
+                ], 403);
+            }
+
+            $request->validate([
+                "motivo_restauracion" => "required|string|max:500",
+            ]);
+
+            $vehiculo = Vehiculo::find($id);
+
+            if (!$vehiculo) {
+                return response()->json([
+                    "status" => "Errors",
+                    "message" => "vehiculo no encontrado",
+                ], 404);
+            }
+
+            if ($vehiculo->estado !== VehiculoEstadoEnum::FUERA_SERVICIO->value) {
+                return response()->json([
+                    "status" => "Errors",
+                    "message" => "solo se puede restaurar autos fuera de servicio"
+                ], 422);
+            }
+
+            DB::beginTransaction();
+            $vehiculo->update([
+                "estado" => VehiculoEstadoEnum::DISPONIBLE->value,
+                "motivo_restauracion" => $request->motivo_restauracion,
+            ]);
+            DB::commit();
+
+            $vehiculo->load(['modelo.marca', 'categoria']);
+
+            return response()->json([
+                'status'  => 'success',
+                'message' => 'Vehiculo restaurado a disponible correctamente.',
+                'data'    => $vehiculo,
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                "status" => "Errors",
+                "message" => "Error interno de el servidor"
             ], 500);
         }
     }
