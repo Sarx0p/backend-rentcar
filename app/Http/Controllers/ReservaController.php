@@ -118,6 +118,21 @@ class ReservaController extends Controller
                 ], 422);
             }
 
+            //validar que el cliente no tenga ya otra reserva activa que se traslape con estas fechas
+            $clienteTraslapado = Reserva::where('cliente_id', $request->cliente_id)
+                ->whereNotIn('estado', [EstadoReservaEnum::CANCELADA->value])
+                ->where(function ($query) use ($request) {
+                    $query->where('fecha_inicio', '<', $request->fecha_fin)
+                        ->where('fecha_fin', '>', $request->fecha_inicio);
+                })->exists();
+
+            if ($clienteTraslapado) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'Este cliente ya tiene una reserva activa que se traslapa con estas fechas',
+                ], 422);
+            }
+
             $incidenciasPendientes = Incidencia::where('vehiculo_id', $vehiculo->id)
                 ->where('estado_incidencia', IncidenciaEstadoEnum::REPORTADA->value)
                 ->get(['id', 'tipo_incidencia', 'descripcion', 'fecha']);

@@ -60,7 +60,28 @@ class ContratoController extends Controller
                 ->when($request->estado, function ($query, $estado) {
                     $query->where('estado_contrato', $estado);
                 })
-                ->latest()
+                ->when($request->estado_pago, function ($query, $estadoPago) {
+                    $query->where('estado_pago', $estadoPago);
+                })
+                ->orderByRaw("
+                CASE estado_contrato
+                    WHEN 'ACTIVO' THEN 1
+                    WHEN 'VENCIDO' THEN 2
+                    WHEN 'PENDIENTE' THEN 3
+                    WHEN 'FINALIZADO' THEN 4
+                    WHEN 'ANULADO' THEN 5
+                    ELSE 99
+                END
+            ")
+                ->orderByRaw("
+                CASE estado_pago
+                    WHEN 'PENDIENTE' THEN 1
+                    WHEN 'PARCIAL' THEN 2
+                    WHEN 'PAGADO' THEN 3
+                    ELSE 99
+                END
+            ")
+                ->orderBy('fecha_hora_entrega')
                 ->paginate(10);
 
             return response()->json([
@@ -281,6 +302,22 @@ class ContratoController extends Controller
                 ], 422);
             }
 
+            //validar que el cliente no tenga otra reserva activa que se traslape con estas fechas (evita duplicidad)
+            $reservaClienteTraslapada = Reserva::where('cliente_id', $request->cliente_id)
+                ->whereIn('estado', [EstadoReservaEnum::PENDIENTE->value, EstadoReservaEnum::CONFIRMADA->value])
+                ->where(function ($query) use ($fechaEntrega, $fechaDevolucion) {
+                    $query->where('fecha_inicio', '<', $fechaDevolucion)
+                        ->where('fecha_fin', '>', $fechaEntrega);
+                })
+                ->exists();
+
+            if ($reservaClienteTraslapada) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'Este cliente ya tiene una reserva activa que se traslapa con estas fechas. Genera el contrato desde esa reserva o cancélala primero.',
+                ], 422);
+            }
+
             // Obtener incidencias pendientes ANTES de la transacción
             $incidenciasPendientes = $vehiculo->incidencias()
                 ->where('estado_incidencia', IncidenciaEstadoEnum::REPORTADA->value)
@@ -384,6 +421,7 @@ class ContratoController extends Controller
                 'vehiculo.categoria:id,nombre,precio_dia',
                 'reserva:id,fecha_inicio,fecha_fin',
                 'user:id,nombre,apellido',
+                'pagos:id,contrato_id,monto,estado_transaccion',
             ])->findOrFail($id);
 
             return response()->json([

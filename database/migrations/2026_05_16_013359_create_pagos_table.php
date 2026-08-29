@@ -17,6 +17,7 @@ return new class extends Migration
             $table->decimal('monto', 8, 2);
             $table->string('metodo_pago', 50);
             $table->string('estado_transaccion', 30);
+            $table->string('motivo_cancelacion', 500)->nullable();
             $table->dateTime('fecha_pago');
             $table->timestamps();
         });

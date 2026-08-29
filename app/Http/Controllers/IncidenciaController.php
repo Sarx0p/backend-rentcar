@@ -2,10 +2,10 @@
 
 namespace App\Http\Controllers;
 
-use App\Enums\RolEnum;
+use App\Enums\EstadoPagoEnum;
 use App\Enums\IncidenciaEstadoEnum;
 use App\Enums\IncidenciaTipoResponsableEnum;
-use App\Enums\VehiculoEstadoEnum;
+use App\Enums\RolEnum;
 use App\Http\Requests\IncidenciaController\StoreIncidenciaRequest;
 use App\Http\Requests\IncidenciaController\UpdateIncidenciaRequest;
 use App\Models\Incidencia;
@@ -99,19 +99,19 @@ class IncidenciaController extends Controller
                     'costo'             => $request->costo,
                 ]);
 
-                // Caso: responsabilidad del CLIENTE → el costo se suma al contrato
+                // Caso: responsabilidad del CLIENTE → el costo se suma al contrato y pasa a PENDIENTE
                 if (
                     $request->responsable_tipo === IncidenciaTipoResponsableEnum::CLIENTE->value
                     && $request->filled('costo')
+                    && $request->costo > 0
                     && $incidencia->contrato
                 ) {
                     $contrato = $incidencia->contrato;
                     $contrato->update([
                         'monto_total_renta' => $contrato->monto_total_renta + $request->costo,
+                        'estado_pago'       => EstadoPagoEnum::PENDIENTE->value,
                     ]);
                 }
-
-            
 
                 return $incidencia;
             });
@@ -210,36 +210,31 @@ class IncidenciaController extends Controller
                 $responsableNuevo = $incidencia->responsable_tipo;
                 $costoNuevo       = $incidencia->costo;
 
-                if (
-                    $responsableNuevo === IncidenciaTipoResponsableEnum::CLIENTE->value
-                    && $incidencia->contrato
-                    && $costoNuevo != $costoAnterior
-                ) {
+                // Calcular la diferencia a aplicar al contrato
+                $montoCobradoAntes = ($responsableAnterior === IncidenciaTipoResponsableEnum::CLIENTE->value)
+                    ? ($costoAnterior ?? 0)
+                    : 0;
+
+                $montoCobradoAhora = ($responsableNuevo === IncidenciaTipoResponsableEnum::CLIENTE->value)
+                    ? ($costoNuevo ?? 0)
+                    : 0;
+
+                $diferencia = $montoCobradoAhora - $montoCobradoAntes;
+
+                if ($diferencia != 0 && $incidencia->contrato) {
                     $contrato = $incidencia->contrato;
 
-                    $montoAnteriorAplicado = $responsableAnterior === IncidenciaTipoResponsableEnum::CLIENTE->value
-                        ? $costoAnterior
-                        : 0;
-
-                    $diferencia = ($costoNuevo ?? 0) - $montoAnteriorAplicado;
-
-                    $contrato->update([
+                    $payloadUpdate = [
                         'monto_total_renta' => $contrato->monto_total_renta + $diferencia,
-                    ]);
-                }
+                    ];
 
-                if (
-                    $responsableAnterior === IncidenciaTipoResponsableEnum::CLIENTE->value
-                    && $responsableNuevo !== IncidenciaTipoResponsableEnum::CLIENTE->value
-                    && $incidencia->contrato
-                ) {
-                    $contrato = $incidencia->contrato;
-                    $contrato->update([
-                        'monto_total_renta' => $contrato->monto_total_renta - ($costoAnterior ?? 0),
-                    ]);
-                }
+                    // Si se le está sumando un cobro nuevo o adicional al cliente, cambia el estado de pago a PENDIENTE
+                    if ($diferencia > 0) {
+                        $payloadUpdate['estado_pago'] = EstadoPagoEnum::PENDIENTE->value;
+                    }
 
-                // AQUI SE ELIMINÓ EL BLOQUE QUE CAMBIABA A MANTENIMIENTO, tal como indicó Claude.
+                    $contrato->update($payloadUpdate);
+                }
             });
 
             return response()->json([

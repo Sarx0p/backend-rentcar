@@ -72,10 +72,11 @@ Route::prefix('admin')->group(function () {
         Route::apiResource('reservas', ReservaController::class)->except(['destroy']);
         // SE QUITO POR LA OPTIMISACION DE EL INDEX DE VEHIUCLOS DONDE QEUDABA LA RUTA INUTILIZADA
         Route::apiResource('vehiculos', VehiculoController::class);
+        Route::patch('/vehiculos/{id}/restaurar', [VehiculoController::class, 'restaurar']);
         Route::get('contratos/{id}/pdf', [ContratoController::class, 'generarPdf']);
         Route::post('contratos/directo', [ContratoController::class, 'storeDirecto']);
         Route::apiResource('contratos', ContratoController::class)->only(['index', 'show', 'store']);
-        Route::apiResource('pagos', PagoController::class)->only(['index', 'show', 'store']);
+        Route::apiResource('pagos', PagoController::class)->only(['index', 'show', 'store','destroy']);
         Route::apiResource('cargos-adicionales', CargoAdicionalController::class)->only(['index', 'show', 'store']);
         Route::apiResource('incidencias', IncidenciaController::class)->only(['index', 'show', 'store', 'update', 'destroy']);
         Route::apiResource('cierres-renta', CierreRentaController::class)->only(['index', 'show', 'store']);
