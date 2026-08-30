@@ -8,6 +8,7 @@ use App\Http\Controllers\ClienteController;
 use App\Http\Controllers\ReservaController;
 use App\Http\Controllers\VehiculoController;
 use App\Http\Controllers\MarcaController;
+use App\Http\Controllers\NotificacionController;
 use App\Http\Controllers\ModeloController;
 use App\Http\Controllers\CategoriaController;
 use App\Http\Controllers\ContratoController;
@@ -72,6 +73,7 @@ Route::prefix('admin')->group(function () {
         Route::apiResource('reservas', ReservaController::class)->except(['destroy']);
         // SE QUITO POR LA OPTIMISACION DE EL INDEX DE VEHIUCLOS DONDE QEUDABA LA RUTA INUTILIZADA
         Route::apiResource('vehiculos', VehiculoController::class);
+        Route::get('/notificaciones', [NotificacionController::class, 'index']);
         Route::patch('/vehiculos/{id}/restaurar', [VehiculoController::class, 'restaurar']);
         Route::get('contratos/{id}/pdf', [ContratoController::class, 'generarPdf']);
         Route::post('contratos/directo', [ContratoController::class, 'storeDirecto']);
