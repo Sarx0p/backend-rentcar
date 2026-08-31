@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Enums\EstadoContratoEnum;
 use App\Enums\EstadoPagoEnum;
 use App\Enums\EstadoTransaccionEnum;
+use App\Enums\MotivoCancelacionPagoEnum;
 use App\Enums\RolEnum;
 use App\Http\Requests\PagoController\StorePagoRequest;
 use App\Models\Contrato;
@@ -12,6 +13,8 @@ use App\Models\Pago;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class PagoController extends Controller
 {
@@ -34,7 +37,7 @@ class PagoController extends Controller
             }
 
             $pagos = Pago::with([
-                'contrato:id,numero_contrato,monto_total_renta,estado_pago',
+                'contrato:id,numero_contrato,monto_total_renta,estado_contrato,estado_pago',
             ])
                 ->when($request->search, function ($query, $search) {
                     $query->where('metodo_pago', 'like', '%' . $search . '%')
@@ -127,7 +130,7 @@ class PagoController extends Controller
                 return $pago;
             });
 
-            $pago->load('contrato:id,numero_contrato,monto_total_renta,estado_pago');
+            $pago->load('contrato:id,numero_contrato,monto_total_renta,estado_contrato,estado_pago');
             return response()->json([
                 'status'  => 'success',
                 'message' => 'Pago registrado con éxito',
@@ -165,7 +168,7 @@ class PagoController extends Controller
             }
 
             $pago = Pago::with([
-                'contrato:id,numero_contrato,monto_total_renta,estado_pago',
+                'contrato:id,numero_contrato,monto_total_renta,estado_contrato,estado_pago',
             ])->findOrFail($id);
 
             return response()->json([
@@ -213,7 +216,10 @@ class PagoController extends Controller
             }
 
             $request->validate([
-                'motivo_cancelacion' => 'required|string|max:500',
+                'motivo_cancelacion' => ['required', Rule::in(array_column(MotivoCancelacionPagoEnum::cases(), 'value'))],
+            ], [
+                'motivo_cancelacion.required' => 'Debe indicar el motivo de cancelación.',
+                'motivo_cancelacion.in'       => 'El motivo de cancelación no es válido.',
             ]);
 
             $pago = Pago::with('contrato')->find($id);
@@ -270,13 +276,19 @@ class PagoController extends Controller
                 }
             });
 
-            $pago->load('contrato:id,numero_contrato,monto_total_renta,estado_pago');
+            $pago->load('contrato:id,numero_contrato,monto_total_renta,estado_contrato,estado_pago');
 
             return response()->json([
                 'status'  => 'success',
                 'message' => 'Pago cancelado correctamente',
                 'data'    => $pago,
             ], 200);
+        } catch (ValidationException $e) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Error de validación',
+                'errors'  => $e->errors(),
+            ], 422);
         } catch (\Exception $e) {
             return response()->json([
                 'status'  => 'error',
