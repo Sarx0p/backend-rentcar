@@ -15,6 +15,7 @@ class Contrato extends Model
         'numero_contrato',
         'cliente_id',
         'vehiculo_id',
+        'info_registro',
         'reserva_id',
         'fecha_hora_entrega',
         'fecha_hora_devolucion',
@@ -42,6 +43,7 @@ class Contrato extends Model
         'precio_por_dia'        => 'decimal:2',
         'monto_descuento'       => 'decimal:2',
         'monto_total_renta'     => 'decimal:2',
+        'info_registro'         => 'array',
     ];
 
     public function cliente(): BelongsTo
@@ -83,7 +85,4 @@ class Contrato extends Model
     {
         return $this->hasMany(Incidencia::class, 'contrato_id');
     }
-
-
-    
 }

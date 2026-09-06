@@ -17,6 +17,7 @@ return new class extends Migration
 
             $table->foreignId('cliente_id')->constrained('clientes');
             $table->foreignId('vehiculo_id')->constrained('vehiculos');
+            $table->json('info_registro')->nullable();
             $table->foreignId('reserva_id')->nullable()->constrained('reservas');
             $table->dateTime('fecha_hora_entrega');
             $table->dateTime('fecha_hora_devolucion');

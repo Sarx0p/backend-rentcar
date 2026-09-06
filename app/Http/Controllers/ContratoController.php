@@ -40,22 +40,14 @@ class ContratoController extends Controller
             }
 
             $contratos = Contrato::with([
-                'cliente:id,nombre,dui,telefono,municipio_id,numero_licencia',
-                'cliente.municipio.departamento',
-                'vehiculo:id,placa,color,anio,estado,modelo_id,categoria_id',
-                'vehiculo.modelo:id,nombre,marca_id',
-                'vehiculo.modelo.marca:id,nombre',
-                'vehiculo.categoria:id,nombre,precio_dia',
                 'reserva:id,fecha_inicio,fecha_fin',
                 'user:id,nombre,apellido',
             ])
                 ->when($request->search, function ($query, $search) {
                     $query->where('numero_contrato', 'like', '%' . $search . '%')
                         ->orWhere('estado_contrato', 'like', '%' . $search . '%')
-                        ->orWhereHas('cliente', function ($q) use ($search) {
-                            $q->where('nombre', 'like', '%' . $search . '%')
-                                ->orWhere('dui', 'like', '%' . $search . '%');
-                        });
+                        ->orWhereRaw("JSON_EXTRACT(info_registro, '$.cliente.nombre') LIKE ?", ['%' . $search . '%'])
+                        ->orWhereRaw("JSON_EXTRACT(info_registro, '$.cliente.dui') LIKE ?", ['%' . $search . '%']);
                 })
                 ->when($request->estado, function ($query, $estado) {
                     $query->where('estado_contrato', $estado);
@@ -102,7 +94,11 @@ class ContratoController extends Controller
     public function store(StoreContratoRequest $request)
     {
         try {
-            $reserva = Reserva::with(['vehiculo', 'cliente'])->findOrFail($request->reserva_id);
+            $reserva = Reserva::with([
+                'vehiculo.modelo.marca',
+                'vehiculo.categoria',
+                'cliente.municipio.departamento',
+            ])->findOrFail($request->reserva_id);
 
             if ($reserva->estado !== EstadoReservaEnum::PENDIENTE->value) {
                 return response()->json([
@@ -181,9 +177,28 @@ class ContratoController extends Controller
                 );
 
                 $contrato = Contrato::create([
-                    'numero_contrato'           => $this->generarNumeroContrato(),
-                    'cliente_id'                => $reserva->cliente_id,
-                    'vehiculo_id'               => $vehiculo->id,
+                    'numero_contrato' => $this->generarNumeroContrato(),
+                    'cliente_id'      => $reserva->cliente_id,
+                    'vehiculo_id'     => $vehiculo->id,
+                    'info_registro'   => [
+                        'vehiculo' => [
+                            'placa'      => $vehiculo->placa,
+                            'color'      => $vehiculo->color,
+                            'anio'       => $vehiculo->anio,
+                            'modelo'     => $vehiculo->modelo->nombre,
+                            'marca'      => $vehiculo->modelo->marca->nombre,
+                            'categoria'  => $vehiculo->categoria->nombre,
+                            'precio_dia' => $vehiculo->categoria->precio_dia,
+                        ],
+                        'cliente' => [
+                            'nombre'          => $reserva->cliente->nombre,
+                            'dui'             => $reserva->cliente->dui,
+                            'telefono'        => $reserva->cliente->telefono,
+                            'numero_licencia' => $reserva->cliente->numero_licencia,
+                            'municipio'       => $reserva->cliente->municipio->nombre ?? null,
+                            'departamento'    => $reserva->cliente->municipio->departamento->nombre ?? null,
+                        ],
+                    ],
                     'reserva_id'                => $reserva->id,
                     'fecha_hora_entrega'        => $request->fecha_hora_entrega,
                     'fecha_hora_devolucion'     => $request->fecha_hora_devolucion,
@@ -206,12 +221,6 @@ class ContratoController extends Controller
             });
 
             $contrato->load([
-                'cliente:id,nombre,dui,telefono,municipio_id,numero_licencia',
-                'cliente.municipio.departamento',
-                'vehiculo:id,placa,color,anio,estado,modelo_id,categoria_id',
-                'vehiculo.modelo:id,nombre,marca_id',
-                'vehiculo.modelo.marca:id,nombre',
-                'vehiculo.categoria:id,nombre,precio_dia',
                 'reserva:id,fecha_inicio,fecha_fin',
                 'user:id,nombre,apellido',
             ]);
@@ -237,7 +246,7 @@ class ContratoController extends Controller
     public function storeDirecto(StoreContratoDirectoRequest $request)
     {
         try {
-            $cliente = Cliente::findOrFail($request->cliente_id);
+            $cliente = Cliente::with('municipio.departamento')->findOrFail($request->cliente_id);
 
             if ($cliente->vencimiento_licencia->isPast()) {
                 return response()->json([
@@ -257,7 +266,7 @@ class ContratoController extends Controller
                 ], 422);
             }
 
-            $vehiculo = Vehiculo::findOrFail($request->vehiculo_id);
+            $vehiculo = Vehiculo::with(['modelo.marca', 'categoria'])->findOrFail($request->vehiculo_id);
 
             if ($vehiculo->estado !== VehiculoEstadoEnum::DISPONIBLE->value) {
                 return response()->json([
@@ -286,7 +295,7 @@ class ContratoController extends Controller
                 ], 422);
             }
 
-            // NUEVO: validar que no choque con una reserva futura del mismo vehículo
+            // Validar que no choque con una reserva futura del mismo vehículo
             $reservaTraslapada = Reserva::where('vehiculo_id', $vehiculo->id)
                 ->whereIn('estado', [EstadoReservaEnum::PENDIENTE->value, EstadoReservaEnum::CONFIRMADA->value])
                 ->where(function ($query) use ($fechaEntrega, $fechaDevolucion) {
@@ -302,7 +311,7 @@ class ContratoController extends Controller
                 ], 422);
             }
 
-            //validar que el cliente no tenga otra reserva activa que se traslape con estas fechas (evita duplicidad)
+            // Validar que el cliente no tenga otra reserva activa que se traslape con estas fechas (evita duplicidad)
             $reservaClienteTraslapada = Reserva::where('cliente_id', $request->cliente_id)
                 ->whereIn('estado', [EstadoReservaEnum::PENDIENTE->value, EstadoReservaEnum::CONFIRMADA->value])
                 ->where(function ($query) use ($fechaEntrega, $fechaDevolucion) {
@@ -323,7 +332,7 @@ class ContratoController extends Controller
                 ->where('estado_incidencia', IncidenciaEstadoEnum::REPORTADA->value)
                 ->get(['id', 'tipo_incidencia', 'descripcion', 'fecha']);
 
-            $contrato = DB::transaction(function () use ($request, $vehiculo, $fechaEntrega, $fechaDevolucion, $incidenciasPendientes) {
+            $contrato = DB::transaction(function () use ($request, $cliente, $vehiculo, $fechaEntrega, $fechaDevolucion, $incidenciasPendientes) {
                 $descuento  = $request->monto_descuento ?? 0;
                 $montoTotal = ($request->dias_acordados * $request->precio_por_dia) - $descuento;
 
@@ -339,9 +348,28 @@ class ContratoController extends Controller
                 );
 
                 $contrato = Contrato::create([
-                    'numero_contrato'           => $this->generarNumeroContrato(),
-                    'cliente_id'                => $request->cliente_id,
-                    'vehiculo_id'               => $vehiculo->id,
+                    'numero_contrato' => $this->generarNumeroContrato(),
+                    'cliente_id'      => $request->cliente_id,
+                    'vehiculo_id'     => $vehiculo->id,
+                    'info_registro'   => [
+                        'vehiculo' => [
+                            'placa'      => $vehiculo->placa,
+                            'color'      => $vehiculo->color,
+                            'anio'       => $vehiculo->anio,
+                            'modelo'     => $vehiculo->modelo->nombre,
+                            'marca'      => $vehiculo->modelo->marca->nombre,
+                            'categoria'  => $vehiculo->categoria->nombre,
+                            'precio_dia' => $vehiculo->categoria->precio_dia,
+                        ],
+                        'cliente' => [
+                            'nombre'          => $cliente->nombre,
+                            'dui'             => $cliente->dui,
+                            'telefono'        => $cliente->telefono,
+                            'numero_licencia' => $cliente->numero_licencia,
+                            'municipio'       => $cliente->municipio->nombre ?? null,
+                            'departamento'    => $cliente->municipio->departamento->nombre ?? null,
+                        ],
+                    ],
                     'reserva_id'                => null,
                     'fecha_hora_entrega'        => $fechaEntrega,
                     'fecha_hora_devolucion'     => $fechaDevolucion,
@@ -362,15 +390,7 @@ class ContratoController extends Controller
                 return $contrato;
             });
 
-            $contrato->load([
-                'cliente:id,nombre,dui,telefono,municipio_id,numero_licencia',
-                'cliente.municipio.departamento',
-                'vehiculo:id,placa,color,anio,estado,modelo_id,categoria_id',
-                'vehiculo.modelo:id,nombre,marca_id',
-                'vehiculo.modelo.marca:id,nombre',
-                'vehiculo.categoria:id,nombre,precio_dia',
-                'user:id,nombre,apellido',
-            ]);
+            $contrato->load(['user:id,nombre,apellido']);
 
             return response()->json([
                 'status'  => 'success',
@@ -413,12 +433,6 @@ class ContratoController extends Controller
             }
 
             $contrato = Contrato::with([
-                'cliente:id,nombre,dui,telefono,municipio_id,numero_licencia',
-                'cliente.municipio.departamento',
-                'vehiculo:id,placa,color,anio,estado,modelo_id,categoria_id',
-                'vehiculo.modelo:id,nombre,marca_id',
-                'vehiculo.modelo.marca:id,nombre',
-                'vehiculo.categoria:id,nombre,precio_dia',
                 'reserva:id,fecha_inicio,fecha_fin',
                 'user:id,nombre,apellido',
                 'pagos:id,contrato_id,monto,estado_transaccion',
@@ -460,12 +474,7 @@ class ContratoController extends Controller
     public function generarPdf(string $id)
     {
         try {
-            $contrato = Contrato::with([
-                'cliente.municipio.departamento',
-                'vehiculo.modelo.marca',
-                'vehiculo.categoria',
-                'user',
-            ])->findOrFail($id);
+            $contrato = Contrato::with(['user'])->findOrFail($id);
 
             $pdf = Pdf::loadView('contratos.pdf', compact('contrato'));
             $pdf->setPaper('letter', 'portrait');

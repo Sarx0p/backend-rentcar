@@ -197,7 +197,7 @@ class CargoAdicionalController extends Controller
             return response()->json([
                 'status'  => 'error',
                 'message' => 'Error interno del servidor',
-             
+
             ], 500);
         }
     }
