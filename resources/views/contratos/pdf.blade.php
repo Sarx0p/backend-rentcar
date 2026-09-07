@@ -24,29 +24,29 @@
     <div class="campo-row">
         <div class="campo" style="width:100%">
             <span class="campo-label">Nombre: </span>
-            <span class="campo-valor" style="min-width:400px">{{ $contrato->cliente->nombre }}</span>
+            <span class="campo-valor" style="min-width:400px">{{ $contrato->info_registro['cliente']['nombre'] ?? '' }}</span>
         </div>
     </div>
 
     <div class="campo-row">
         <div class="campo" style="width:40%">
             <span class="campo-label">Número de DUI: </span>
-            <span class="campo-valor">{{ $contrato->cliente->dui }}</span>
+            <span class="campo-valor">{{ $contrato->info_registro['cliente']['dui'] ?? '' }}</span>
         </div>
         <div class="campo" style="width:60%">
             <span class="campo-label">Número de licencia: </span>
-            <span class="campo-valor">{{ $contrato->cliente->numero_licencia }}</span>
+            <span class="campo-valor">{{ $contrato->info_registro['cliente']['numero_licencia'] ?? '' }}</span>
         </div>
     </div>
 
     <div class="campo-row">
         <div class="campo" style="width:40%">
             <span class="campo-label">Departamento: </span>
-            <span class="campo-valor">{{ $contrato->cliente->municipio->departamento->nombre }}</span>
+            <span class="campo-valor">{{ $contrato->info_registro['cliente']['departamento'] ?? '' }}</span>
         </div>
         <div class="campo" style="width:60%">
             <span class="campo-label">Municipio: </span>
-            <span class="campo-valor">{{ $contrato->cliente->municipio->nombre }}</span>
+            <span class="campo-valor">{{ $contrato->info_registro['cliente']['municipio'] ?? '' }}</span>
         </div>
     </div>
 
@@ -55,30 +55,30 @@
     <div class="campo-row">
         <div class="campo" style="width:33%">
             <span class="campo-label">Marca: </span>
-            <span class="campo-valor">{{ $contrato->vehiculo->modelo->marca->nombre }}</span>
+            <span class="campo-valor">{{ $contrato->info_registro['vehiculo']['marca'] ?? '' }}</span>
         </div>
         <div class="campo" style="width:33%">
             <span class="campo-label">Tipo: </span>
-            <span class="campo-valor">{{ $contrato->vehiculo->categoria->nombre }}</span>
+            <span class="campo-valor">{{ $contrato->info_registro['vehiculo']['categoria'] ?? '' }}</span>
         </div>
         <div class="campo" style="width:33%">
             <span class="campo-label">Placa: </span>
-            <span class="campo-valor">{{ $contrato->vehiculo->placa }}</span>
+            <span class="campo-valor">{{ $contrato->info_registro['vehiculo']['placa'] ?? '' }}</span>
         </div>
     </div>
 
     <div class="campo-row">
         <div class="campo" style="width:33%">
             <span class="campo-label">Color: </span>
-            <span class="campo-valor">{{ $contrato->vehiculo->color }}</span>
+            <span class="campo-valor">{{ $contrato->info_registro['vehiculo']['color'] ?? '' }}</span>
         </div>
         <div class="campo" style="width:33%">
             <span class="campo-label">Modelo: </span>
-            <span class="campo-valor">{{ $contrato->vehiculo->modelo->nombre }}</span>
+            <span class="campo-valor">{{ $contrato->info_registro['vehiculo']['modelo'] ?? '' }}</span>
         </div>
         <div class="campo" style="width:33%">
             <span class="campo-label">Año: </span>
-            <span class="campo-valor">{{ $contrato->vehiculo->anio }}</span>
+            <span class="campo-valor">{{ $contrato->info_registro['vehiculo']['anio'] ?? '' }}</span>
         </div>
     </div>
 
@@ -163,7 +163,7 @@
         <div class="firma-col">
             <div style="text-align:center; font-size: 12px; margin-bottom: 8px;">NOMBRE DEL CLIENTE</div>
             <div style="text-align:center; font-weight: bold; font-size: 13px; height: 32px; display: flex; align-items: center; justify-content: center; margin-bottom: 4px;">
-                {{ $contrato->cliente->nombre }}
+                {{ $contrato->info_registro['cliente']['nombre'] ?? '' }}
             </div>
             <div style="border-top: 1px solid #000;"></div>
             <div style="text-align:center; font-size: 12px; margin-top: 12px; margin-bottom: 40px;">FIRMA DEL CLIENTE</div>
