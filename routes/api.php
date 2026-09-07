@@ -28,7 +28,7 @@ use App\Http\Controllers\HistorialController;
 Route::get('/marcas', [MarcaController::class, 'index']);
 Route::get('/marcas/{id}', [MarcaController::class, 'index']);
 
-Route::middleware('auth:api')->group(function () {
+Route::middleware(['auth:api', 'estado.activo'])->group(function () {
     Route::post('/marcas', [MarcaController::class, 'store']);
     Route::put('/marcas/{id}', [MarcaController::class, 'update']);
 });
@@ -36,7 +36,7 @@ Route::middleware('auth:api')->group(function () {
 Route::get('/modelos', [ModeloController::class, 'index']);
 Route::get('/marcas/{marcaId}/modelos', [ModeloController::class, 'porMarca']);
 
-Route::middleware('auth:api')->group(function () {
+Route::middleware(['auth:api', 'estado.activo'])->group(function () {
     Route::post('/modelos', [ModeloController::class, 'store']);
     Route::put('/modelos/{id}', [ModeloController::class, 'update']);
 });
@@ -44,7 +44,7 @@ Route::middleware('auth:api')->group(function () {
 Route::get('categorias', [CategoriaController::class, 'index']);
 Route::get('categorias/{id}', [CategoriaController::class, 'show']);
 
-Route::group(['middleware' => ['auth:api']], function () {
+Route::group(['middleware' => ['auth:api', 'estado.activo']], function () {
     Route::post('categorias', [CategoriaController::class, 'store']);
     Route::put('categorias/{id}', [CategoriaController::class, 'update']);
     Route::delete('categorias/{id}', [CategoriaController::class, 'destroy']);
@@ -54,7 +54,7 @@ Route::prefix('auth')->group(function () {
 
     Route::post('login', [AuthController::class, 'login']);
 
-    Route::middleware('auth:api')->group(function () {
+    Route::middleware(['auth:api', 'estado.activo'])->group(function () {
         Route::get('me',       [AuthController::class, 'me']);
         Route::post('logout',  [AuthController::class, 'logout']);
         Route::post('refresh', [AuthController::class, 'refresh']);
@@ -63,11 +63,11 @@ Route::prefix('auth')->group(function () {
 
 Route::prefix('admin')->group(function () {
 
-    Route::middleware(['auth:api', 'role:ADMINISTRADOR'])->group(function () {
+    Route::middleware(['auth:api', 'estado.activo', 'role:ADMINISTRADOR'])->group(function () {
         Route::apiResource('usuarios', UsuarioController::class);
     });
 
-    Route::middleware(['auth:api', 'role:ADMINISTRADOR|EMPLEADO'])->group(function () {
+    Route::middleware(['auth:api', 'estado.activo', 'role:ADMINISTRADOR|EMPLEADO'])->group(function () {
         Route::apiResource('clientes', ClienteController::class);
         Route::get('clientes/{id}/licencia-vigente', [ClienteController::class, 'licenciaVigente']);
         Route::apiResource('reservas', ReservaController::class)->except(['destroy']);
@@ -78,7 +78,7 @@ Route::prefix('admin')->group(function () {
         Route::get('contratos/{id}/pdf', [ContratoController::class, 'generarPdf']);
         Route::post('contratos/directo', [ContratoController::class, 'storeDirecto']);
         Route::apiResource('contratos', ContratoController::class)->only(['index', 'show', 'store']);
-        Route::apiResource('pagos', PagoController::class)->only(['index', 'show', 'store','destroy']);
+        Route::apiResource('pagos', PagoController::class)->only(['index', 'show', 'store', 'destroy']);
         Route::apiResource('cargos-adicionales', CargoAdicionalController::class)->only(['index', 'show', 'store']);
         Route::apiResource('incidencias', IncidenciaController::class)->only(['index', 'show', 'store', 'update', 'destroy']);
         Route::apiResource('cierres-renta', CierreRentaController::class)->only(['index', 'show', 'store']);
@@ -88,8 +88,6 @@ Route::prefix('admin')->group(function () {
         Route::get('/departamentos', [DepartamentoController::class, 'index']);
         Route::apiResource('mantenimientos', MantenimientoController::class);
         Route::get('/departamentos/{departamentoId}/municipios', [DepartamentoController::class, 'porDepartamento']);
-
-
 
         Route::prefix('clientes/{cliente}/historial')->group(function () {
             Route::get('/resumen', [HistorialController::class, 'resumen']);
@@ -112,6 +110,6 @@ Route::prefix('admin')->group(function () {
     });
 });
 
-Route::middleware('auth:api')->group(function () {
+Route::middleware(['auth:api', 'estado.activo'])->group(function () {
     Route::get('dashboard/resumen', [DashboardController::class, 'resumen']);
 });
