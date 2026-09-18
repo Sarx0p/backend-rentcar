@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\CierreRentaEstadoEnum;
 use App\Enums\EstadoContratoEnum;
 use App\Enums\EstadoPagoEnum;
 use App\Enums\EstadoTransaccionEnum;
@@ -80,10 +81,14 @@ class PagoController extends Controller
 
             $contrato = Contrato::findOrFail($request->contrato_id);
 
-            if ($contrato->estado_contrato !== EstadoContratoEnum::ACTIVO->value) {
+            $puedeRecibirPago = $contrato->estado_contrato === EstadoContratoEnum::ACTIVO->value
+                || ($contrato->estado_contrato === EstadoContratoEnum::FINALIZADO->value
+                    && $contrato->estado_pago !== EstadoPagoEnum::PAGADO->value);
+
+            if (!$puedeRecibirPago) {
                 return response()->json([
                     'status'  => 'error',
-                    'message' => 'Solo se pueden registrar pagos en contratos ACTIVOS',
+                    'message' => 'Solo se pueden registrar pagos en contratos ACTIVOS o FINALIZADOS con deuda pendiente',
                 ], 422);
             }
 
@@ -222,7 +227,7 @@ class PagoController extends Controller
                 'motivo_cancelacion.in'       => 'El motivo de cancelación no es válido.',
             ]);
 
-            $pago = Pago::with('contrato')->find($id);
+            $pago = Pago::with('contrato.cierreRenta')->find($id);
 
             if (!$pago) {
                 return response()->json([
@@ -238,7 +243,12 @@ class PagoController extends Controller
                 ], 422);
             }
 
-            if ($pago->contrato && $pago->contrato->estado_contrato === EstadoContratoEnum::FINALIZADO->value) {
+            $contrato = $pago->contrato;
+            $cerradoConDeuda = $contrato
+                && $contrato->cierreRenta
+                && $contrato->cierreRenta->estado === CierreRentaEstadoEnum::FINALIZADO_CON_DEUDA->value;
+
+            if ($contrato && $contrato->estado_contrato === EstadoContratoEnum::FINALIZADO->value && !$cerradoConDeuda) {
                 return response()->json([
                     'status'  => 'error',
                     'message' => 'No se puede cancelar un pago de un contrato ya finalizado',
@@ -253,8 +263,6 @@ class PagoController extends Controller
                     'motivo_cancelacion' => $request->motivo_cancelacion,
                 ]);
 
-                // Si el pago cancelado SÍ estaba confirmado, el estado_pago del contrato
-                // quedó desactualizado (se calculó contando ese monto). Hay que recalcularlo.
                 if ($eraConfirmado && $pago->contrato) {
                     $contrato = $pago->contrato;
 

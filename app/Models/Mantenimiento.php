@@ -16,6 +16,7 @@ class Mantenimiento extends Model
         'fecha',
         'lugar',
         'estado',
+        'incidencia_id',
         'vehiculo_id',
     ];
 
@@ -32,5 +33,10 @@ class Mantenimiento extends Model
     public function vehiculo(): BelongsTo
     {
         return $this->belongsTo(Vehiculo::class, 'vehiculo_id');
+    }
+
+    public function incidencia()
+    {
+        return $this->belongsTo(Incidencia::class, 'incidencia_id');
     }
 }

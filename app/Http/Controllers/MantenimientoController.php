@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers;
 
-use App\Enums\RolEnum;
 use App\Enums\EstadoMantenimientoEnum;
+use App\Enums\IncidenciaEstadoEnum;
+use App\Enums\RolEnum;
 use App\Enums\VehiculoEstadoEnum;
 use App\Http\Requests\MantenimientoController\StoreMantenimientoRequest;
 use App\Http\Requests\MantenimientoController\UpdateMantenimientoRequest;
+use App\Models\Incidencia;
 use App\Models\Mantenimiento;
 use App\Models\Vehiculo;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -40,7 +42,10 @@ class MantenimientoController extends Controller
                 ], 422);
             }
 
-            $mantenimientos = Mantenimiento::with(['vehiculo:id,anio,color,placa,estado,propietario_id'])
+            $mantenimientos = Mantenimiento::with([
+                'vehiculo:id,anio,color,placa,estado,propietario_id',
+                'incidencia',
+            ])
                 ->when($request->search, function ($query, $search) {
                     $query->where(function ($subQuery) use ($search) {
                         $subQuery->where('tipo_mantenimiento', 'like', '%' . $search . '%')
@@ -89,17 +94,39 @@ class MantenimientoController extends Controller
                     'message' => 'Este vehículo ya se encuentra en mantenimiento actualmente',
                 ], 422);
             }
+            if ($request->filled('incidencia_id')) {
+            $incidencia = Incidencia::find($request->incidencia_id);
+
+            if (!$incidencia) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'La incidencia seleccionada no existe',
+                ], 422);
+            }
+
+            if ((int) $incidencia->vehiculo_id !== (int) $request->vehiculo_id) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'La incidencia seleccionada no pertenece al vehículo especificado',
+                ], 422);
+            }
+
+            if ($incidencia->estado_incidencia === IncidenciaEstadoEnum::RESUELTA->value) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'La incidencia seleccionada ya se encuentra resuelta',
+                ], 422);
+            }
+        }
 
             if (in_array($vehiculo->estado, [
                 VehiculoEstadoEnum::RENTADO->value,
-                VehiculoEstadoEnum::RESERVADO->value,
             ])) {
                 return response()->json([
                     'status'  => 'error',
                     'message' => "No se puede enviar a mantenimiento un vehículo en estado {$vehiculo->estado}",
                 ], 422);
             }
-
 
             $mantenimientoReciente = Mantenimiento::where('vehiculo_id', $request->vehiculo_id)
                 ->where('created_at', '>=', now()->subMinute())
@@ -115,6 +142,7 @@ class MantenimientoController extends Controller
             $mantenimiento = DB::transaction(function () use ($request, $vehiculo) {
                 $mantenimiento = Mantenimiento::create([
                     'vehiculo_id'        => $request->vehiculo_id,
+                    'incidencia_id'      => $request->incidencia_id ?? null,
                     'tipo_mantenimiento' => $request->tipo_mantenimiento,
                     'descripcion'        => $request->descripcion,
                     'costo'              => $request->costo,
@@ -130,7 +158,10 @@ class MantenimientoController extends Controller
                 return $mantenimiento;
             });
 
-            $mantenimiento->load('vehiculo:id,anio,color,placa,estado,propietario_id');
+            $mantenimiento->load([
+                'vehiculo:id,anio,color,placa,estado,propietario_id',
+                'incidencia',
+            ]);
 
             return response()->json([
                 'status'  => 'success',
@@ -168,8 +199,10 @@ class MantenimientoController extends Controller
                 ], 403);
             }
 
-            $mantenimiento = Mantenimiento::with('vehiculo:id,anio,color,placa,estado,propietario_id')
-                ->findOrFail($id);
+            $mantenimiento = Mantenimiento::with([
+                'vehiculo:id,anio,color,placa,estado,propietario_id',
+                'incidencia',
+            ])->findOrFail($id);
 
             return response()->json([
                 'status' => 'success',
@@ -194,9 +227,8 @@ class MantenimientoController extends Controller
     public function update(UpdateMantenimientoRequest $request, string $id)
     {
         try {
-            $mantenimiento = Mantenimiento::with('vehiculo')->findOrFail($id);
+            $mantenimiento = Mantenimiento::with(['vehiculo', 'incidencia'])->findOrFail($id);
 
-            // Validación de inmutabilidad para registros ya cerrados o anulados
             if (in_array($mantenimiento->estado, [
                 EstadoMantenimientoEnum::FINALIZADO->value,
                 EstadoMantenimientoEnum::CANCELADO->value,
@@ -212,10 +244,7 @@ class MantenimientoController extends Controller
                 $request->estado === EstadoMantenimientoEnum::ACTIVO->value &&
                 $mantenimiento->estado !== EstadoMantenimientoEnum::ACTIVO->value
             ) {
-                if (in_array($mantenimiento->vehiculo->estado, [
-                    VehiculoEstadoEnum::RENTADO->value,
-                    VehiculoEstadoEnum::RESERVADO->value,
-                ])) {
+                if ($mantenimiento->vehiculo->estado === VehiculoEstadoEnum::RENTADO->value) {
                     return response()->json([
                         'status'  => 'error',
                         'message' => "No se puede reactivar el mantenimiento porque el vehículo está actualmente {$mantenimiento->vehiculo->estado}",
@@ -258,6 +287,15 @@ class MantenimientoController extends Controller
                 }
 
                 if (
+                    $estadoNuevo === EstadoMantenimientoEnum::FINALIZADO->value
+                    && $mantenimiento->incidencia_id
+                ) {
+                    $mantenimiento->incidencia?->update([
+                        'estado_incidencia' => IncidenciaEstadoEnum::RESUELTA->value,
+                    ]);
+                }
+
+                if (
                     $estadoAnterior !== EstadoMantenimientoEnum::ACTIVO->value
                     && $estadoNuevo === EstadoMantenimientoEnum::ACTIVO->value
                 ) {
@@ -270,7 +308,10 @@ class MantenimientoController extends Controller
             return response()->json([
                 'status'  => 'success',
                 'message' => 'Mantenimiento actualizado con éxito',
-                'data'    => $mantenimiento->fresh('vehiculo:id,anio,color,placa,estado,propietario_id'),
+                'data'    => $mantenimiento->fresh([
+                    'vehiculo:id,anio,color,placa,estado,propietario_id',
+                    'incidencia',
+                ]),
             ], 200);
         } catch (ModelNotFoundException $e) {
             return response()->json([
@@ -336,7 +377,10 @@ class MantenimientoController extends Controller
             return response()->json([
                 'status'  => 'success',
                 'message' => 'Mantenimiento anulado con éxito',
-                'data'    => $mantenimiento->fresh('vehiculo:id,anio,color,placa,estado,propietario_id'),
+                'data'    => $mantenimiento->fresh([
+                    'vehiculo:id,anio,color,placa,estado,propietario_id',
+                    'incidencia',
+                ]),
             ], 200);
         } catch (ModelNotFoundException $e) {
             return response()->json([

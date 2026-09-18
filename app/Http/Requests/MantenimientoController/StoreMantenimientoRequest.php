@@ -30,6 +30,7 @@ class StoreMantenimientoRequest extends FormRequest
     {
         return [
             'vehiculo_id'        => 'required|exists:vehiculos,id',
+            'incidencia_id' => 'nullable|integer|exists:incidencias,id|prohibited_if:tipo_mantenimiento,' . TipoMantenimientoEnum::PREVENTIVO->value,
             'tipo_mantenimiento' => 'required|in:' . implode(',', array_column(TipoMantenimientoEnum::cases(), 'value')),
             'descripcion'        => 'nullable|string|max:250',
             'costo'              => 'required|numeric|min:0|max:999999.99|regex:/^\d+(\.\d{1,2})?$/',
@@ -42,6 +43,9 @@ class StoreMantenimientoRequest extends FormRequest
         return [
             'vehiculo_id.required'        => 'Debe seleccionar un vehículo.',
             'vehiculo_id.exists'          => 'El vehículo seleccionado no existe.',
+            'incidencia_id.integer'       => 'El ID de la incidencia debe ser un número entero.',
+            'incidencia_id.exists'        => 'La incidencia seleccionada no existe.',
+            'incidencia_id.prohibited_if' => 'Un mantenimiento de tipo PREVENTIVO no puede tener una incidencia vinculada.',
             'tipo_mantenimiento.required' => 'El tipo de mantenimiento es obligatorio.',
             'tipo_mantenimiento.in'       => 'El tipo de mantenimiento no es válido.',
             'costo.required'              => 'El costo es obligatorio.',

@@ -20,7 +20,7 @@ class StoreContratoRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'reserva_id'                => 'required|exists:reservas,id',
+            'reserva_id'                => 'required|exists:reservas,id|unique:contratos,reserva_id,',
             'fecha_hora_entrega'        => 'required|date',
             'fecha_hora_devolucion'     => 'required|date|after:fecha_hora_entrega',
             'precio_por_dia'            => 'required|numeric|min:0.1',
@@ -34,6 +34,7 @@ class StoreContratoRequest extends FormRequest
     public function messages(): array
     {
         return [
+            'reserva_id.unique'                  => 'Esta reserva ya tiene un contrato generado',
             'reserva_id.required'                => 'Debe indicar la reserva de origen.',
             'reserva_id.exists'                  => 'La reserva indicada no existe.',
             'fecha_hora_entrega.required'        => 'La fecha y hora de entrega son obligatorias.',

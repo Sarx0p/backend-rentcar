@@ -11,9 +11,7 @@ use Illuminate\Http\Exceptions\HttpResponseException;
 
 class StoreIncidenciaRequest extends FormRequest
 {
-    /**
-     * Determine if the user is authorized to make this request.
-     */
+
     public function authorize(): bool
     {
         $user = auth('api')->user();
@@ -22,13 +20,12 @@ class StoreIncidenciaRequest extends FormRequest
             || $user->hasRole(RolEnum::EMPLEADO->value);
     }
 
-    /**
-     * Get the validation rules that apply to the request.
-     */
+
     public function rules(): array
     {
         return [
             'vehiculo_id'      => 'required|exists:vehiculos,id',
+            'incidencia_id'    => 'nullable|integer|exists:incidencias,id',
             'contrato_id'      => 'nullable|exists:contratos,id',
             'tipo_incidencia'  => 'required|in:' . implode(',', array_column(TipoIncidenciaEnum::cases(), 'value')),
             'responsable_tipo' => 'required|in:' . implode(',', array_column(IncidenciaTipoResponsableEnum::cases(), 'value')),
@@ -38,10 +35,7 @@ class StoreIncidenciaRequest extends FormRequest
         ];
     }
 
-    /**
-     * Regla de negocio: si el responsable es CLIENTE, el contrato es obligatorio
-     * (para poder identificar a cuál cliente específico corresponde el cobro).
-     */
+
     public function withValidator(Validator $validator): void
     {
         $validator->after(function ($validator) {
@@ -56,9 +50,7 @@ class StoreIncidenciaRequest extends FormRequest
         });
     }
 
-    /**
-     * Mensajes personalizados.
-     */
+
     public function messages(): array
     {
         return [
@@ -74,9 +66,7 @@ class StoreIncidenciaRequest extends FormRequest
         ];
     }
 
-    /**
-     * Si la autorización falla.
-     */
+
     protected function failedAuthorization()
     {
         throw new HttpResponseException(response()->json([
@@ -85,9 +75,7 @@ class StoreIncidenciaRequest extends FormRequest
         ], 403));
     }
 
-    /**
-     * Si la validación falla.
-     */
+   
     protected function failedValidation(Validator $validator)
     {
         throw new HttpResponseException(response()->json([

@@ -20,7 +20,9 @@ return new class extends Migration
             $table->integer('horas_retraso')->default(0);
             $table->decimal('monto_extras', 8, 2)->default(0.00);
             $table->string('estado', 30);
-            $table->foreignId('contrato_id')->constrained('contratos');
+            $table->string('motivo_cierre_deuda', 500)->nullable();
+            $table->decimal('monto_deuda', 8, 2)->nullable();
+            $table->foreignId('contrato_id')->unique()->constrained('contratos');
             $table->foreignId('usuario_id')->constrained('users');
             $table->timestamps();
         });

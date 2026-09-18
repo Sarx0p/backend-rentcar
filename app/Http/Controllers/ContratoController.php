@@ -114,6 +114,13 @@ class ContratoController extends Controller
                 ], 422);
             }
 
+            if ($reserva->cliente->vencimiento_licencia->isPast()) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'El cliente tiene la licencia vencida, no puede generar el contrato',
+                ], 422);
+            }
+
             $vehiculo = $reserva->vehiculo;
 
             if ($vehiculo->estado !== VehiculoEstadoEnum::DISPONIBLE->value) {
@@ -223,6 +230,8 @@ class ContratoController extends Controller
             $contrato->load([
                 'reserva:id,fecha_inicio,fecha_fin',
                 'user:id,nombre,apellido',
+                'cliente',
+                'vehiculo.modelo.marca',
             ]);
 
             return response()->json([
@@ -390,7 +399,11 @@ class ContratoController extends Controller
                 return $contrato;
             });
 
-            $contrato->load(['user:id,nombre,apellido']);
+            $contrato->load([
+                'user:id,nombre,apellido',
+                'cliente',
+                'vehiculo.modelo.marca',
+            ]);
 
             return response()->json([
                 'status'  => 'success',
@@ -436,6 +449,8 @@ class ContratoController extends Controller
                 'reserva:id,fecha_inicio,fecha_fin',
                 'user:id,nombre,apellido',
                 'pagos:id,contrato_id,monto,estado_transaccion',
+                'cliente',
+                'vehiculo.modelo.marca',
             ])->findOrFail($id);
 
             return response()->json([

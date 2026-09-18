@@ -210,7 +210,6 @@ class IncidenciaController extends Controller
                 $responsableNuevo = $incidencia->responsable_tipo;
                 $costoNuevo       = $incidencia->costo;
 
-                // Calcular la diferencia a aplicar al contrato
                 $montoCobradoAntes = ($responsableAnterior === IncidenciaTipoResponsableEnum::CLIENTE->value)
                     ? ($costoAnterior ?? 0)
                     : 0;
