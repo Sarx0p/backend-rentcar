@@ -37,8 +37,6 @@ class ReporteController extends Controller
         return $permitido;
     }
 
-
-
     public function ingresos(Request $request)
     {
         try {
@@ -155,6 +153,94 @@ class ReporteController extends Controller
         }
     }
 
+    /**
+     * Resultado neto por propietario: ingresos - gastos (mantenimiento + incidencias del negocio).
+     */
+    public function resultadoNetoPorPropietario(Request $request)
+    {
+        try {
+            if (!$this->tienePermiso(true)) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'No tienes permiso para ver este reporte',
+                ], 403);
+            }
+
+            $fechaInicio = $request->fecha_inicio ?? now()->startOfMonth()->format('Y-m-d');
+            $fechaFin    = $request->fecha_fin ?? now()->endOfMonth()->format('Y-m-d');
+
+            $propietarioBusqueda = trim((string) ($request->input('propietario') ?? ''));
+
+            $propietarios = \App\Models\Propietario::with('vehiculos.modelo.marca')
+                ->where('estado', \App\Enums\EstadoPropietarioEnum::ACTIVO->value)
+                ->when($propietarioBusqueda !== '', function ($query) use ($propietarioBusqueda) {
+                    $query->where('nombre', 'like', "%{$propietarioBusqueda}%");
+                })
+                ->get()
+                ->map(function ($propietario) use ($fechaInicio, $fechaFin) {
+                    $vehiculoIds = $propietario->vehiculos->pluck('id');
+
+                    $ingresos = Pago::whereHas('contrato', function ($q) use ($vehiculoIds) {
+                        $q->whereIn('vehiculo_id', $vehiculoIds);
+                    })
+                        ->where('estado_transaccion', EstadoTransaccionEnum::CONFIRMADO->value)
+                        ->whereDate('fecha_pago', '>=', $fechaInicio)
+                        ->whereDate('fecha_pago', '<=', $fechaFin)
+                        ->sum('monto');
+
+                    $gastoMantenimiento = Mantenimiento::whereIn('vehiculo_id', $vehiculoIds)
+                        ->whereDate('fecha', '>=', $fechaInicio)
+                        ->whereDate('fecha', '<=', $fechaFin)
+                        ->sum('costo');
+
+                    $incidenciasNegocio = Incidencia::whereIn('vehiculo_id', $vehiculoIds)
+                        ->where('responsable_tipo', IncidenciaTipoResponsableEnum::NEGOCIO->value)
+                        ->whereDate('fecha', '>=', $fechaInicio)
+                        ->whereDate('fecha', '<=', $fechaFin)
+                        ->get(['id', 'vehiculo_id', 'tipo_incidencia', 'descripcion', 'costo', 'fecha']);
+
+                    $gastoIncidencias = $incidenciasNegocio->sum('costo');
+                    $gastoTotal = $gastoMantenimiento;
+
+                    return [
+                        'propietario'         => $propietario,
+                        'num_vehiculos'       => $vehiculoIds->count(),
+                        'ingresos'            => $ingresos,
+                        'gasto_mantenimiento' => $gastoMantenimiento,
+                        'gasto_incidencias'   => $gastoIncidencias,
+                        'incidencias_detalle' => $incidenciasNegocio,
+                        'gasto_total'         => $gastoTotal,
+                        'resultado_neto'      => $ingresos - $gastoTotal,
+                    ];
+                })
+                ->sortByDesc('resultado_neto')
+                ->values();
+
+            $totalIngresos = $propietarios->sum('ingresos');
+            $totalGastos   = $propietarios->sum('gasto_total');
+            $totalNeto     = $propietarios->sum('resultado_neto');
+
+            $pdf = Pdf::loadView('reportes.resultado-neto-por-propietario', [
+                'propietarios'        => $propietarios,
+                'totalIngresos'       => $totalIngresos,
+                'totalGastos'         => $totalGastos,
+                'totalNeto'           => $totalNeto,
+                'fechaInicio'         => $fechaInicio,
+                'fechaFin'            => $fechaFin,
+                'propietarioBusqueda' => $propietarioBusqueda,
+            ]);
+
+            $pdf->setPaper('letter', 'landscape');
+
+            return $pdf->stream('reporte-resultado-neto-por-propietario.pdf');
+        } catch (\Exception $e) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Error interno del servidor',
+            ], 500);
+        }
+    }
+
     public function reservasCanceladas(Request $request)
     {
         try {
@@ -191,8 +277,6 @@ class ReporteController extends Controller
             ], 500);
         }
     }
-
-
 
     /**
      * Desempeño general: resumen ejecutivo del negocio.
@@ -258,7 +342,6 @@ class ReporteController extends Controller
         }
     }
 
-    //este es el metodo que filtra los ingresos de los vehiculos por las fechas y por propietario
     public function ingresosPorVehiculo(Request $request)
     {
         try {
@@ -370,10 +453,10 @@ class ReporteController extends Controller
                         ->sum('costo');
 
                     return [
-                        'vehiculo'                 => $vehiculo,
-                        'gasto_mantenimiento'      => $gastoMantenimiento,
+                        'vehiculo'                  => $vehiculo,
+                        'gasto_mantenimiento'       => $gastoMantenimiento,
                         'gasto_incidencias_negocio' => $gastoIncidenciasNegocio,
-                        'gasto_total'              => $gastoMantenimiento + $gastoIncidenciasNegocio,
+                        'gasto_total'               => $gastoMantenimiento,
                     ];
                 })
                 ->sortByDesc('gasto_total')
@@ -437,12 +520,12 @@ class ReporteController extends Controller
                         ->whereDate('fecha', '<=', $fechaFin)
                         ->sum('costo');
 
-                    $gastoTotal = $gastoMantenimiento + $gastoIncidencias;
+                    $gastoTotal = $gastoMantenimiento;
 
                     return [
-                        'vehiculo'      => $vehiculo,
-                        'ingresos'      => $ingresos,
-                        'gastos'        => $gastoTotal,
+                        'vehiculo'       => $vehiculo,
+                        'ingresos'       => $ingresos,
+                        'gastos'         => $gastoTotal,
                         'resultado_neto' => $ingresos - $gastoTotal,
                     ];
                 })
@@ -489,13 +572,14 @@ class ReporteController extends Controller
             $contratos = Contrato::with([
                 'cliente:id,nombre,dui,telefono',
                 'vehiculo:id,placa,color',
+                'pagos' => function ($query) {
+                    $query->where('estado_transaccion', EstadoTransaccionEnum::CONFIRMADO->value);
+                },
             ])
                 ->where('estado_pago', '!=', EstadoPagoEnum::PAGADO->value)
                 ->get()
                 ->map(function ($contrato) {
-                    $totalPagado = $contrato->pagos()
-                        ->where('estado_transaccion', EstadoTransaccionEnum::CONFIRMADO->value)
-                        ->sum('monto');
+                    $totalPagado = $contrato->pagos->sum('monto');
 
                     return [
                         'contrato'      => $contrato,

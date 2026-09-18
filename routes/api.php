@@ -99,6 +99,7 @@ Route::prefix('admin')->group(function () {
         Route::prefix('reportes')->group(function () {
             Route::get('ingresos', [ReporteController::class, 'ingresos']);
             Route::get('estado-flota', [ReporteController::class, 'estadoFlota']);
+            Route::get('resultado-neto-por-propietario', [ReporteController::class, 'resultadoNetoPorPropietario']);
             Route::get('licencias-por-vencer', [ReporteController::class, 'licenciasPorVencer']);
             Route::get('reservas-canceladas', [ReporteController::class, 'reservasCanceladas']);
             Route::get('desempeno-general', [ReporteController::class, 'desempenoGeneral']);

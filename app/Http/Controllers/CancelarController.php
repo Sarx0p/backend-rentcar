@@ -89,12 +89,23 @@ class CancelarController extends Controller
                 'motivo'     => 'required|string',
             ]);
 
-            $reserva = Reserva::with('vehiculo')->findOrFail($request->reserva_id);
+            $reserva = Reserva::with(['vehiculo', 'contrato'])->findOrFail($request->reserva_id);
 
             if ($reserva->estado === EstadoReservaEnum::CANCELADA->value) {
                 return response()->json([
                     'status'  => 'error',
                     'message' => 'Esta reserva ya fue cancelada',
+                ], 422);
+            }
+
+
+            $esPendiente = $reserva->estado === EstadoReservaEnum::PENDIENTE->value;
+            $esConfirmadaSinContrato = ($reserva->estado === EstadoReservaEnum::CONFIRMADA->value) && !$reserva->contrato;
+
+            if (!$esPendiente && !$esConfirmadaSinContrato) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'Solo se pueden cancelar reservas pendientes o confirmadas sin contrato',
                 ], 422);
             }
 
@@ -194,7 +205,7 @@ class CancelarController extends Controller
             return response()->json([
                 'status'  => 'error',
                 'message' => 'Error interno del servidor',
-                
+
             ], 500);
         }
     }

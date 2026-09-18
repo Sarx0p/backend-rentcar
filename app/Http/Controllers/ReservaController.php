@@ -12,6 +12,8 @@ use App\Http\Requests\ReservaController\UpdateReservaRequest;
 use App\Models\Reserva;
 use App\Models\Vehiculo;
 use App\Models\Cliente;
+use App\Models\Contrato;
+use App\Enums\EstadoContratoEnum;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -71,7 +73,7 @@ class ReservaController extends Controller
 
     /**
      * Store a newly created resource in storage.
-     */
+     **/
     public function store(StoreReservaRequest $request)
     {
         try {
@@ -98,6 +100,7 @@ class ReservaController extends Controller
                 ], 422);
             }
 
+            // 1. Validar traslape con otras RESERVAS del vehículo
             $traslapada = Reserva::where('vehiculo_id', $request->vehiculo_id)
                 ->whereNotIn('estado', [EstadoReservaEnum::CANCELADA->value])
                 ->where(function ($query) use ($request) {
@@ -118,7 +121,20 @@ class ReservaController extends Controller
                 ], 422);
             }
 
-            //validar que el cliente no tenga ya otra reserva activa que se traslape con estas fechas
+            $contratoTraslapado = Contrato::where('vehiculo_id', $request->vehiculo_id)
+                ->where('estado_contrato', EstadoContratoEnum::ACTIVO->value)
+                ->where(function ($query) use ($request) {
+                    $query->where('fecha_hora_entrega', '<', $request->fecha_fin)
+                        ->where('fecha_hora_devolucion', '>', $request->fecha_inicio);
+                })->exists();
+
+            if ($contratoTraslapado) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'El vehículo ya tiene un contrato activo que se traslapa con esas fechas',
+                ], 422);
+            }
+
             $clienteTraslapado = Reserva::where('cliente_id', $request->cliente_id)
                 ->whereNotIn('estado', [EstadoReservaEnum::CANCELADA->value])
                 ->where(function ($query) use ($request) {
@@ -130,6 +146,20 @@ class ReservaController extends Controller
                 return response()->json([
                     'status'  => 'error',
                     'message' => 'Este cliente ya tiene una reserva activa que se traslapa con estas fechas',
+                ], 422);
+            }
+
+            $clienteContratoTraslapado = Contrato::where('cliente_id', $request->cliente_id)
+                ->where('estado_contrato', EstadoContratoEnum::ACTIVO->value)
+                ->where(function ($query) use ($request) {
+                    $query->where('fecha_hora_entrega', '<', $request->fecha_fin)
+                        ->where('fecha_hora_devolucion', '>', $request->fecha_inicio);
+                })->exists();
+
+            if ($clienteContratoTraslapado) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'Este cliente ya tiene un contrato activo que se traslapa con estas fechas',
                 ], 422);
             }
 
@@ -226,6 +256,7 @@ class ReservaController extends Controller
         }
     }
 
+
     /**
      * Update the specified resource in storage.
      */
@@ -257,6 +288,20 @@ class ReservaController extends Controller
                     return response()->json([
                         'status'  => 'error',
                         'message' => 'No se puede actualizar: El vehículo ya tiene otra reserva en esas fechas',
+                    ], 422);
+                }
+
+                $contratoTraslapado = Contrato::where('vehiculo_id', $reserva->vehiculo_id)
+                    ->where('estado_contrato', EstadoContratoEnum::ACTIVO->value)
+                    ->where(function ($query) use ($inicioEvaluar, $finEvaluar) {
+                        $query->where('fecha_hora_entrega', '<', $finEvaluar)
+                            ->where('fecha_hora_devolucion', '>', $inicioEvaluar);
+                    })->exists();
+
+                if ($contratoTraslapado) {
+                    return response()->json([
+                        'status'  => 'error',
+                        'message' => 'No se puede actualizar: El vehículo tiene un contrato activo que se traslapa con esas fechas',
                     ], 422);
                 }
             }

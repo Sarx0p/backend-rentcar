@@ -20,13 +20,15 @@ class StoreCierreRentaRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'contrato_id'                 => 'required|exists:contratos,id',
+            'contrato_id'                 => 'required|exists:contratos,id|unique:cierres_renta,contrato_id',
             'fecha_hora_recepcion'        => 'required|date',
             'nivel_combustible_recepcion' => 'required|string|max:30',
             'estado_vehiculo_recepcion'   => 'required|string|max:50',
             'observaciones'               => 'sometimes|nullable|string|max:500',
             'aplicar_cargo_retraso'       => 'sometimes|boolean',
             'monto_retraso'               => 'required_if:aplicar_cargo_retraso,true|numeric|min:0.01',
+            'forzar_cierre_con_deuda'     => 'sometimes|boolean',
+            'motivo_cierre_deuda'         => 'required_if:forzar_cierre_con_deuda,true|nullable|string|max:500',
         ];
     }
 
@@ -35,10 +37,12 @@ class StoreCierreRentaRequest extends FormRequest
         return [
             'contrato_id.required'                 => 'Debe indicar el contrato a cerrar.',
             'contrato_id.exists'                   => 'El contrato indicado no existe.',
+            'contrato_id.unique'                   => 'Este contrato ya tiene un cierre registrado.',
             'fecha_hora_recepcion.required'        => 'La fecha y hora de recepción son obligatorias.',
             'nivel_combustible_recepcion.required' => 'El nivel de combustible de recepción es obligatorio.',
             'estado_vehiculo_recepcion.required'   => 'El estado del vehículo al recibirlo es obligatorio.',
             'monto_retraso.required_if'            => 'Debe indicar el monto del cargo por retraso.',
+            'motivo_cierre_deuda.required_if'      => 'Debe indicar el motivo para cerrar el contrato con deuda pendiente.',
         ];
     }
 

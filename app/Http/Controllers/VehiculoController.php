@@ -50,10 +50,9 @@ class VehiculoController extends Controller
                 ->orderByRaw("
                 CASE estado
                     WHEN 'DISPONIBLE' THEN 1
-                    WHEN 'RESERVADO' THEN 2
-                    WHEN 'RENTADO' THEN 3
-                    WHEN 'MANTENIMIENTO' THEN 4
-                    WHEN 'FUERA DE SERVICIO' THEN 5
+                    WHEN 'RENTADO' THEN 2
+                    WHEN 'MANTENIMIENTO' THEN 3
+                    WHEN 'FUERA DE SERVICIO' THEN 4
                     ELSE 99
                 END
             ")
@@ -140,8 +139,6 @@ class VehiculoController extends Controller
         }
     }
 
-    // decidi hacer el update por la situcacion qeu aya un trabajo de pintura en vehiuclo poder tener la livertad
-    //de hacer la actualizacion en ves de tener que crear el carro
     public function update(UpdateVehiculoRequest $request, string $id)
     {
         try {
@@ -232,13 +229,17 @@ class VehiculoController extends Controller
             }
 
             $tieneReservasActivas = $vehiculo->reservas()
-                ->whereNotIn('estado', [EstadoReservaEnum::CANCELADA->value])
+                ->whereNotIn('estado', [
+                    EstadoReservaEnum::CANCELADA->value,
+                    EstadoReservaEnum::CONCLUIDA->value,
+                ])
+                ->where('fecha_fin', '>=', now())
                 ->exists();
 
             if ($tieneReservasActivas) {
                 return response()->json([
                     'status'  => 'error',
-                    'message' => 'No se puede desactivar el vehículo porque tiene reservas activas asociadas.',
+                    'message' => 'No se puede desactivar el vehículo porque tiene reservas activas o futuras asociadas.',
                 ], 422);
             }
 

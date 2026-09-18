@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\EstadoReservaEnum;
 use App\Enums\VehiculoEstadoEnum;
 use App\Models\Cliente;
 use App\Models\Reserva;
@@ -15,10 +16,21 @@ class DashboardController extends Controller
     {
         $hoy = Carbon::today();
 
-        $reservasDelDia = Reserva::whereDate('fecha_inicio', $hoy)->count();
+        // 1. Reservas del día (omite canceladas y concluidas)
+        $reservasDelDia = Reserva::whereDate('fecha_inicio', $hoy)
+            ->whereNotIn('estado', [
+                EstadoReservaEnum::CANCELADA->value,
+                EstadoReservaEnum::CONCLUIDA->value,
+            ])
+            ->count();
 
+        // 2. Reservas del mes (omite canceladas y concluidas)
         $reservasDelMes = Reserva::whereMonth('fecha_inicio', Carbon::now()->month)
             ->whereYear('fecha_inicio', Carbon::now()->year)
+            ->whereNotIn('estado', [
+                EstadoReservaEnum::CANCELADA->value,
+                EstadoReservaEnum::CONCLUIDA->value,
+            ])
             ->count();
 
         $clientesRegistrados = Cliente::count();
@@ -28,18 +40,27 @@ class DashboardController extends Controller
             VehiculoEstadoEnum::DISPONIBLE->value
         )->count();
 
-        $vehiculosOcupados = Vehiculo::whereIn('estado', [
-            VehiculoEstadoEnum::RESERVADO->value,
-            VehiculoEstadoEnum::RENTADO->value,
-        ])->count();
+        $vehiculosOcupados = Vehiculo::where(
+            'estado',
+            VehiculoEstadoEnum::RENTADO->value
+        )->count();
 
-        $reservasPorMes = Reserva::selectRaw('MONTH(fecha_inicio) as mes, COUNT(*) as total')
-            ->whereYear('fecha_inicio', Carbon::now()->year)
-            ->groupBy('mes')
-            ->orderBy('mes')
-            ->get();
+        $reservasPorMes = Reserva::whereYear('fecha_inicio', Carbon::now()->year)
+            ->whereNotIn('estado', [EstadoReservaEnum::CANCELADA->value])
+            ->get(['fecha_inicio'])
+            ->groupBy(function ($reserva) {
+                return (int) Carbon::parse($reserva->fecha_inicio)->format('m');
+            })
+            ->map(function ($items, $mes) {
+                return [
+                    'mes'   => $mes,
+                    'total' => $items->count(),
+                ];
+            })
+            ->values();
 
-        $vehiculosPorEstado = Vehiculo::selectRaw('estado, COUNT(*) as total')
+        $vehiculosPorEstado = Vehiculo::select('estado')
+            ->selectRaw('count(*) as total')
             ->groupBy('estado')
             ->orderBy('estado')
             ->get();
@@ -57,14 +78,14 @@ class DashboardController extends Controller
 
         return response()->json([
             'resumen' => [
-                'reservas_dia' => $reservasDelDia,
-                'reservas_mes' => $reservasDelMes,
+                'reservas_dia'         => $reservasDelDia,
+                'reservas_mes'         => $reservasDelMes,
                 'clientes_registrados' => $clientesRegistrados,
                 'vehiculos_disponibles' => $vehiculosDisponibles,
-                'vehiculos_ocupados' => $vehiculosOcupados,
+                'vehiculos_ocupados'    => $vehiculosOcupados,
             ],
             'graficas' => [
-                'reservas_por_mes' => $reservasPorMes,
+                'reservas_por_mes'     => $reservasPorMes,
                 'vehiculos_por_estado' => $vehiculosPorEstado,
             ],
             'ultimas_reservas' => $ultimasReservas,
