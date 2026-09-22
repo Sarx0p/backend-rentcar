@@ -3,7 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Enums\EstadoReservaEnum;
+use App\Enums\IncidenciaEstadoEnum;
 use App\Enums\RolEnum;
+use App\Enums\TipoIncidenciaEnum;
 use App\Enums\VehiculoEstadoEnum;
 use App\Http\Requests\VehiculoController\StoreVehiculoRequest;
 use App\Http\Requests\VehiculoController\UpdateVehiculoRequest;
@@ -17,6 +19,12 @@ class VehiculoController extends Controller
     {
         try {
             $vehiculos = Vehiculo::with(['modelo.marca', 'categoria'])
+                ->withCount([
+                    'incidencias as incidencias_esteticas_count' => function ($q) {
+                        $q->where('estado_incidencia', '!=', IncidenciaEstadoEnum::RESUELTA->value)
+                          ->where('tipo_incidencia', TipoIncidenciaEnum::DANIO_ESTETICO->value);
+                    }
+                ])
                 ->when($request->filled('estado'), function ($query) use ($request) {
                     $query->where('estado', $request->estado);
                 })
@@ -117,8 +125,21 @@ class VehiculoController extends Controller
     public function show(string $id)
     {
         try {
-            $vehiculo = Vehiculo::with(['modelo.marca', 'categoria'])
-                ->find($id);
+            $vehiculo = Vehiculo::with([
+                'modelo.marca',
+                'categoria',
+                'incidencias' => function ($q) {
+                    $q->where('estado_incidencia', '!=', IncidenciaEstadoEnum::RESUELTA->value)
+                      ->where('tipo_incidencia', TipoIncidenciaEnum::DANIO_ESTETICO->value);
+                }
+            ])
+            ->withCount([
+                'incidencias as incidencias_esteticas_count' => function ($q) {
+                    $q->where('estado_incidencia', '!=', IncidenciaEstadoEnum::RESUELTA->value)
+                      ->where('tipo_incidencia', TipoIncidenciaEnum::DANIO_ESTETICO->value);
+                }
+            ])
+            ->find($id);
 
             if (!$vehiculo) {
                 return response()->json([
@@ -274,10 +295,9 @@ class VehiculoController extends Controller
             if (
                 !$user->hasRole(RolEnum::ADMINISTRADOR->value) &&
                 !$user->hasRole(RolEnum::EMPLEADO->value)
-
             ) {
                 return response()->json([
-                    "status" => "Errors",
+                    "status"  => "Errors",
                     "message" => "no tienes permiso para restaurar un vehiculo"
                 ], 403);
             }
@@ -290,21 +310,21 @@ class VehiculoController extends Controller
 
             if (!$vehiculo) {
                 return response()->json([
-                    "status" => "Errors",
+                    "status"  => "Errors",
                     "message" => "vehiculo no encontrado",
                 ], 404);
             }
 
             if ($vehiculo->estado !== VehiculoEstadoEnum::FUERA_SERVICIO->value) {
                 return response()->json([
-                    "status" => "Errors",
+                    "status"  => "Errors",
                     "message" => "solo se puede restaurar autos fuera de servicio"
                 ], 422);
             }
 
             DB::beginTransaction();
             $vehiculo->update([
-                "estado" => VehiculoEstadoEnum::DISPONIBLE->value,
+                "estado"              => VehiculoEstadoEnum::DISPONIBLE->value,
                 "motivo_restauracion" => $request->motivo_restauracion,
             ]);
             DB::commit();
@@ -318,7 +338,7 @@ class VehiculoController extends Controller
             ], 200);
         } catch (\Exception $e) {
             return response()->json([
-                "status" => "Errors",
+                "status"  => "Errors",
                 "message" => "Error interno de el servidor"
             ], 500);
         }

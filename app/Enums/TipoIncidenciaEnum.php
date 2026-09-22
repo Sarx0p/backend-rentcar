@@ -4,8 +4,8 @@ namespace App\Enums;
 
 enum TipoIncidenciaEnum: string
 {
-    case DANIO = 'DANIO';
-    case ACCIDENTE = 'ACCIDENTE';
-    case FALLA_MECANICA = 'FALLA MECANICA';
-    case OTRO = 'OTRO';
+    case DANIO_ESTETICO = 'DANIO ESTETICO';
+    case DANIO_MECANICO = 'DANIO MECANICO';
+
 }
+// SE HISO LA SIMPLIFICACION DE LOS ENUMS PARA MEJOR COMPRENCION

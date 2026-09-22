@@ -8,6 +8,7 @@ use App\Enums\EstadoPagoEnum;
 use App\Enums\EstadoReservaEnum;
 use App\Enums\VehiculoEstadoEnum;
 use App\Enums\IncidenciaEstadoEnum;
+use App\Enums\TipoIncidenciaEnum;
 use App\Http\Requests\ContratoController\StoreContratoRequest;
 use App\Http\Requests\ContratoController\StoreContratoDirectoRequest;
 use App\Models\Contrato;
@@ -18,6 +19,7 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Carbon\Carbon;
 
 class ContratoController extends Controller
 {
@@ -157,30 +159,30 @@ class ContratoController extends Controller
                 ], 422);
             }
 
-            $contrato = DB::transaction(function () use ($request, $reserva, $vehiculo) {
-                $inicio = \Carbon\Carbon::parse($request->fecha_hora_entrega);
-                $fin    = \Carbon\Carbon::parse($request->fecha_hora_devolucion);
+            // Obtener ÚNICAMENTE incidencias de DANIO ESTETICO no resueltas del vehículo
+            $incidenciasEsteticas = $vehiculo->incidencias()
+                ->where('estado_incidencia', '!=', IncidenciaEstadoEnum::RESUELTA->value)
+                ->where('tipo_incidencia', TipoIncidenciaEnum::DANIO_ESTETICO->value)
+                ->get(['id', 'tipo_incidencia', 'descripcion', 'fecha']);
+
+            $contrato = DB::transaction(function () use ($request, $reserva, $vehiculo, $incidenciasEsteticas) {
+                $inicio = Carbon::parse($request->fecha_hora_entrega);
+                $fin    = Carbon::parse($request->fecha_hora_devolucion);
                 $dias   = max(1, $inicio->diffInDays($fin));
 
                 $descuento  = $request->monto_descuento ?? 0;
                 $montoTotal = ($dias * $request->precio_por_dia) - $descuento;
 
-                // Obtener incidencias pendientes (REPORTADA) del vehículo
-                $incidenciasPendientes = $vehiculo->incidencias()
-                    ->where('estado_incidencia', IncidenciaEstadoEnum::REPORTADA->value)
-                    ->get(['tipo_incidencia', 'descripcion', 'fecha']);
-
-                // Construir texto de incidencias
-                $textoIncidencias = $incidenciasPendientes->isNotEmpty()
-                    ? 'Incidencias previas registradas: ' .
-                    $incidenciasPendientes->map(function ($inc) {
-                        return "[{$inc->tipo_incidencia}] {$inc->descripcion} ({$inc->fecha->format('d/m/Y')})";
+                // Texto descriptivo solo de daños estéticos
+                $textoEstetico = $incidenciasEsteticas->isNotEmpty()
+                    ? 'Daños estéticos previos: ' . $incidenciasEsteticas->map(function ($inc) {
+                        $fechaFormat = $inc->fecha ? Carbon::parse($inc->fecha)->format('d/m/Y') : 'N/A';
+                        return "{$inc->descripcion} ({$fechaFormat})";
                     })->implode(' | ')
                     : null;
 
-                // Concatenar observaciones del usuario con el texto de incidencias
                 $observacionesFinal = trim(
-                    ($request->observaciones_entrega ?? '') . ' ' . ($textoIncidencias ?? '')
+                    ($request->observaciones_entrega ?? '') . ' ' . ($textoEstetico ?? '')
                 );
 
                 $contrato = Contrato::create([
@@ -237,6 +239,10 @@ class ContratoController extends Controller
             return response()->json([
                 'status'  => 'success',
                 'message' => 'Contrato creado con éxito desde la reserva',
+                'advertencia_estetica' => $incidenciasEsteticas->isNotEmpty()
+                    ? 'Atención: El vehículo cuenta con ' . $incidenciasEsteticas->count() . ' detalle(s) estético(s) previo(s).'
+                    : null,
+                'detalles_esteticos' => $incidenciasEsteticas,
                 'data'    => $contrato,
             ], 201);
         } catch (ModelNotFoundException $e) {
@@ -320,7 +326,7 @@ class ContratoController extends Controller
                 ], 422);
             }
 
-            // Validar que el cliente no tenga otra reserva activa que se traslape con estas fechas (evita duplicidad)
+            // Validar que el cliente no tenga otra reserva activa que se traslape con estas fechas
             $reservaClienteTraslapada = Reserva::where('cliente_id', $request->cliente_id)
                 ->whereIn('estado', [EstadoReservaEnum::PENDIENTE->value, EstadoReservaEnum::CONFIRMADA->value])
                 ->where(function ($query) use ($fechaEntrega, $fechaDevolucion) {
@@ -336,24 +342,25 @@ class ContratoController extends Controller
                 ], 422);
             }
 
-            // Obtener incidencias pendientes ANTES de la transacción
-            $incidenciasPendientes = $vehiculo->incidencias()
-                ->where('estado_incidencia', IncidenciaEstadoEnum::REPORTADA->value)
+            // Obtener ÚNICAMENTE incidencias de DANIO ESTETICO no resueltas del vehículo
+            $incidenciasEsteticas = $vehiculo->incidencias()
+                ->where('estado_incidencia', '!=', IncidenciaEstadoEnum::RESUELTA->value)
+                ->where('tipo_incidencia', TipoIncidenciaEnum::DANIO_ESTETICO->value)
                 ->get(['id', 'tipo_incidencia', 'descripcion', 'fecha']);
 
-            $contrato = DB::transaction(function () use ($request, $cliente, $vehiculo, $fechaEntrega, $fechaDevolucion, $incidenciasPendientes) {
+            $contrato = DB::transaction(function () use ($request, $cliente, $vehiculo, $fechaEntrega, $fechaDevolucion, $incidenciasEsteticas) {
                 $descuento  = $request->monto_descuento ?? 0;
                 $montoTotal = ($request->dias_acordados * $request->precio_por_dia) - $descuento;
 
-                $textoIncidencias = $incidenciasPendientes->isNotEmpty()
-                    ? 'Incidencias previas registradas: ' .
-                    $incidenciasPendientes->map(function ($inc) {
-                        return "[{$inc->tipo_incidencia}] {$inc->descripcion} ({$inc->fecha->format('d/m/Y')})";
+                $textoEstetico = $incidenciasEsteticas->isNotEmpty()
+                    ? 'Daños estéticos previos: ' . $incidenciasEsteticas->map(function ($inc) {
+                        $fechaFormat = $inc->fecha ? Carbon::parse($inc->fecha)->format('d/m/Y') : 'N/A';
+                        return "{$inc->descripcion} ({$fechaFormat})";
                     })->implode(' | ')
                     : null;
 
                 $observacionesFinal = trim(
-                    ($request->observaciones_entrega ?? '') . ' ' . ($textoIncidencias ?? '')
+                    ($request->observaciones_entrega ?? '') . ' ' . ($textoEstetico ?? '')
                 );
 
                 $contrato = Contrato::create([
@@ -408,10 +415,10 @@ class ContratoController extends Controller
             return response()->json([
                 'status'  => 'success',
                 'message' => 'Contrato directo creado con éxito',
-                'advertencia' => $incidenciasPendientes->isNotEmpty()
-                    ? 'Este vehículo tiene incidencias pendientes sin resolver.'
+                'advertencia_estetica' => $incidenciasEsteticas->isNotEmpty()
+                    ? 'Atención: El vehículo cuenta con ' . $incidenciasEsteticas->count() . ' detalle(s) estético(s) previo(s).'
                     : null,
-                'incidencias_pendientes' => $incidenciasPendientes,
+                'detalles_esteticos' => $incidenciasEsteticas,
                 'data'    => $contrato,
             ], 201);
         } catch (ModelNotFoundException $e) {
@@ -451,6 +458,10 @@ class ContratoController extends Controller
                 'pagos:id,contrato_id,monto,estado_transaccion',
                 'cliente',
                 'vehiculo.modelo.marca',
+                'vehiculo.incidencias' => function ($q) {
+                    $q->where('estado_incidencia', '!=', IncidenciaEstadoEnum::RESUELTA->value)
+                      ->where('tipo_incidencia', TipoIncidenciaEnum::DANIO_ESTETICO->value);
+                },
             ])->findOrFail($id);
 
             return response()->json([
