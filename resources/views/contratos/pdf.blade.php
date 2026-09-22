@@ -113,10 +113,12 @@
     </div>
 
     <div class="campo-row">
-        <div class="campo" style="width:100%">
-            <span class="campo-label">Observaciones del vehículo: </span>
-            <span class="campo-valor" style="min-width:400px">{{ $contrato->observaciones_entrega ?? '' }}</span>
-        </div>
+    <div class="campo" style="width:100%">
+        <span class="campo-label">Observaciones del vehículo: </span>
+        <span class="campo-valor" style="min-width:400px; font-size: 11px;">
+            {{ \Illuminate\Support\Str::limit($contrato->incidencias->pluck('descripcion')->implode(', '), 110, '...') }}
+        </span>
+    </div>
     </div>
 
     <div class="dibujos-combustible">

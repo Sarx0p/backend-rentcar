@@ -6,6 +6,7 @@ use App\Enums\RolEnum;
 use App\Enums\VehiculoEstadoEnum;
 use App\Enums\EstadoReservaEnum;
 use App\Enums\IncidenciaEstadoEnum;
+use App\Enums\TipoIncidenciaEnum;
 use App\Models\Incidencia;
 use App\Http\Requests\ReservaController\StoreReservaRequest;
 use App\Http\Requests\ReservaController\UpdateReservaRequest;
@@ -43,7 +44,7 @@ class ReservaController extends Controller
                 'vehiculo:id,placa,color,anio,estado,modelo_id,categoria_id',
                 'vehiculo.modelo:id,nombre,marca_id',
                 'vehiculo.modelo.marca:id,nombre',
-                'vehiculo.categoria:id,nombre,precio_dia', // corrgido
+                'vehiculo.categoria:id,nombre,precio_dia',
                 'user:id,nombre,apellido',
             ])
                 ->when($request->search, function ($query, $search) {
@@ -163,8 +164,10 @@ class ReservaController extends Controller
                 ], 422);
             }
 
+            // Filtrar únicamente incidencias de daño estético pendientes (no resueltas)
             $incidenciasPendientes = Incidencia::where('vehiculo_id', $vehiculo->id)
-                ->where('estado_incidencia', IncidenciaEstadoEnum::REPORTADA->value)
+                ->where('estado_incidencia', '!=', IncidenciaEstadoEnum::RESUELTA->value)
+                ->where('tipo_incidencia', TipoIncidenciaEnum::DANIO_ESTETICO->value)
                 ->get(['id', 'tipo_incidencia', 'descripcion', 'fecha']);
 
             $reserva = DB::transaction(function () use ($request, $userAuth) {
@@ -192,7 +195,7 @@ class ReservaController extends Controller
                 'status'  => 'success',
                 'message' => 'Reserva creada con éxito',
                 'advertencia' => $incidenciasPendientes->isNotEmpty()
-                    ? 'Este vehículo tiene incidencias pendientes sin resolver.'
+                    ? 'Este vehículo tiene daños estéticos registrados sin resolver.'
                     : null,
                 'incidencias_pendientes' => $incidenciasPendientes,
                 'data'    => $reserva,
@@ -233,7 +236,7 @@ class ReservaController extends Controller
                 'vehiculo:id,placa,color,anio,estado,modelo_id,categoria_id',
                 'vehiculo.modelo:id,nombre,marca_id',
                 'vehiculo.modelo.marca:id,nombre',
-                'vehiculo.categoria:id,nombre,precio_dia', //  corregido
+                'vehiculo.categoria:id,nombre,precio_dia',
                 'user:id,nombre,apellido',
                 'cancelacion:id,fecha_cancelacion,motivo,usuario_id',
                 'cancelacion.user:id,nombre,apellido',
@@ -255,7 +258,6 @@ class ReservaController extends Controller
             ], 500);
         }
     }
-
 
     /**
      * Update the specified resource in storage.

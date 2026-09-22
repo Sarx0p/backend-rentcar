@@ -4,16 +4,18 @@ namespace App\Http\Controllers;
 
 use App\Enums\CargoAdicionalEstadoEnum;
 use App\Enums\CargoAdicionalTipoEnum;
-use App\Enums\RolEnum;
+use App\Enums\CierreRentaEstadoEnum;
 use App\Enums\EstadoContratoEnum;
 use App\Enums\EstadoPagoEnum;
 use App\Enums\EstadoReservaEnum;
+use App\Enums\IncidenciaEstadoEnum;
+use App\Enums\RolEnum;
 use App\Enums\VehiculoEstadoEnum;
-use App\Enums\CierreRentaEstadoEnum;
 use App\Http\Requests\CierreRentaController\StoreCierreRentaRequest;
 use App\Models\CargoAdicional;
-use App\Models\Contrato;
 use App\Models\CierreRenta;
+use App\Models\Contrato;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -103,15 +105,16 @@ class CierreRentaController extends Controller
 
             $resultado = DB::transaction(function () use ($request, $contrato, $forzarConDeuda) {
 
-                // Calcular horas de retraso con margen de 2 horas
+                // 1. Calcular horas de retraso con margen de 2 horas
                 $fechaDevolucionAcordada = $contrato->fecha_hora_devolucion;
-                $fechaRecepcionReal      = \Carbon\Carbon::parse($request->fecha_hora_recepcion);
+                $fechaRecepcionReal      = Carbon::parse($request->fecha_hora_recepcion);
                 $fechaLimite             = $fechaDevolucionAcordada->copy()->addHours(2);
 
                 $horasRetraso = $fechaRecepcionReal->gt($fechaLimite)
                     ? max(0, $fechaDevolucionAcordada->diffInHours($fechaRecepcionReal, false))
                     : 0;
 
+                // 2. Aplicar cargo por retraso si corresponde
                 if ($horasRetraso > 0 && $request->aplicar_cargo_retraso && !$forzarConDeuda) {
                     CargoAdicional::create([
                         'contrato_id'    => $contrato->id,
@@ -136,6 +139,38 @@ class CierreRentaController extends Controller
                     ];
                 }
 
+                $partesObservaciones = [];
+
+                if (!empty($request->observaciones)) {
+                    $partesObservaciones[] = "OBSERVACIONES GENERALES:\n" . trim($request->observaciones);
+                }
+
+                $cargosAdicionales = $contrato->cargosAdicionales()->get();
+                if ($cargosAdicionales->isNotEmpty()) {
+                    $textoCargos = $cargosAdicionales->map(function ($cargo) {
+                        return "- {$cargo->descripcion} ($" . number_format($cargo->monto, 2) . ")";
+                    })->implode("\n");
+
+                    $partesObservaciones[] = "CARGOS ADICIONALES:\n" . $textoCargos;
+                }
+
+                $incidenciasNoResueltas = $contrato->incidencias()
+                    ->whereNotIn('estado_incidencia', [
+                        IncidenciaEstadoEnum::RESUELTA->value,
+                        IncidenciaEstadoEnum::ANULADA->value,
+                    ])
+                    ->pluck('descripcion');
+
+                if ($incidenciasNoResueltas->isNotEmpty()) {
+                    $textoIncidencias = $incidenciasNoResueltas->map(function ($desc) {
+                        return "- " . $desc;
+                    })->implode("\n");
+
+                    $partesObservaciones[] = "INCIDENCIAS NO RESUELTAS:\n" . $textoIncidencias;
+                }
+
+                $observacionesFinales = implode("\n\n", $partesObservaciones);
+
                 $montoDeuda = $forzarConDeuda
                     ? max(0, $contrato->monto_total_renta - $contrato->montoPagado())
                     : null;
@@ -146,7 +181,7 @@ class CierreRentaController extends Controller
                     'fecha_hora_recepcion'        => $request->fecha_hora_recepcion,
                     'nivel_combustible_recepcion' => $request->nivel_combustible_recepcion,
                     'estado_vehiculo_recepcion'   => $request->estado_vehiculo_recepcion,
-                    'observaciones'               => $request->observaciones,
+                    'observaciones'               => $observacionesFinales,
                     'horas_retraso'               => $horasRetraso,
                     'monto_extras'                => $contrato->cargosAdicionales()->sum('monto'),
                     'estado'                      => $forzarConDeuda
@@ -166,7 +201,6 @@ class CierreRentaController extends Controller
                     ]);
                 }
 
-                // estado_pago NO se toca aquí: se deja reflejando la deuda real (PENDIENTE/PARCIAL)
                 $contrato->update([
                     'estado_contrato' => EstadoContratoEnum::FINALIZADO->value,
                 ]);
@@ -206,7 +240,7 @@ class CierreRentaController extends Controller
             return response()->json([
                 'status'  => 'error',
                 'message' => 'Error interno del servidor',
-                'error' => $e->getMessage(),
+                'error'   => $e->getMessage(),
             ], 500);
         }
     }

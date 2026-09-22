@@ -6,9 +6,12 @@ use App\Enums\EstadoPagoEnum;
 use App\Enums\IncidenciaEstadoEnum;
 use App\Enums\IncidenciaTipoResponsableEnum;
 use App\Enums\RolEnum;
+use App\Enums\TipoIncidenciaEnum;
+use App\Enums\VehiculoEstadoEnum;
 use App\Http\Requests\IncidenciaController\StoreIncidenciaRequest;
 use App\Http\Requests\IncidenciaController\UpdateIncidenciaRequest;
 use App\Models\Incidencia;
+use App\Models\Vehiculo;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -85,7 +88,6 @@ class IncidenciaController extends Controller
     public function store(StoreIncidenciaRequest $request)
     {
         try {
-            // authorize(), rules() y withValidator() ya se resolvieron automáticamente
             $incidencia = DB::transaction(function () use ($request) {
                 $incidencia = Incidencia::create([
                     'vehiculo_id'       => $request->vehiculo_id,
@@ -99,7 +101,17 @@ class IncidenciaController extends Controller
                     'costo'             => $request->costo,
                 ]);
 
-                // Caso: responsabilidad del CLIENTE → el costo se suma al contrato y pasa a PENDIENTE
+                if ($request->tipo_incidencia === TipoIncidenciaEnum::DANIO_MECANICO->value) {
+                    $vehiculo = Vehiculo::find($request->vehiculo_id);
+
+                    if ($vehiculo && $vehiculo->estado !== VehiculoEstadoEnum::MANTENIMIENTO->value) {
+                        $vehiculo->update([
+                            'estado' => VehiculoEstadoEnum::ENPROCESO->value,
+                        ]);
+                    }
+                }
+
+                // 3. Impacto Financiero: Si la culpa es del CLIENTE, imputar costo al contrato
                 if (
                     $request->responsable_tipo === IncidenciaTipoResponsableEnum::CLIENTE->value
                     && $request->filled('costo')
@@ -116,27 +128,15 @@ class IncidenciaController extends Controller
                 return $incidencia;
             });
 
-            $incidencia->load([
-                'vehiculo:id,placa,color,estado',
-                'contrato:id,numero_contrato,monto_total_renta,cliente_id',
-                'contrato.cliente:id,nombre',
-                'usuario:id,nombre,apellido',
-            ]);
-
             return response()->json([
                 'status'  => 'success',
                 'message' => 'Incidencia registrada con éxito',
-                'data'    => $incidencia,
+                'data'    => $incidencia->load(['vehiculo', 'contrato']),
             ], 201);
-        } catch (ModelNotFoundException $e) {
-            return response()->json([
-                'status'  => 'error',
-                'message' => 'Vehículo o contrato no encontrado',
-            ], 404);
         } catch (\Exception $e) {
             return response()->json([
                 'status'  => 'error',
-                'message' => 'Error interno del servidor',
+                'message' => 'Error interno al registrar la incidencia',
             ], 500);
         }
     }

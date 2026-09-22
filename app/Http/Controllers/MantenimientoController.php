@@ -94,38 +94,37 @@ class MantenimientoController extends Controller
                     'message' => 'Este vehículo ya se encuentra en mantenimiento actualmente',
                 ], 422);
             }
-            if ($request->filled('incidencia_id')) {
-            $incidencia = Incidencia::find($request->incidencia_id);
 
-            if (!$incidencia) {
-                return response()->json([
-                    'status'  => 'error',
-                    'message' => 'La incidencia seleccionada no existe',
-                ], 422);
-            }
-
-            if ((int) $incidencia->vehiculo_id !== (int) $request->vehiculo_id) {
-                return response()->json([
-                    'status'  => 'error',
-                    'message' => 'La incidencia seleccionada no pertenece al vehículo especificado',
-                ], 422);
-            }
-
-            if ($incidencia->estado_incidencia === IncidenciaEstadoEnum::RESUELTA->value) {
-                return response()->json([
-                    'status'  => 'error',
-                    'message' => 'La incidencia seleccionada ya se encuentra resuelta',
-                ], 422);
-            }
-        }
-
-            if (in_array($vehiculo->estado, [
-                VehiculoEstadoEnum::RENTADO->value,
-            ])) {
+            if ($vehiculo->estado === VehiculoEstadoEnum::RENTADO->value) {
                 return response()->json([
                     'status'  => 'error',
                     'message' => "No se puede enviar a mantenimiento un vehículo en estado {$vehiculo->estado}",
                 ], 422);
+            }
+
+            if ($request->filled('incidencia_id')) {
+                $incidencia = Incidencia::find($request->incidencia_id);
+
+                if (!$incidencia) {
+                    return response()->json([
+                        'status'  => 'error',
+                        'message' => 'La incidencia seleccionada no existe',
+                    ], 422);
+                }
+
+                if ((int) $incidencia->vehiculo_id !== (int) $request->vehiculo_id) {
+                    return response()->json([
+                        'status'  => 'error',
+                        'message' => 'La incidencia seleccionada no pertenece al vehículo especificado',
+                    ], 422);
+                }
+
+                if ($incidencia->estado_incidencia === IncidenciaEstadoEnum::RESUELTA->value) {
+                    return response()->json([
+                        'status'  => 'error',
+                        'message' => 'La incidencia seleccionada ya se encuentra resuelta',
+                    ], 422);
+                }
             }
 
             $mantenimientoReciente = Mantenimiento::where('vehiculo_id', $request->vehiculo_id)
@@ -158,15 +157,13 @@ class MantenimientoController extends Controller
                 return $mantenimiento;
             });
 
-            $mantenimiento->load([
-                'vehiculo:id,anio,color,placa,estado,propietario_id',
-                'incidencia',
-            ]);
-
             return response()->json([
                 'status'  => 'success',
                 'message' => 'Mantenimiento registrado con éxito',
-                'data'    => $mantenimiento,
+                'data'    => $mantenimiento->load([
+                    'vehiculo:id,anio,color,placa,estado,propietario_id',
+                    'incidencia',
+                ]),
             ], 201);
         } catch (ModelNotFoundException $e) {
             return response()->json([
@@ -239,26 +236,6 @@ class MantenimientoController extends Controller
                 ], 422);
             }
 
-            if (
-                $request->has('estado') &&
-                $request->estado === EstadoMantenimientoEnum::ACTIVO->value &&
-                $mantenimiento->estado !== EstadoMantenimientoEnum::ACTIVO->value
-            ) {
-                if ($mantenimiento->vehiculo->estado === VehiculoEstadoEnum::RENTADO->value) {
-                    return response()->json([
-                        'status'  => 'error',
-                        'message' => "No se puede reactivar el mantenimiento porque el vehículo está actualmente {$mantenimiento->vehiculo->estado}",
-                    ], 422);
-                }
-
-                if ($mantenimiento->vehiculo->estado === VehiculoEstadoEnum::MANTENIMIENTO->value) {
-                    return response()->json([
-                        'status'  => 'error',
-                        'message' => 'El vehículo ya se encuentra en otro mantenimiento activo actualmente',
-                    ], 422);
-                }
-            }
-
             DB::transaction(function () use ($request, $mantenimiento) {
                 $estadoAnterior = $mantenimiento->estado;
 
@@ -271,36 +248,29 @@ class MantenimientoController extends Controller
                 ]));
 
                 $mantenimiento->refresh();
-
                 $estadoNuevo = $mantenimiento->estado;
 
                 if (
                     $estadoAnterior === EstadoMantenimientoEnum::ACTIVO->value
-                    && in_array($estadoNuevo, [
-                        EstadoMantenimientoEnum::FINALIZADO->value,
-                        EstadoMantenimientoEnum::CANCELADO->value,
-                    ])
+                    && $estadoNuevo === EstadoMantenimientoEnum::FINALIZADO->value
                 ) {
                     $mantenimiento->vehiculo->update([
                         'estado' => VehiculoEstadoEnum::DISPONIBLE->value,
                     ]);
+
+                    if ($mantenimiento->incidencia_id) {
+                        $mantenimiento->incidencia?->update([
+                            'estado_incidencia' => IncidenciaEstadoEnum::RESUELTA->value,
+                        ]);
+                    }
                 }
 
                 if (
-                    $estadoNuevo === EstadoMantenimientoEnum::FINALIZADO->value
-                    && $mantenimiento->incidencia_id
-                ) {
-                    $mantenimiento->incidencia?->update([
-                        'estado_incidencia' => IncidenciaEstadoEnum::RESUELTA->value,
-                    ]);
-                }
-
-                if (
-                    $estadoAnterior !== EstadoMantenimientoEnum::ACTIVO->value
-                    && $estadoNuevo === EstadoMantenimientoEnum::ACTIVO->value
+                    $estadoAnterior === EstadoMantenimientoEnum::ACTIVO->value
+                    && $estadoNuevo === EstadoMantenimientoEnum::CANCELADO->value
                 ) {
                     $mantenimiento->vehiculo->update([
-                        'estado' => VehiculoEstadoEnum::MANTENIMIENTO->value,
+                        'estado' => VehiculoEstadoEnum::DISPONIBLE->value,
                     ]);
                 }
             });
@@ -313,6 +283,7 @@ class MantenimientoController extends Controller
                     'incidencia',
                 ]),
             ], 200);
+
         } catch (ModelNotFoundException $e) {
             return response()->json([
                 'status'  => 'error',
@@ -329,21 +300,9 @@ class MantenimientoController extends Controller
     /**
      * Remove the specified resource from storage (Anulación lógica).
      */
-    public function destroy(string $id)
+   public function destroy(string $id)
     {
         try {
-            $user = auth('api')->user();
-
-            if (
-                !$user->hasRole(RolEnum::ADMINISTRADOR->value) &&
-                !$user->hasRole(RolEnum::EMPLEADO->value)
-            ) {
-                return response()->json([
-                    'status'  => 'error',
-                    'message' => 'No tienes permiso para anular este mantenimiento',
-                ], 403);
-            }
-
             $mantenimiento = Mantenimiento::with('vehiculo')->findOrFail($id);
 
             if ($mantenimiento->estado === EstadoMantenimientoEnum::CANCELADO->value) {
@@ -382,6 +341,7 @@ class MantenimientoController extends Controller
                     'incidencia',
                 ]),
             ], 200);
+
         } catch (ModelNotFoundException $e) {
             return response()->json([
                 'status'  => 'error',
