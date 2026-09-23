@@ -74,8 +74,8 @@
                 <td>{{ $totalClientesNuevos ?? 0 }}</td>
             </tr>
             <tr class="total-destacado">
-                <td>Gastos en mantenimiento</td>
-                <td>${{ number_format($totalGastosMantenimiento ?? 0, 2) }}</td>
+                <td>Gastos por incidencias</td>
+                <td>${{ number_format($totalGastosIncidencias ?? 0, 2) }}</td>
             </tr>
         </tbody>
     </table>

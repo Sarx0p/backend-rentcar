@@ -47,7 +47,6 @@
                 <th>Propietario</th>
                 <th>Vehículos</th>
                 <th class="right">Ingresos</th>
-                <th class="right">Gasto Mantenimiento</th>
                 <th class="right">Gasto Incidencias</th>
                 <th class="right">Gasto Total</th>
                 <th class="right">Resultado Neto</th>
@@ -59,21 +58,20 @@
                     <td>{{ $item['propietario']->nombre ?? 'N/A' }}</td>
                     <td>{{ $item['num_vehiculos'] }}</td>
                     <td class="right">${{ number_format($item['ingresos'], 2) }}</td>
-                    <td class="right">${{ number_format($item['gasto_mantenimiento'], 2) }}</td>
                     <td class="right">${{ number_format($item['gasto_incidencias'], 2) }}</td>
                     <td class="right">${{ number_format($item['gasto_total'], 2) }}</td>
                     <td class="right">${{ number_format($item['resultado_neto'], 2) }}</td>
                 </tr>
             @empty
                 <tr>
-                    <td colspan="7">No hay propietarios registrados.</td>
+                    <td colspan="6">No hay propietarios registrados.</td>
                 </tr>
             @endforelse
 
             <tr class="total-destacado">
                 <td colspan="2">Total general</td>
                 <td class="right">${{ number_format($totalIngresos ?? 0, 2) }}</td>
-                <td colspan="2"></td>
+                <td></td>
                 <td class="right">${{ number_format($totalGastos ?? 0, 2) }}</td>
                 <td class="right">${{ number_format($totalNeto ?? 0, 2) }}</td>
             </tr>
