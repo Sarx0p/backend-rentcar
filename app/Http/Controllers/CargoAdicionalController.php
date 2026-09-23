@@ -5,13 +5,15 @@ namespace App\Http\Controllers;
 use App\Enums\CargoAdicionalEstadoEnum;
 use App\Enums\CargoAdicionalTipoEnum;
 use App\Enums\EstadoContratoEnum;
+use App\Enums\EstadoPagoEnum;
+use App\Enums\EstadoTransaccionEnum;
 use App\Enums\RolEnum;
 use App\Models\CargoAdicional;
 use App\Models\Contrato;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Nette\Schema\ValidationException;
+use Illuminate\Validation\ValidationException;
 
 class CargoAdicionalController extends Controller
 {
@@ -24,8 +26,10 @@ class CargoAdicionalController extends Controller
             $userAuth = auth('api')->user();
 
             if (
-                !$userAuth->hasRole(RolEnum::ADMINISTRADOR->value) &&
-                !$userAuth->hasRole(RolEnum::EMPLEADO->value)
+                !$userAuth || (
+                    !$userAuth->hasRole(RolEnum::ADMINISTRADOR->value) &&
+                    !$userAuth->hasRole(RolEnum::EMPLEADO->value)
+                )
             ) {
                 return response()->json([
                     'status'  => 'error',
@@ -36,7 +40,6 @@ class CargoAdicionalController extends Controller
             $cargos = CargoAdicional::with([
                 'contrato:id,numero_contrato,monto_total_renta,estado_pago',
             ])
-
                 ->when($request->search, function ($query, $search) {
                     $query->where(function ($subQuery) use ($search) {
                         $subQuery->where('tipo_cargo', 'like', '%' . $search . '%')
@@ -50,7 +53,6 @@ class CargoAdicionalController extends Controller
                             });
                     });
                 })
-
                 ->when($request->tipo_cargo, function ($query, $tipo) {
                     $query->where('tipo_cargo', $tipo);
                 })
@@ -67,7 +69,7 @@ class CargoAdicionalController extends Controller
                 'status' => 'success',
                 'data'   => $cargos,
             ], 200);
-        } catch (\Exception) {
+        } catch (\Exception $e) {
             return response()->json([
                 'status'  => 'error',
                 'message' => 'Error interno del servidor',
@@ -78,14 +80,16 @@ class CargoAdicionalController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-     public function store(Request $request)
+    public function store(Request $request)
     {
         try {
             $userAuth = auth('api')->user();
 
             if (
-                !$userAuth->hasRole(RolEnum::ADMINISTRADOR->value) &&
-                !$userAuth->hasRole(RolEnum::EMPLEADO->value)
+                !$userAuth || (
+                    !$userAuth->hasRole(RolEnum::ADMINISTRADOR->value) &&
+                    !$userAuth->hasRole(RolEnum::EMPLEADO->value)
+                )
             ) {
                 return response()->json([
                     'status'  => 'error',
@@ -112,7 +116,6 @@ class CargoAdicionalController extends Controller
 
             $cargo = DB::transaction(function () use ($request, $contrato) {
 
-
                 $cargo = CargoAdicional::create([
                     'contrato_id'    => $contrato->id,
                     'tipo_cargo'     => $request->tipo_cargo,
@@ -122,12 +125,27 @@ class CargoAdicionalController extends Controller
                     'estado_cargo'   => CargoAdicionalEstadoEnum::PENDIENTE->value,
                 ]);
 
-                $montoBase    = ($contrato->dias_acordados * $contrato->precio_por_dia) - $contrato->monto_descuento;
-                $totalCargos  = $contrato->cargosAdicionales()->sum('monto');
-                $nuevoTotal   = $montoBase + $totalCargos;
+                $montoBase   = ($contrato->dias_acordados * $contrato->precio_por_dia) - ($contrato->monto_descuento ?? 0);
+                $totalCargos = $contrato->cargosAdicionales()->sum('monto');
+                $nuevoTotal  = $montoBase + $totalCargos;
+
+                $montoPagado = $contrato->pagos()
+                    ->where('estado_transaccion', EstadoTransaccionEnum::CONFIRMADO->value)
+                    ->sum('monto');
+
+                $nuevoSaldoPendiente = max(0, $nuevoTotal - $montoPagado);
+
+                if ($nuevoSaldoPendiente <= 0 && $nuevoTotal > 0) {
+                    $nuevoEstadoPago = EstadoPagoEnum::PAGADO->value;
+                } elseif ($montoPagado > 0) {
+                    $nuevoEstadoPago = EstadoPagoEnum::PARCIAL->value;
+                } else {
+                    $nuevoEstadoPago = EstadoPagoEnum::PENDIENTE->value;
+                }
 
                 $contrato->update([
                     'monto_total_renta' => $nuevoTotal,
+                    'estado_pago'       => $nuevoEstadoPago,
                 ]);
 
                 return $cargo;
@@ -150,13 +168,12 @@ class CargoAdicionalController extends Controller
             return response()->json([
                 'status'  => 'error',
                 'message' => 'Error de validación',
-
+                'errors'  => $e->errors(),
             ], 422);
         } catch (\Exception $e) {
             return response()->json([
                 'status'  => 'error',
                 'message' => 'Error interno del servidor',
-
             ], 500);
         }
     }
@@ -170,8 +187,10 @@ class CargoAdicionalController extends Controller
             $userAuth = auth('api')->user();
 
             if (
-                !$userAuth->hasRole(RolEnum::ADMINISTRADOR->value) &&
-                !$userAuth->hasRole(RolEnum::EMPLEADO->value)
+                !$userAuth || (
+                    !$userAuth->hasRole(RolEnum::ADMINISTRADOR->value) &&
+                    !$userAuth->hasRole(RolEnum::EMPLEADO->value)
+                )
             ) {
                 return response()->json([
                     'status'  => 'error',
@@ -197,7 +216,6 @@ class CargoAdicionalController extends Controller
             return response()->json([
                 'status'  => 'error',
                 'message' => 'Error interno del servidor',
-
             ], 500);
         }
     }
@@ -207,7 +225,97 @@ class CargoAdicionalController extends Controller
      */
     public function update(Request $request, string $id)
     {
-        //
+        try {
+            $userAuth = auth('api')->user();
+
+            if (
+                !$userAuth || (
+                    !$userAuth->hasRole(RolEnum::ADMINISTRADOR->value) &&
+                    !$userAuth->hasRole(RolEnum::EMPLEADO->value)
+                )
+            ) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'No tienes permiso para actualizar cargos adicionales',
+                ], 403);
+            }
+
+            $cargo = CargoAdicional::findOrFail($id);
+            $contrato = $cargo->contrato;
+
+            if ($contrato->estado_contrato !== EstadoContratoEnum::ACTIVO->value) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'Solo se pueden modificar cargos en contratos ACTIVOS',
+                ], 422);
+            }
+
+            $request->validate([
+                'tipo_cargo'     => 'sometimes|in:' . implode(',', array_column(CargoAdicionalTipoEnum::cases(), 'value')),
+                'descripcion'    => 'sometimes|string|nullable',
+                'monto'          => 'sometimes|numeric|min:0.01',
+                'fecha_registro' => 'sometimes|date',
+                'estado_cargo'   => 'sometimes|in:' . implode(',', array_column(CargoAdicionalEstadoEnum::cases(), 'value')),
+            ]);
+
+            DB::transaction(function () use ($request, $cargo, $contrato) {
+                $cargo->update($request->only([
+                    'tipo_cargo',
+                    'descripcion',
+                    'monto',
+                    'fecha_registro',
+                    'estado_cargo',
+                ]));
+
+                $montoBase   = ($contrato->dias_acordados * $contrato->precio_por_dia) - ($contrato->monto_descuento ?? 0);
+                $totalCargos = $contrato->cargosAdicionales()->sum('monto');
+                $nuevoTotal  = $montoBase + $totalCargos;
+
+                $montoPagado = $contrato->pagos()
+                    ->where('estado_transaccion', EstadoTransaccionEnum::CONFIRMADO->value)
+                    ->sum('monto');
+
+                $nuevoSaldoPendiente = max(0, $nuevoTotal - $montoPagado);
+
+                if ($nuevoSaldoPendiente <= 0 && $nuevoTotal > 0) {
+                    $nuevoEstadoPago = EstadoPagoEnum::PAGADO->value;
+                } elseif ($montoPagado > 0) {
+                    $nuevoEstadoPago = EstadoPagoEnum::PARCIAL->value;
+                } else {
+                    $nuevoEstadoPago = EstadoPagoEnum::PENDIENTE->value;
+                }
+
+                $contrato->update([
+                    'monto_total_renta' => $nuevoTotal,
+                    'estado_pago'       => $nuevoEstadoPago,
+                ]);
+            });
+
+            $cargo->load('contrato:id,numero_contrato,monto_total_renta,estado_pago');
+
+            return response()->json([
+                'status'  => 'success',
+                'message' => 'Cargo adicional actualizado correctamente',
+                'data'    => $cargo,
+            ], 200);
+
+        } catch (ModelNotFoundException $e) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Cargo adicional no encontrado',
+            ], 404);
+        } catch (ValidationException $e) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Error de validación',
+                'errors'  => $e->errors(),
+            ], 422);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Error interno del servidor',
+            ], 500);
+        }
     }
 
     /**
@@ -215,6 +323,73 @@ class CargoAdicionalController extends Controller
      */
     public function destroy(string $id)
     {
-        //
+        try {
+            $userAuth = auth('api')->user();
+
+            if (
+                !$userAuth || (
+                    !$userAuth->hasRole(RolEnum::ADMINISTRADOR->value) &&
+                    !$userAuth->hasRole(RolEnum::EMPLEADO->value)
+                )
+            ) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'No tienes permiso para eliminar cargos adicionales',
+                ], 403);
+            }
+
+            $cargo = CargoAdicional::findOrFail($id);
+            $contrato = $cargo->contrato;
+
+            if ($contrato->estado_contrato !== EstadoContratoEnum::ACTIVO->value) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'Solo se pueden eliminar cargos en contratos ACTIVOS',
+                ], 422);
+            }
+
+            DB::transaction(function () use ($cargo, $contrato) {
+                $cargo->delete();
+
+                $montoBase   = ($contrato->dias_acordados * $contrato->precio_por_dia) - ($contrato->monto_descuento ?? 0);
+                $totalCargos = $contrato->cargosAdicionales()->sum('monto');
+                $nuevoTotal  = $montoBase + $totalCargos;
+
+                $montoPagado = $contrato->pagos()
+                    ->where('estado_transaccion', EstadoTransaccionEnum::CONFIRMADO->value)
+                    ->sum('monto');
+
+                $nuevoSaldoPendiente = max(0, $nuevoTotal - $montoPagado);
+
+                if ($nuevoSaldoPendiente <= 0 && $nuevoTotal > 0) {
+                    $nuevoEstadoPago = EstadoPagoEnum::PAGADO->value;
+                } elseif ($montoPagado > 0) {
+                    $nuevoEstadoPago = EstadoPagoEnum::PARCIAL->value;
+                } else {
+                    $nuevoEstadoPago = EstadoPagoEnum::PENDIENTE->value;
+                }
+
+                $contrato->update([
+                    'monto_total_renta' => $nuevoTotal,
+                    'estado_pago'       => $nuevoEstadoPago,
+                ]);
+            });
+
+            return response()->json([
+                'status'  => 'success',
+                'message' => 'Cargo adicional eliminado y saldos recalculados correctamente',
+            ], 200);
+
+        } catch (ModelNotFoundException $e) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Cargo adicional no encontrado',
+            ], 404);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Error interno del servidor',
+            ], 500);
+        }
     }
 }

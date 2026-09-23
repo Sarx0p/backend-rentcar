@@ -7,14 +7,15 @@ use App\Enums\EstadoTransaccionEnum;
 use App\Enums\EstadoPagoEnum;
 use App\Enums\VehiculoEstadoEnum;
 use App\Enums\IncidenciaTipoResponsableEnum;
+use App\Enums\EstadoPropietarioEnum;
 use App\Models\Pago;
 use App\Models\Vehiculo;
 use App\Models\Cliente;
 use App\Models\Cancelacion;
 use App\Models\Contrato;
-use App\Models\Mantenimiento;
 use App\Models\Incidencia;
 use App\Models\Reserva;
+use App\Models\Propietario;
 use Illuminate\Http\Request;
 use Barryvdh\DomPDF\Facade\Pdf;
 
@@ -26,6 +27,10 @@ class ReporteController extends Controller
     private function tienePermiso($incluirContador = false): bool
     {
         $userAuth = auth('api')->user();
+
+        if (!$userAuth) {
+            return false;
+        }
 
         $permitido = $userAuth->hasRole(RolEnum::ADMINISTRADOR->value)
             || $userAuth->hasRole(RolEnum::EMPLEADO->value);
@@ -154,7 +159,7 @@ class ReporteController extends Controller
     }
 
     /**
-     * Resultado neto por propietario: ingresos - gastos (mantenimiento + incidencias del negocio).
+     * Resultado neto por propietario: ingresos - gastos por incidencias del negocio.
      */
     public function resultadoNetoPorPropietario(Request $request)
     {
@@ -171,8 +176,8 @@ class ReporteController extends Controller
 
             $propietarioBusqueda = trim((string) ($request->input('propietario') ?? ''));
 
-            $propietarios = \App\Models\Propietario::with('vehiculos.modelo.marca')
-                ->where('estado', \App\Enums\EstadoPropietarioEnum::ACTIVO->value)
+            $propietarios = Propietario::with('vehiculos.modelo.marca')
+                ->where('estado', EstadoPropietarioEnum::ACTIVO->value)
                 ->when($propietarioBusqueda !== '', function ($query) use ($propietarioBusqueda) {
                     $query->where('nombre', 'like', "%{$propietarioBusqueda}%");
                 })
@@ -188,11 +193,6 @@ class ReporteController extends Controller
                         ->whereDate('fecha_pago', '<=', $fechaFin)
                         ->sum('monto');
 
-                    $gastoMantenimiento = Mantenimiento::whereIn('vehiculo_id', $vehiculoIds)
-                        ->whereDate('fecha', '>=', $fechaInicio)
-                        ->whereDate('fecha', '<=', $fechaFin)
-                        ->sum('costo');
-
                     $incidenciasNegocio = Incidencia::whereIn('vehiculo_id', $vehiculoIds)
                         ->where('responsable_tipo', IncidenciaTipoResponsableEnum::NEGOCIO->value)
                         ->whereDate('fecha', '>=', $fechaInicio)
@@ -200,13 +200,12 @@ class ReporteController extends Controller
                         ->get(['id', 'vehiculo_id', 'tipo_incidencia', 'descripcion', 'costo', 'fecha']);
 
                     $gastoIncidencias = $incidenciasNegocio->sum('costo');
-                    $gastoTotal = $gastoMantenimiento;
+                    $gastoTotal       = $gastoIncidencias;
 
                     return [
                         'propietario'         => $propietario,
                         'num_vehiculos'       => $vehiculoIds->count(),
                         'ingresos'            => $ingresos,
-                        'gasto_mantenimiento' => $gastoMantenimiento,
                         'gasto_incidencias'   => $gastoIncidencias,
                         'incidencias_detalle' => $incidenciasNegocio,
                         'gasto_total'         => $gastoTotal,
@@ -315,20 +314,21 @@ class ReporteController extends Controller
                 ->whereDate('created_at', '<=', $fechaFin)
                 ->count();
 
-            $totalGastosMantenimiento = Mantenimiento::whereDate('fecha', '>=', $fechaInicio)
+            $totalGastosIncidencias = Incidencia::where('responsable_tipo', IncidenciaTipoResponsableEnum::NEGOCIO->value)
+                ->whereDate('fecha', '>=', $fechaInicio)
                 ->whereDate('fecha', '<=', $fechaFin)
                 ->sum('costo');
 
             $pdf = Pdf::loadView('reportes.desempeno-general', [
-                'fechaInicio'              => $fechaInicio,
-                'fechaFin'                 => $fechaFin,
-                'totalIngresos'            => $totalIngresos,
-                'totalContratos'           => $totalContratos,
-                'totalVehiculos'           => $totalVehiculos,
-                'vehiculosRentados'        => $vehiculosRentados,
-                'tasaOcupacion'            => $tasaOcupacion,
-                'totalClientesNuevos'      => $totalClientesNuevos,
-                'totalGastosMantenimiento' => $totalGastosMantenimiento,
+                'fechaInicio'            => $fechaInicio,
+                'fechaFin'               => $fechaFin,
+                'totalIngresos'          => $totalIngresos,
+                'totalContratos'         => $totalContratos,
+                'totalVehiculos'         => $totalVehiculos,
+                'vehiculosRentados'      => $vehiculosRentados,
+                'tasaOcupacion'          => $tasaOcupacion,
+                'totalClientesNuevos'    => $totalClientesNuevos,
+                'totalGastosIncidencias' => $totalGastosIncidencias,
             ]);
 
             $pdf->setPaper('letter', 'portrait');
@@ -423,7 +423,7 @@ class ReporteController extends Controller
     }
 
     /**
-     * Gastos por vehículo: mantenimientos + incidencias asumidas por el negocio.
+     * Gastos por vehículo: incidencias asumidas por el negocio.
      */
     public function gastosPorVehiculo(Request $request)
     {
@@ -441,11 +441,6 @@ class ReporteController extends Controller
             $vehiculos = Vehiculo::with(['modelo.marca'])
                 ->get()
                 ->map(function ($vehiculo) use ($fechaInicio, $fechaFin) {
-                    $gastoMantenimiento = Mantenimiento::where('vehiculo_id', $vehiculo->id)
-                        ->whereDate('fecha', '>=', $fechaInicio)
-                        ->whereDate('fecha', '<=', $fechaFin)
-                        ->sum('costo');
-
                     $gastoIncidenciasNegocio = Incidencia::where('vehiculo_id', $vehiculo->id)
                         ->where('responsable_tipo', IncidenciaTipoResponsableEnum::NEGOCIO->value)
                         ->whereDate('fecha', '>=', $fechaInicio)
@@ -454,9 +449,8 @@ class ReporteController extends Controller
 
                     return [
                         'vehiculo'                  => $vehiculo,
-                        'gasto_mantenimiento'       => $gastoMantenimiento,
                         'gasto_incidencias_negocio' => $gastoIncidenciasNegocio,
-                        'gasto_total'               => $gastoMantenimiento,
+                        'gasto_total'               => $gastoIncidenciasNegocio,
                     ];
                 })
                 ->sortByDesc('gasto_total')
@@ -483,7 +477,7 @@ class ReporteController extends Controller
     }
 
     /**
-     * Resultado neto por vehículo: ingresos - gastos.
+     * Resultado neto por vehículo: ingresos - gastos por incidencias.
      */
     public function resultadoNetoPorVehiculo(Request $request)
     {
@@ -509,18 +503,13 @@ class ReporteController extends Controller
                         ->whereDate('fecha_pago', '<=', $fechaFin)
                         ->sum('monto');
 
-                    $gastoMantenimiento = Mantenimiento::where('vehiculo_id', $vehiculo->id)
-                        ->whereDate('fecha', '>=', $fechaInicio)
-                        ->whereDate('fecha', '<=', $fechaFin)
-                        ->sum('costo');
-
                     $gastoIncidencias = Incidencia::where('vehiculo_id', $vehiculo->id)
                         ->where('responsable_tipo', IncidenciaTipoResponsableEnum::NEGOCIO->value)
                         ->whereDate('fecha', '>=', $fechaInicio)
                         ->whereDate('fecha', '<=', $fechaFin)
                         ->sum('costo');
 
-                    $gastoTotal = $gastoMantenimiento;
+                    $gastoTotal = $gastoIncidencias;
 
                     return [
                         'vehiculo'       => $vehiculo,
