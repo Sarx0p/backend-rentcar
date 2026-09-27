@@ -19,6 +19,18 @@ class ModeloController extends Controller
     public function index()
     {
         try {
+            $userAuth = auth('api')->user();
+
+            if (
+                !$userAuth->hasRole(RolEnum::ADMINISTRADOR->value) &&
+                !$userAuth->hasRole(RolEnum::EMPLEADO->value)
+            ) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'No tienes permiso para ver los modelos.',
+                ], 403);
+            }
+
             $modelos = Modelo::with('marca')->orderBy('nombre')->get();
 
             if ($modelos->isEmpty()) {
@@ -43,6 +55,18 @@ class ModeloController extends Controller
     public function porMarca(int $marcaId)
     {
         try {
+            $userAuth = auth('api')->user();
+
+            if (
+                !$userAuth->hasRole(RolEnum::ADMINISTRADOR->value) &&
+                !$userAuth->hasRole(RolEnum::EMPLEADO->value)
+            ) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'No tienes permiso para ver los modelos.',
+                ], 403);
+            }
+
             $marca = Marca::find($marcaId);
 
             if (!$marca) {
@@ -140,6 +164,18 @@ class ModeloController extends Controller
     public function show(string $id)
     {
         try {
+            $userAuth = auth('api')->user();
+
+            if (
+                !$userAuth->hasRole(RolEnum::ADMINISTRADOR->value) &&
+                !$userAuth->hasRole(RolEnum::EMPLEADO->value)
+            ) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'No tienes permiso para ver este modelo.',
+                ], 403);
+            }
+
             $modelo = Modelo::with('marca:id,nombre')->findOrFail($id);
 
             return response()->json([

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Enums\EstadoReservaEnum;
+use App\Enums\RolEnum;
 use App\Enums\VehiculoEstadoEnum;
 use App\Models\Cliente;
 use App\Models\Reserva;
@@ -14,6 +15,16 @@ class DashboardController extends Controller
 {
     public function resumen(): JsonResponse
     {
+        $userAuth = auth('api')->user();
+        if (
+            !$userAuth->hasRole(RolEnum::ADMINISTRADOR->value) &&
+            !$userAuth->hasRole(RolEnum::EMPLEADO->value)
+        ) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'No tienes permiso para ver el resumen del dashboard.',
+            ], 403);
+        }
         $hoy = Carbon::today();
 
         // 1. Reservas del día (omite canceladas y concluidas)
@@ -66,12 +77,12 @@ class DashboardController extends Controller
             ->get();
 
         $ultimasReservas = Reserva::with([
-                'cliente:id,nombre,dui,telefono',
-                'vehiculo:id,placa,color,anio,estado,modelo_id,categoria_id',
-                'vehiculo.modelo:id,nombre,marca_id',
-                'vehiculo.modelo.marca:id,nombre',
-                'vehiculo.categoria:id,nombre,precio_dia',
-            ])
+            'cliente:id,nombre,dui,telefono',
+            'vehiculo:id,placa,color,anio,estado,modelo_id,categoria_id',
+            'vehiculo.modelo:id,nombre,marca_id',
+            'vehiculo.modelo.marca:id,nombre',
+            'vehiculo.categoria:id,nombre,precio_dia',
+        ])
             ->orderByDesc('id')
             ->take(5)
             ->get();
