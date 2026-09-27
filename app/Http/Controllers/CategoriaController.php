@@ -16,26 +16,37 @@ class CategoriaController extends Controller
      */
     public function index()
     {
-        try{
+        try {
+            $userAuth = auth('api')->user();
+
+            if (
+                !$userAuth->hasRole(RolEnum::ADMINISTRADOR->value) &&
+                !$userAuth->hasRole(RolEnum::EMPLEADO->value)
+            ) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'No tienes permiso para ver las categorías.',
+                ], 403);
+            }
+
             $categorias = Categoria::orderBy('nombre')->get();
 
-            if($categorias->isEmpty()) {
+            if ($categorias->isEmpty()) {
                 return response()->json([
                     'status'  => 'error',
                     'message' => 'No hay categorias registradas.',
-                ],404);
+                ], 404);
             }
 
             return response()->json([
                 'status' => 'success',
                 'data'   => $categorias,
-            ],200);
-
-        } catch(\Exception $e) {
+            ], 200);
+        } catch (\Exception $e) {
             return response()->json([
                 'status'  => 'error',
                 'message' => 'Error interno del servidor.',
-            ],500);
+            ], 500);
         }
     }
 
@@ -44,14 +55,14 @@ class CategoriaController extends Controller
      */
     public function store(Request $request)
     {
-        try{
+        try {
             $userAuth = auth('api')->user();
 
-            if(!$userAuth->hasRole(RolEnum::ADMINISTRADOR->value)) {
+            if (!$userAuth->hasRole(RolEnum::ADMINISTRADOR->value)) {
                 return response()->json([
                     'status'  => 'error',
                     'message' => 'No tienes permiso para realizar esta acción.',
-                ],403);
+                ], 403);
             }
 
             $request->validate([
@@ -72,22 +83,20 @@ class CategoriaController extends Controller
                 'status'  => 'success',
                 'message' => 'Categoria registrada correctamente.',
                 'data'    => $categoria,
-            ],201);
-
+            ], 201);
         } catch (ValidationException $e) {
             return response()->json([
                 'status'  => 'error',
                 'message' => 'Faltan campos requeridos.',
                 'errors'  => $e->errors(),
-            ],422);
-
+            ], 422);
         } catch (\Exception $e) {
             DB::rollBack();
 
             return response()->json([
                 'status'  => 'error',
                 'message' => 'Error interno del servidor.',
-            ],500);
+            ], 500);
         }
     }
 
@@ -96,26 +105,37 @@ class CategoriaController extends Controller
      */
     public function show(string $id)
     {
-        try{
+        try {
+            $userAuth = auth('api')->user();
+
+            if (
+                !$userAuth->hasRole(RolEnum::ADMINISTRADOR->value) &&
+                !$userAuth->hasRole(RolEnum::EMPLEADO->value)
+            ) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'No tienes permiso para ver esta categoría.',
+                ], 403);
+            }
+
             $categoria = Categoria::find($id);
 
-            if(!$categoria) {
+            if (!$categoria) {
                 return response()->json([
                     'status'  => 'error',
                     'message' => 'Categoria no encontrada.',
-                ],404);
+                ], 404);
             }
 
             return response()->json([
                 'status' => 'success',
                 'data'   => $categoria,
-            ],200);
-
-        } catch(\Exception $e) {
+            ], 200);
+        } catch (\Exception $e) {
             return response()->json([
                 'status'  => 'error',
                 'message' => 'Error interno del servidor.',
-            ],500);
+            ], 500);
         }
     }
 

@@ -123,6 +123,16 @@ class ContratoController extends Controller
                 ], 422);
             }
 
+            if (
+                Carbon::parse($request->fecha_hora_entrega)->ne(Carbon::parse($reserva->fecha_inicio)) ||
+                Carbon::parse($request->fecha_hora_devolucion)->ne(Carbon::parse($reserva->fecha_fin))
+            ) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'Las fechas del contrato deben coincidir exactamente con las fechas de la reserva',
+                ], 422);
+            }
+
             $vehiculo = $reserva->vehiculo;
 
             if ($vehiculo->estado !== VehiculoEstadoEnum::DISPONIBLE->value) {
@@ -460,7 +470,7 @@ class ContratoController extends Controller
                 'vehiculo.modelo.marca',
                 'vehiculo.incidencias' => function ($q) {
                     $q->where('estado_incidencia', '!=', IncidenciaEstadoEnum::RESUELTA->value)
-                      ->where('tipo_incidencia', TipoIncidenciaEnum::DANIO_ESTETICO->value);
+                        ->where('tipo_incidencia', TipoIncidenciaEnum::DANIO_ESTETICO->value);
                 },
             ])->findOrFail($id);
 
@@ -525,7 +535,8 @@ class ContratoController extends Controller
 
     private function generarNumeroContrato(): string
     {
-        $ultimoContrato = Contrato::latest()->first();
+        $ultimoContrato = Contrato::orderBy('id', 'desc')->lockForUpdate()->first();
+
         $numero = $ultimoContrato
             ? str_pad((intval(substr($ultimoContrato->numero_contrato, -4)) + 1), 4, '0', STR_PAD_LEFT)
             : '0001';

@@ -17,26 +17,37 @@ class MarcaController extends Controller
      */
     public function index()
     {
-        try{
+        try {
+            $userAuth = auth('api')->user();
+
+            if (
+                !$userAuth->hasRole(RolEnum::ADMINISTRADOR->value) &&
+                !$userAuth->hasRole(RolEnum::EMPLEADO->value)
+            ) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'No tienes permiso para ver las marcas.',
+                ], 403);
+            }
+
             $marcas = Marca::orderBy('nombre')->get();
 
-            if($marcas->isEmpty()){
+            if ($marcas->isEmpty()) {
                 return response()->json([
                     'status'  => 'error',
                     'message' => 'No hay marcas registradas.'
-                ],404);
+                ], 404);
             }
 
             return response()->json([
                 'status' => 'success',
                 'data'   => $marcas,
-            ],200);
-
-        } catch(\Exception $e){
+            ], 200);
+        } catch (\Exception $e) {
             return response()->json([
                 'status'  => 'error',
                 'message' => 'Error interno del servidor.',
-            ],500);
+            ], 500);
         }
     }
 
@@ -45,14 +56,14 @@ class MarcaController extends Controller
      */
     public function store(Request $request)
     {
-        try{
+        try {
             $userAuth = auth('api')->user();
 
-            if(!$userAuth->hasRole(RolEnum::ADMINISTRADOR->value)){
+            if (!$userAuth->hasRole(RolEnum::ADMINISTRADOR->value)) {
                 return response()->json([
                     'status'  => 'error',
                     'message' => 'No tienes permiso para realizar esta acción.',
-                ],403);
+                ], 403);
             }
 
             $request->validate([
@@ -71,22 +82,20 @@ class MarcaController extends Controller
                 'status'  => 'success',
                 'message' => 'Marca registrada con exito.',
                 'data'    => $marca,
-            ],201);
-
+            ], 201);
         } catch (ValidationException $e) {
             return response()->json([
                 'status'  => 'error',
                 'message' => 'Faltan campos requeridos.',
                 'errors'  => $e->errors(),
-            ],422);
-
+            ], 422);
         } catch (\Exception $e) {
             DB::rollBack();
 
             return response()->json([
                 'status'  => 'error',
                 'message' => 'Error interno del servidor.',
-            ],500);
+            ], 500);
         }
     }
 
@@ -95,29 +104,35 @@ class MarcaController extends Controller
      */
     public function show(string $id)
     {
-        try{
-            $marcas = Marca::findOrField($id);
+        try {
+            $userAuth = auth('api')->user();
+
+            if (
+                !$userAuth->hasRole(RolEnum::ADMINISTRADOR->value) &&
+                !$userAuth->hasRole(RolEnum::EMPLEADO->value)
+            ) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'No tienes permiso para ver esta marca.',
+                ], 403);
+            }
+
+            $marca = Marca::findOrFail($id);
 
             return response()->json([
-                "status" => "succes",
-                "data" => $marcas
-            ],200);
-
-
-        }
-        catch(ModelNotFoundException){
+                'status' => 'success',
+                'data'   => $marca
+            ], 200);
+        } catch (ModelNotFoundException $e) {
             return response()->json([
-                "status" => "errors",
-                "message" => "No se encontraron marcas"
-            ],404);
-
-        }
-        catch(\Exception $e){
+                'status'  => 'error',
+                'message' => 'Marca no encontrada.'
+            ], 404);
+        } catch (\Exception $e) {
             return response()->json([
-                "status" => "errors",
-                "message" => "Error interno de el servidor"
-            ],500);
-
+                'status'  => 'error',
+                'message' => 'Error interno del servidor.'
+            ], 500);
         }
     }
 
@@ -126,51 +141,44 @@ class MarcaController extends Controller
      */
     public function update(Request $request, string $id)
     {
-         try{
+        try {
             $userAuth = auth('api')->user();
 
-            if(!$userAuth->hasRole(RolEnum::ADMINISTRADOR->value)){
+            if (!$userAuth->hasRole(RolEnum::ADMINISTRADOR->value)) {
                 return response()->json([
                     'status'  => 'error',
                     'message' => 'No tienes permiso para realizar esta acción.',
-                ],403);
+                ], 403);
             }
 
-           $request->validate([
-               'nombre' => ['required', 'string', 'min:2', 'max:80', Rule::unique('marcas', 'nombre')->ignore($id)],
-           ]);
+            $request->validate([
+                'nombre' => ['required', 'string', 'min:2', 'max:80', Rule::unique('marcas', 'nombre')->ignore($id)],
+            ]);
 
-           $marcas = Marca::findOrFail($id);
+            $marca = Marca::findOrFail($id);
+            $marca->update($request->only(['nombre']));
 
-           $marcas->update($request->only(["nombre"]));
-
-           return response()->json([
-            "message" => "Marca actualizada correctamente",
-            "data" => $marcas
-           ],201);
-
-
-
+            return response()->json([
+                'status'  => 'success',
+                'message' => 'Marca actualizada correctamente.',
+                'data'    => $marca
+            ], 200);
         } catch (ValidationException $e) {
             return response()->json([
                 'status'  => 'error',
                 'message' => 'Faltan campos requeridos.',
                 'errors'  => $e->errors(),
             ], 422);
-
-        }catch(ModelNotFoundException){
+        } catch (ModelNotFoundException $e) {
             return response()->json([
-                "status" => "errors",
-                "message" => "propietario no encontrado "
-            ],404);
-
-        }catch (\Exception $e) {
-            DB::rollBack();
-
+                'status'  => 'error',
+                'message' => 'Marca no encontrada.'
+            ], 404);
+        } catch (\Exception $e) {
             return response()->json([
                 'status'  => 'error',
                 'message' => 'Error interno del servidor.',
-            ],500);
+            ], 500);
         }
     }
 
@@ -179,13 +187,41 @@ class MarcaController extends Controller
      */
     public function destroy(string $id)
     {
-        try{
+        try {
+            $userAuth = auth('api')->user();
 
-        }catch(\Exception $e){
+            if (!$userAuth->hasRole(RolEnum::ADMINISTRADOR->value)) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'No tienes permiso para realizar esta acción.',
+                ], 403);
+            }
+
+            $marca = Marca::findOrFail($id);
+
+            if ($marca->modelos()->exists()) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'No se puede eliminar esta marca porque tiene modelos de vehículos asociados.',
+                ], 422);
+            }
+
+            $marca->delete();
+
             return response()->json([
-                "ststus" => "Errors",
-                "message" => "Error interno de el servidor"
-            ]);
+                'status'  => 'success',
+                'message' => 'Marca eliminada con éxito.',
+            ], 200);
+        } catch (ModelNotFoundException $e) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Marca no encontrada.',
+            ], 404);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Error interno del servidor.',
+            ], 500);
         }
     }
 }
