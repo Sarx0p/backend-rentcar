@@ -38,14 +38,17 @@ class PagoController extends Controller
             }
 
             $pagos = Pago::with([
-                'contrato:id,numero_contrato,monto_total_renta,estado_contrato,estado_pago',
+                'contrato:id,numero_contrato,monto_total_renta,estado_contrato,estado_pago,cliente_id',
+                'contrato.cliente:id,nombre,dui',
             ])
                 ->when($request->search, function ($query, $search) {
-                    $query->where('metodo_pago', 'like', '%' . $search . '%')
-                        ->orWhere('estado_transaccion', 'like', '%' . $search . '%')
-                        ->orWhereHas('contrato', function ($q) use ($search) {
-                            $q->where('numero_contrato', 'like', '%' . $search . '%');
-                        });
+                    $query->where(function ($q) use ($search) {
+                        $q->where('metodo_pago', 'like', '%' . $search . '%')
+                            ->orWhere('estado_transaccion', 'like', '%' . $search . '%')
+                            ->orWhereHas('contrato', function ($q2) use ($search) {
+                                $q2->where('numero_contrato', 'like', '%' . $search . '%');
+                            });
+                    });
                 })
                 ->when($request->estado_transaccion, function ($query, $estado) {
                     $query->where('estado_transaccion', $estado);

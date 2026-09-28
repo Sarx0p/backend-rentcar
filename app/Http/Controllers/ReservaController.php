@@ -48,15 +48,25 @@ class ReservaController extends Controller
                 'user:id,nombre,apellido',
             ])
                 ->when($request->search, function ($query, $search) {
-                    $query->where('estado', 'like', '%' . $search . '%')
-                        ->orWhereHas('cliente', function ($q) use ($search) {
-                            $q->where('nombre', 'like', '%' . $search . '%')
-                                ->orWhere('dui', 'like', '%' . $search . '%');
-                        });
+                    $query->where(function ($q) use ($search) {
+                        $q->where('estado', 'like', '%' . $search . '%')
+                            ->orWhereHas('cliente', function ($q2) use ($search) {
+                                $q2->where('nombre', 'like', '%' . $search . '%')
+                                    ->orWhere('dui', 'like', '%' . $search . '%');
+                            });
+                    });
                 })
-                ->when($request->estado, function ($query, $estado) {
-                    $query->where('estado', $estado);
-                })
+                ->when(
+                    $request->filled('estado'),
+                    function ($query) use ($request) {
+                        $query->where('estado', $request->estado);
+                    },
+                    function ($query) use ($request) {
+                        if (!$request->boolean('incluir_canceladas')) {
+                            $query->where('estado', '!=', EstadoReservaEnum::CANCELADA->value);
+                        }
+                    }
+                )
                 ->latest()
                 ->paginate(10);
 

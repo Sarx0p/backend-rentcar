@@ -44,12 +44,16 @@ class ContratoController extends Controller
             $contratos = Contrato::with([
                 'reserva:id,fecha_inicio,fecha_fin',
                 'user:id,nombre,apellido',
+                'cliente:id,nombre,dui',
+                'vehiculo.modelo.marca',
             ])
                 ->when($request->search, function ($query, $search) {
-                    $query->where('numero_contrato', 'like', '%' . $search . '%')
-                        ->orWhere('estado_contrato', 'like', '%' . $search . '%')
-                        ->orWhereRaw("JSON_EXTRACT(info_registro, '$.cliente.nombre') LIKE ?", ['%' . $search . '%'])
-                        ->orWhereRaw("JSON_EXTRACT(info_registro, '$.cliente.dui') LIKE ?", ['%' . $search . '%']);
+                    $query->where(function ($q) use ($search) {
+                        $q->where('numero_contrato', 'like', '%' . $search . '%')
+                            ->orWhere('estado_contrato', 'like', '%' . $search . '%')
+                            ->orWhereRaw("JSON_EXTRACT(info_registro, '$.cliente.nombre') LIKE ?", ['%' . $search . '%'])
+                            ->orWhereRaw("JSON_EXTRACT(info_registro, '$.cliente.dui') LIKE ?", ['%' . $search . '%']);
+                    });
                 })
                 ->when($request->estado, function ($query, $estado) {
                     $query->where('estado_contrato', $estado);
@@ -123,13 +127,22 @@ class ContratoController extends Controller
                 ], 422);
             }
 
-            if (
-                Carbon::parse($request->fecha_hora_entrega)->ne(Carbon::parse($reserva->fecha_inicio)) ||
-                Carbon::parse($request->fecha_hora_devolucion)->ne(Carbon::parse($reserva->fecha_fin))
-            ) {
+            $entrega = Carbon::parse($request->fecha_hora_entrega);
+
+            if (!$entrega->isSameDay($reserva->fecha_inicio)) {
                 return response()->json([
                     'status'  => 'error',
-                    'message' => 'Las fechas del contrato deben coincidir exactamente con las fechas de la reserva',
+                    'message' => 'La entrega debe realizarse el día de inicio de la reserva',
+                ], 422);
+            }
+
+            $dias       = max(1, (int) $reserva->fecha_inicio->diffInDays($reserva->fecha_fin));
+            $devolucion = $entrega->copy()->addDays($dias);
+
+            if ($request->filled('vehiculo_id') && (int) $request->vehiculo_id !== (int) $reserva->vehiculo_id) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'El vehículo enviado no coincide con el de la reserva',
                 ], 422);
             }
 
@@ -144,9 +157,9 @@ class ContratoController extends Controller
 
             $contratoTraslapado = Contrato::where('vehiculo_id', $vehiculo->id)
                 ->where('estado_contrato', EstadoContratoEnum::ACTIVO->value)
-                ->where(function ($query) use ($request) {
-                    $query->where('fecha_hora_entrega', '<', $request->fecha_hora_devolucion)
-                        ->where('fecha_hora_devolucion', '>', $request->fecha_hora_entrega);
+                ->where(function ($query) use ($entrega, $devolucion) {
+                    $query->where('fecha_hora_entrega', '<', $devolucion)
+                        ->where('fecha_hora_devolucion', '>', $entrega);
                 })
                 ->exists();
 
@@ -157,7 +170,6 @@ class ContratoController extends Controller
                 ], 422);
             }
 
-            // Validar que el cliente no tenga otro contrato activo
             $tieneContratoActivo = Contrato::where('cliente_id', $reserva->cliente_id)
                 ->where('estado_contrato', EstadoContratoEnum::ACTIVO->value)
                 ->exists();
@@ -169,21 +181,17 @@ class ContratoController extends Controller
                 ], 422);
             }
 
-            // Obtener ÚNICAMENTE incidencias de DANIO ESTETICO no resueltas del vehículo
             $incidenciasEsteticas = $vehiculo->incidencias()
                 ->where('estado_incidencia', '!=', IncidenciaEstadoEnum::RESUELTA->value)
                 ->where('tipo_incidencia', TipoIncidenciaEnum::DANIO_ESTETICO->value)
                 ->get(['id', 'tipo_incidencia', 'descripcion', 'fecha']);
 
-            $contrato = DB::transaction(function () use ($request, $reserva, $vehiculo, $incidenciasEsteticas) {
-                $inicio = Carbon::parse($request->fecha_hora_entrega);
-                $fin    = Carbon::parse($request->fecha_hora_devolucion);
-                $dias   = max(1, $inicio->diffInDays($fin));
+            $contrato = DB::transaction(function () use ($request, $reserva, $vehiculo, $incidenciasEsteticas, $entrega, $devolucion, $dias) {
 
+                $precioDia  = (float) $vehiculo->categoria->precio_dia;
                 $descuento  = $request->monto_descuento ?? 0;
-                $montoTotal = ($dias * $request->precio_por_dia) - $descuento;
+                $montoTotal = ($dias * $precioDia) - $descuento;
 
-                // Texto descriptivo solo de daños estéticos
                 $textoEstetico = $incidenciasEsteticas->isNotEmpty()
                     ? 'Daños estéticos previos: ' . $incidenciasEsteticas->map(function ($inc) {
                         $fechaFormat = $inc->fecha ? Carbon::parse($inc->fecha)->format('d/m/Y') : 'N/A';
@@ -219,10 +227,10 @@ class ContratoController extends Controller
                         ],
                     ],
                     'reserva_id'                => $reserva->id,
-                    'fecha_hora_entrega'        => $request->fecha_hora_entrega,
-                    'fecha_hora_devolucion'     => $request->fecha_hora_devolucion,
+                    'fecha_hora_entrega'        => $entrega,
+                    'fecha_hora_devolucion'     => $devolucion,
                     'dias_acordados'            => $dias,
-                    'precio_por_dia'            => $request->precio_por_dia,
+                    'precio_por_dia'            => $precioDia,
                     'monto_descuento'           => $descuento,
                     'monto_total_renta'         => $montoTotal,
                     'nivel_combustible_entrega' => $request->nivel_combustible_entrega,
@@ -336,7 +344,6 @@ class ContratoController extends Controller
                 ], 422);
             }
 
-            // Validar que el cliente no tenga otra reserva activa que se traslape con estas fechas
             $reservaClienteTraslapada = Reserva::where('cliente_id', $request->cliente_id)
                 ->whereIn('estado', [EstadoReservaEnum::PENDIENTE->value, EstadoReservaEnum::CONFIRMADA->value])
                 ->where(function ($query) use ($fechaEntrega, $fechaDevolucion) {
@@ -352,15 +359,15 @@ class ContratoController extends Controller
                 ], 422);
             }
 
-            // Obtener ÚNICAMENTE incidencias de DANIO ESTETICO no resueltas del vehículo
             $incidenciasEsteticas = $vehiculo->incidencias()
                 ->where('estado_incidencia', '!=', IncidenciaEstadoEnum::RESUELTA->value)
                 ->where('tipo_incidencia', TipoIncidenciaEnum::DANIO_ESTETICO->value)
                 ->get(['id', 'tipo_incidencia', 'descripcion', 'fecha']);
 
             $contrato = DB::transaction(function () use ($request, $cliente, $vehiculo, $fechaEntrega, $fechaDevolucion, $incidenciasEsteticas) {
+                $precioDia  = (float) $vehiculo->categoria->precio_dia;
                 $descuento  = $request->monto_descuento ?? 0;
-                $montoTotal = ($request->dias_acordados * $request->precio_por_dia) - $descuento;
+                $montoTotal = ($request->dias_acordados * $precioDia) - $descuento;
 
                 $textoEstetico = $incidenciasEsteticas->isNotEmpty()
                     ? 'Daños estéticos previos: ' . $incidenciasEsteticas->map(function ($inc) {
@@ -400,7 +407,7 @@ class ContratoController extends Controller
                     'fecha_hora_entrega'        => $fechaEntrega,
                     'fecha_hora_devolucion'     => $fechaDevolucion,
                     'dias_acordados'            => $request->dias_acordados,
-                    'precio_por_dia'            => $request->precio_por_dia,
+                    'precio_por_dia'            => $precioDia,
                     'monto_descuento'           => $descuento,
                     'monto_total_renta'         => $montoTotal,
                     'nivel_combustible_entrega' => $request->nivel_combustible_entrega,

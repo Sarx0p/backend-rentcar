@@ -19,7 +19,7 @@ class CancelarController extends Controller
      */
     public function index(Request $request)
     {
-       try {
+        try {
             $userAuth = auth('api')->user();
 
             if (
@@ -40,14 +40,14 @@ class CancelarController extends Controller
             ])
                 ->when($request->search, function ($query, $search) {
                     $query->where('motivo', 'like', '%' . $search . '%')
-                          ->orWhereHas('reserva.cliente', function ($q) use ($search) {
-                              $q->where('nombre', 'like', '%' . $search . '%')
+                        ->orWhereHas('reserva.cliente', function ($q) use ($search) {
+                            $q->where('nombre', 'like', '%' . $search . '%')
                                 ->orWhere('dui', 'like', '%' . $search . '%');
-                          });
+                        });
                 })
                 ->when($request->fecha_inicio && $request->fecha_fin, function ($query) use ($request) {
                     $query->whereDate('fecha_cancelacion', '>=', $request->fecha_inicio)
-                          ->whereDate('fecha_cancelacion', '<=', $request->fecha_fin);
+                        ->whereDate('fecha_cancelacion', '<=', $request->fecha_fin);
                 })
                 ->latest()
                 ->paginate(10);
@@ -56,7 +56,6 @@ class CancelarController extends Controller
                 'status' => 'success',
                 'data'   => $cancelaciones,
             ], 200);
-
         } catch (\Exception $e) {
             return response()->json([
                 'status'  => 'error',
@@ -143,7 +142,6 @@ class CancelarController extends Controller
                 'message' => 'Reserva cancelada con éxito',
                 'data'    => $cancelacion,
             ], 201);
-
         } catch (ModelNotFoundException $e) {
             return response()->json([
                 'status'  => 'error',
@@ -169,7 +167,7 @@ class CancelarController extends Controller
      */
     public function show(string $id)
     {
-       try {
+        try {
             $userAuth = auth('api')->user();
 
             if (
@@ -184,7 +182,7 @@ class CancelarController extends Controller
 
             $cancelacion = Cancelacion::with([
                 'user:id,nombre,apellido',
-                'reserva:id,fecha_inicio,fecha_fin,tipo_reserva,estado,cliente_id,vehiculo_id',
+                'reserva:id,fecha_inicio,fecha_fin,estado,cliente_id,vehiculo_id',
                 'reserva.cliente:id,nombre,dui,telefono',
                 'reserva.vehiculo:id,placa,color,anio,modelo_id',
                 'reserva.vehiculo.modelo:id,nombre,marca_id',
@@ -195,7 +193,6 @@ class CancelarController extends Controller
                 'status' => 'success',
                 'data'   => $cancelacion,
             ], 200);
-
         } catch (ModelNotFoundException $e) {
             return response()->json([
                 'status'  => 'error',
