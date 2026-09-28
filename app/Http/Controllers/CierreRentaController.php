@@ -8,6 +8,7 @@ use App\Enums\CierreRentaEstadoEnum;
 use App\Enums\EstadoContratoEnum;
 use App\Enums\EstadoPagoEnum;
 use App\Enums\EstadoReservaEnum;
+use App\Enums\EstadoTransaccionEnum;
 use App\Enums\IncidenciaEstadoEnum;
 use App\Enums\RolEnum;
 use App\Enums\VehiculoEstadoEnum;
@@ -45,14 +46,16 @@ class CierreRentaController extends Controller
                 'user:id,nombre,apellido',
             ])
                 ->when($request->search, function ($query, $search) {
-                    $query->where('estado_vehiculo_recepcion', 'like', '%' . $search . '%')
-                        ->orWhereHas('contrato', function ($q) use ($search) {
-                            $q->where('numero_contrato', 'like', '%' . $search . '%');
-                        })
-                        ->orWhereHas('contrato.cliente', function ($q) use ($search) {
-                            $q->where('nombre', 'like', '%' . $search . '%')
-                                ->orWhere('dui', 'like', '%' . $search . '%');
-                        });
+                    $query->where(function ($q) use ($search) {
+                        $q->where('estado_vehiculo_recepcion', 'like', '%' . $search . '%')
+                            ->orWhereHas('contrato', function ($q2) use ($search) {
+                                $q2->where('numero_contrato', 'like', '%' . $search . '%');
+                            })
+                            ->orWhereHas('contrato.cliente', function ($q2) use ($search) {
+                                $q2->where('nombre', 'like', '%' . $search . '%')
+                                    ->orWhere('dui', 'like', '%' . $search . '%');
+                            });
+                    });
                 })
                 ->when($request->estado, function ($query, $estado) {
                     $query->where('estado', $estado);
@@ -87,7 +90,8 @@ class CierreRentaController extends Controller
                 ], 422);
             }
 
-            $forzarConDeuda = (bool) $request->forzar_cierre_con_deuda;
+            $forzarConDeuda      = (bool) $request->forzar_cierre_con_deuda;
+            $aplicarCargoRetraso = $request->boolean('aplicar_cargo_retraso', true);
 
             if ($contrato->estado_pago !== EstadoPagoEnum::PAGADO->value && !$forzarConDeuda) {
                 return response()->json([
@@ -103,41 +107,72 @@ class CierreRentaController extends Controller
                 ], 422);
             }
 
-            $resultado = DB::transaction(function () use ($request, $contrato, $forzarConDeuda) {
+            $resultado = DB::transaction(function () use ($request, $contrato, $forzarConDeuda, $aplicarCargoRetraso) {
 
-                // 1. Calcular horas de retraso con margen de 2 horas
+                // 1. Horas de retraso: margen de 2 horas; pasado el margen se cobran todas las horas, redondeando hacia arriba
                 $fechaDevolucionAcordada = $contrato->fecha_hora_devolucion;
                 $fechaRecepcionReal      = Carbon::parse($request->fecha_hora_recepcion);
                 $fechaLimite             = $fechaDevolucionAcordada->copy()->addHours(2);
 
                 $horasRetraso = $fechaRecepcionReal->gt($fechaLimite)
-                    ? max(0, $fechaDevolucionAcordada->diffInHours($fechaRecepcionReal, false))
+                    ? (int) ceil($fechaDevolucionAcordada->diffInMinutes($fechaRecepcionReal, false) / 60)
                     : 0;
 
-                // 2. Aplicar cargo por retraso si corresponde
-                if ($horasRetraso > 0 && $request->aplicar_cargo_retraso && !$forzarConDeuda) {
-                    CargoAdicional::create([
-                        'contrato_id'    => $contrato->id,
-                        'tipo_cargo'     => CargoAdicionalTipoEnum::RETRASO->value,
-                        'descripcion'    => 'Cargo por retraso de ' . $horasRetraso . ' horas',
-                        'monto'          => $request->monto_retraso,
-                        'fecha_registro' => now(),
-                        'estado_cargo'   => CargoAdicionalEstadoEnum::APLICADO->value,
-                    ]);
+                $totalPagado = (float) $contrato->pagos()
+                    ->where('estado_transaccion', EstadoTransaccionEnum::CONFIRMADO->value)
+                    ->sum('monto');
 
-                    $montoBase   = ($contrato->dias_acordados * $contrato->precio_por_dia) - $contrato->monto_descuento;
-                    $totalCargos = $contrato->cargosAdicionales()->sum('monto');
+                // 2. Cargo por retraso: automático, una sola vez por contrato
+                $tarifaHoraRetraso = 5.00;
+                $montoRetraso      = 0;
 
-                    $contrato->update([
-                        'monto_total_renta' => $montoBase + $totalCargos,
-                        'estado_pago'       => EstadoPagoEnum::PENDIENTE->value,
-                    ]);
+                if ($horasRetraso > 0 && $aplicarCargoRetraso) {
+                    $yaTieneCargoRetraso = $contrato->cargosAdicionales()
+                        ->where('tipo_cargo', CargoAdicionalTipoEnum::RETRASO->value)
+                        ->where('estado_cargo', '!=', CargoAdicionalEstadoEnum::ANULADO->value)
+                        ->exists();
+
+                    if (!$yaTieneCargoRetraso) {
+                        $montoRetraso = $horasRetraso * $tarifaHoraRetraso;
+
+                        CargoAdicional::create([
+                            'contrato_id'    => $contrato->id,
+                            'tipo_cargo'     => CargoAdicionalTipoEnum::RETRASO->value,
+                            'descripcion'    => 'Cargo por retraso de ' . $horasRetraso . ' hora(s)',
+                            'monto'          => $montoRetraso,
+                            'fecha_registro' => now(),
+                            'estado_cargo'   => CargoAdicionalEstadoEnum::APLICADO->value,
+                        ]);
+
+                        $nuevoTotal = (float) $contrato->monto_total_renta + $montoRetraso;
+
+                        $contrato->update([
+                            'monto_total_renta' => $nuevoTotal,
+                            'estado_pago'       => $totalPagado >= $nuevoTotal
+                                ? EstadoPagoEnum::PAGADO->value
+                                : ($totalPagado > 0
+                                    ? EstadoPagoEnum::PARCIAL->value
+                                    : EstadoPagoEnum::PENDIENTE->value),
+                        ]);
+                    }
+                }
+
+                // 3. Si quedó saldo y no se fuerza, el cierre queda en espera (el cargo ya quedó guardado)
+                if ($contrato->estado_pago !== EstadoPagoEnum::PAGADO->value && !$forzarConDeuda) {
+                    $saldoPendiente = max(0, (float) $contrato->monto_total_renta - $totalPagado);
 
                     return [
-                        'bloqueado' => true,
-                        'mensaje'   => 'Se generó un cargo por retraso de $' . number_format($request->monto_retraso, 2) . '. Debe registrarse el pago de ese cargo antes de poder finalizar el cierre, o forzar el cierre con deuda.',
+                        'cierre_completado' => false,
+                        'mensaje'           => 'Se registró un cargo por retraso de ' . $horasRetraso . ' hora(s) ($' . number_format($montoRetraso, 2) . '). El contrato tiene un saldo pendiente de $' . number_format($saldoPendiente, 2) . ': registra el pago para poder cerrar, o cierra con deuda.',
+                        'horas_retraso'     => $horasRetraso,
+                        'monto_retraso'     => $montoRetraso,
+                        'saldo_pendiente'   => $saldoPendiente,
                     ];
                 }
+
+                $cargosVigentes = $contrato->cargosAdicionales()
+                    ->where('estado_cargo', '!=', CargoAdicionalEstadoEnum::ANULADO->value)
+                    ->get();
 
                 $partesObservaciones = [];
 
@@ -145,9 +180,8 @@ class CierreRentaController extends Controller
                     $partesObservaciones[] = "OBSERVACIONES GENERALES:\n" . trim($request->observaciones);
                 }
 
-                $cargosAdicionales = $contrato->cargosAdicionales()->get();
-                if ($cargosAdicionales->isNotEmpty()) {
-                    $textoCargos = $cargosAdicionales->map(function ($cargo) {
+                if ($cargosVigentes->isNotEmpty()) {
+                    $textoCargos = $cargosVigentes->map(function ($cargo) {
                         return "- {$cargo->descripcion} ($" . number_format($cargo->monto, 2) . ")";
                     })->implode("\n");
 
@@ -169,10 +203,8 @@ class CierreRentaController extends Controller
                     $partesObservaciones[] = "INCIDENCIAS NO RESUELTAS:\n" . $textoIncidencias;
                 }
 
-                $observacionesFinales = implode("\n\n", $partesObservaciones);
-
                 $montoDeuda = $forzarConDeuda
-                    ? max(0, $contrato->monto_total_renta - $contrato->montoPagado())
+                    ? max(0, (float) $contrato->monto_total_renta - $totalPagado)
                     : null;
 
                 $cierre = CierreRenta::create([
@@ -181,9 +213,9 @@ class CierreRentaController extends Controller
                     'fecha_hora_recepcion'        => $request->fecha_hora_recepcion,
                     'nivel_combustible_recepcion' => $request->nivel_combustible_recepcion,
                     'estado_vehiculo_recepcion'   => $request->estado_vehiculo_recepcion,
-                    'observaciones'               => $observacionesFinales,
+                    'observaciones'               => implode("\n\n", $partesObservaciones),
                     'horas_retraso'               => $horasRetraso,
-                    'monto_extras'                => $contrato->cargosAdicionales()->sum('monto'),
+                    'monto_extras'                => $cargosVigentes->sum('monto'),
                     'estado'                      => $forzarConDeuda
                         ? CierreRentaEstadoEnum::FINALIZADO_CON_DEUDA->value
                         : CierreRentaEstadoEnum::FINALIZADO->value,
@@ -191,9 +223,12 @@ class CierreRentaController extends Controller
                     'monto_deuda'                 => $montoDeuda,
                 ]);
 
-                $contrato->vehiculo->update([
-                    'estado' => VehiculoEstadoEnum::DISPONIBLE->value,
-                ]);
+                // Solo se libera si sigue RENTADO (no pisar EN_PROCESO ni MANTENIMIENTO)
+                if ($contrato->vehiculo->estado === VehiculoEstadoEnum::RENTADO->value) {
+                    $contrato->vehiculo->update([
+                        'estado' => VehiculoEstadoEnum::DISPONIBLE->value,
+                    ]);
+                }
 
                 if ($contrato->reserva) {
                     $contrato->reserva->update([
@@ -206,16 +241,22 @@ class CierreRentaController extends Controller
                 ]);
 
                 return [
-                    'bloqueado' => false,
-                    'cierre'    => $cierre,
+                    'cierre_completado' => true,
+                    'cierre'            => $cierre,
                 ];
             });
 
-            if ($resultado['bloqueado']) {
+            if (!$resultado['cierre_completado']) {
                 return response()->json([
-                    'status'  => 'error',
-                    'message' => $resultado['mensaje'],
-                ], 422);
+                    'status'            => 'success',
+                    'cierre_completado' => false,
+                    'message'           => $resultado['mensaje'],
+                    'data'              => [
+                        'horas_retraso'   => $resultado['horas_retraso'],
+                        'monto_retraso'   => $resultado['monto_retraso'],
+                        'saldo_pendiente' => $resultado['saldo_pendiente'],
+                    ],
+                ], 200);
             }
 
             $cierre = $resultado['cierre'];
@@ -225,11 +266,12 @@ class CierreRentaController extends Controller
             ]);
 
             return response()->json([
-                'status'  => 'success',
-                'message' => $cierre->estado === CierreRentaEstadoEnum::FINALIZADO_CON_DEUDA->value
+                'status'            => 'success',
+                'cierre_completado' => true,
+                'message'           => $cierre->estado === CierreRentaEstadoEnum::FINALIZADO_CON_DEUDA->value
                     ? 'Renta cerrada con deuda pendiente registrada'
                     : 'Renta cerrada con éxito',
-                'data'    => $cierre,
+                'data'              => $cierre,
             ], 201);
         } catch (ModelNotFoundException $e) {
             return response()->json([

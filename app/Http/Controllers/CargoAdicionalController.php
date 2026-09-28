@@ -5,8 +5,6 @@ namespace App\Http\Controllers;
 use App\Enums\CargoAdicionalEstadoEnum;
 use App\Enums\CargoAdicionalTipoEnum;
 use App\Enums\EstadoContratoEnum;
-use App\Enums\EstadoPagoEnum;
-use App\Enums\EstadoTransaccionEnum;
 use App\Enums\RolEnum;
 use App\Models\CargoAdicional;
 use App\Models\Contrato;
@@ -125,28 +123,7 @@ class CargoAdicionalController extends Controller
                     'estado_cargo'   => CargoAdicionalEstadoEnum::PENDIENTE->value,
                 ]);
 
-                $montoBase   = ($contrato->dias_acordados * $contrato->precio_por_dia) - ($contrato->monto_descuento ?? 0);
-                $totalCargos = $contrato->cargosAdicionales()->sum('monto');
-                $nuevoTotal  = $montoBase + $totalCargos;
-
-                $montoPagado = $contrato->pagos()
-                    ->where('estado_transaccion', EstadoTransaccionEnum::CONFIRMADO->value)
-                    ->sum('monto');
-
-                $nuevoSaldoPendiente = max(0, $nuevoTotal - $montoPagado);
-
-                if ($nuevoSaldoPendiente <= 0 && $nuevoTotal > 0) {
-                    $nuevoEstadoPago = EstadoPagoEnum::PAGADO->value;
-                } elseif ($montoPagado > 0) {
-                    $nuevoEstadoPago = EstadoPagoEnum::PARCIAL->value;
-                } else {
-                    $nuevoEstadoPago = EstadoPagoEnum::PENDIENTE->value;
-                }
-
-                $contrato->update([
-                    'monto_total_renta' => $nuevoTotal,
-                    'estado_pago'       => $nuevoEstadoPago,
-                ]);
+                $contrato->recalcularTotalYEstadoPago();
 
                 return $cargo;
             });
@@ -267,28 +244,7 @@ class CargoAdicionalController extends Controller
                     'estado_cargo',
                 ]));
 
-                $montoBase   = ($contrato->dias_acordados * $contrato->precio_por_dia) - ($contrato->monto_descuento ?? 0);
-                $totalCargos = $contrato->cargosAdicionales()->sum('monto');
-                $nuevoTotal  = $montoBase + $totalCargos;
-
-                $montoPagado = $contrato->pagos()
-                    ->where('estado_transaccion', EstadoTransaccionEnum::CONFIRMADO->value)
-                    ->sum('monto');
-
-                $nuevoSaldoPendiente = max(0, $nuevoTotal - $montoPagado);
-
-                if ($nuevoSaldoPendiente <= 0 && $nuevoTotal > 0) {
-                    $nuevoEstadoPago = EstadoPagoEnum::PAGADO->value;
-                } elseif ($montoPagado > 0) {
-                    $nuevoEstadoPago = EstadoPagoEnum::PARCIAL->value;
-                } else {
-                    $nuevoEstadoPago = EstadoPagoEnum::PENDIENTE->value;
-                }
-
-                $contrato->update([
-                    'monto_total_renta' => $nuevoTotal,
-                    'estado_pago'       => $nuevoEstadoPago,
-                ]);
+                $contrato->recalcularTotalYEstadoPago();
             });
 
             $cargo->load('contrato:id,numero_contrato,monto_total_renta,estado_pago');
@@ -351,28 +307,7 @@ class CargoAdicionalController extends Controller
             DB::transaction(function () use ($cargo, $contrato) {
                 $cargo->delete();
 
-                $montoBase   = ($contrato->dias_acordados * $contrato->precio_por_dia) - ($contrato->monto_descuento ?? 0);
-                $totalCargos = $contrato->cargosAdicionales()->sum('monto');
-                $nuevoTotal  = $montoBase + $totalCargos;
-
-                $montoPagado = $contrato->pagos()
-                    ->where('estado_transaccion', EstadoTransaccionEnum::CONFIRMADO->value)
-                    ->sum('monto');
-
-                $nuevoSaldoPendiente = max(0, $nuevoTotal - $montoPagado);
-
-                if ($nuevoSaldoPendiente <= 0 && $nuevoTotal > 0) {
-                    $nuevoEstadoPago = EstadoPagoEnum::PAGADO->value;
-                } elseif ($montoPagado > 0) {
-                    $nuevoEstadoPago = EstadoPagoEnum::PARCIAL->value;
-                } else {
-                    $nuevoEstadoPago = EstadoPagoEnum::PENDIENTE->value;
-                }
-
-                $contrato->update([
-                    'monto_total_renta' => $nuevoTotal,
-                    'estado_pago'       => $nuevoEstadoPago,
-                ]);
+                $contrato->recalcularTotalYEstadoPago();
             });
 
             return response()->json([

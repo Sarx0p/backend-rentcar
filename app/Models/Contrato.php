@@ -2,6 +2,11 @@
 
 namespace App\Models;
 
+use App\Enums\CargoAdicionalEstadoEnum;
+use App\Enums\EstadoPagoEnum;
+use App\Enums\EstadoTransaccionEnum;
+use App\Enums\IncidenciaEstadoEnum;
+use App\Enums\IncidenciaTipoResponsableEnum;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
@@ -84,5 +89,51 @@ class Contrato extends Model
     public function incidencias(): HasMany
     {
         return $this->hasMany(Incidencia::class, 'contrato_id');
+    }
+
+    /**
+     * Suma de pagos confirmados del contrato.
+     */
+    public function montoPagado(): float
+    {
+        return (float) $this->pagos()
+            ->where('estado_transaccion', EstadoTransaccionEnum::CONFIRMADO->value)
+            ->sum('monto');
+    }
+
+    /**
+     * Recalcula y guarda monto_total_renta y estado_pago desde cero:
+     * renta base + cargos vigentes + incidencias cobradas al cliente.
+     */
+    public function recalcularTotalYEstadoPago(): void
+    {
+        $base = ((float) $this->precio_por_dia * (int) $this->dias_acordados)
+              - (float) $this->monto_descuento;
+        $base = max(0, $base);
+
+        $cargos = (float) $this->cargosAdicionales()
+            ->where('estado_cargo', '!=', CargoAdicionalEstadoEnum::ANULADO->value)
+            ->sum('monto');
+
+        $incidencias = (float) $this->incidencias()
+            ->where('responsable_tipo', IncidenciaTipoResponsableEnum::CLIENTE->value)
+            ->where('estado_incidencia', '!=', IncidenciaEstadoEnum::ANULADA->value)
+            ->sum('costo');
+
+        $total  = $base + $cargos + $incidencias;
+        $pagado = $this->montoPagado();
+
+        $estado = $total <= 0
+            ? EstadoPagoEnum::PAGADO->value
+            : ($pagado >= $total
+                ? EstadoPagoEnum::PAGADO->value
+                : ($pagado > 0
+                    ? EstadoPagoEnum::PARCIAL->value
+                    : EstadoPagoEnum::PENDIENTE->value));
+
+        $this->update([
+            'monto_total_renta' => $total,
+            'estado_pago'       => $estado,
+        ]);
     }
 }

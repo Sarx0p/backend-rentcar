@@ -2,9 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Enums\EstadoPagoEnum;
 use App\Enums\IncidenciaEstadoEnum;
-use App\Enums\IncidenciaTipoResponsableEnum;
 use App\Enums\RolEnum;
 use App\Enums\TipoIncidenciaEnum;
 use App\Enums\VehiculoEstadoEnum;
@@ -111,18 +109,10 @@ class IncidenciaController extends Controller
                     }
                 }
 
-                // 3. Impacto Financiero: Si la culpa es del CLIENTE, imputar costo al contrato
-                if (
-                    $request->responsable_tipo === IncidenciaTipoResponsableEnum::CLIENTE->value
-                    && $request->filled('costo')
-                    && $request->costo > 0
-                    && $incidencia->contrato
-                ) {
-                    $contrato = $incidencia->contrato;
-                    $contrato->update([
-                        'monto_total_renta' => $contrato->monto_total_renta + $request->costo,
-                        'estado_pago'       => EstadoPagoEnum::PENDIENTE->value,
-                    ]);
+                // El total del contrato y el estado de pago se recalculan
+                // con base en cargos vigentes + incidencias del cliente.
+                if ($incidencia->contrato) {
+                    $incidencia->contrato->recalcularTotalYEstadoPago();
                 }
 
                 return $incidencia;
@@ -189,12 +179,11 @@ class IncidenciaController extends Controller
     public function update(UpdateIncidenciaRequest $request, string $id)
     {
         try {
-            // authorize(), rules() y withValidator() ya se resolvieron automáticamente
             $incidencia = Incidencia::with(['contrato', 'vehiculo'])->findOrFail($id);
 
             DB::transaction(function () use ($request, $incidencia) {
-                $costoAnterior       = $incidencia->costo;
-                $responsableAnterior = $incidencia->responsable_tipo;
+                $tipoAnterior   = $incidencia->tipo_incidencia;
+                $estadoAnterior = $incidencia->estado_incidencia;
 
                 $incidencia->update($request->only([
                     'tipo_incidencia',
@@ -207,32 +196,25 @@ class IncidenciaController extends Controller
 
                 $incidencia->refresh();
 
-                $responsableNuevo = $incidencia->responsable_tipo;
-                $costoNuevo       = $incidencia->costo;
+                // El total y el estado de pago se recalculan con el estado actual.
+                if ($incidencia->contrato) {
+                    $incidencia->contrato->recalcularTotalYEstadoPago();
+                }
 
-                $montoCobradoAntes = ($responsableAnterior === IncidenciaTipoResponsableEnum::CLIENTE->value)
-                    ? ($costoAnterior ?? 0)
-                    : 0;
-
-                $montoCobradoAhora = ($responsableNuevo === IncidenciaTipoResponsableEnum::CLIENTE->value)
-                    ? ($costoNuevo ?? 0)
-                    : 0;
-
-                $diferencia = $montoCobradoAhora - $montoCobradoAntes;
-
-                if ($diferencia != 0 && $incidencia->contrato) {
-                    $contrato = $incidencia->contrato;
-
-                    $payloadUpdate = [
-                        'monto_total_renta' => $contrato->monto_total_renta + $diferencia,
-                    ];
-
-                    // Si se le está sumando un cobro nuevo o adicional al cliente, cambia el estado de pago a PENDIENTE
-                    if ($diferencia > 0) {
-                        $payloadUpdate['estado_pago'] = EstadoPagoEnum::PENDIENTE->value;
-                    }
-
-                    $contrato->update($payloadUpdate);
+                // Si la incidencia pasó a DANIO MECANICO, el vehículo entra a EN PROCESO.
+                if (
+                    $tipoAnterior !== TipoIncidenciaEnum::DANIO_MECANICO->value
+                    && $incidencia->tipo_incidencia === TipoIncidenciaEnum::DANIO_MECANICO->value
+                    && !in_array($incidencia->estado_incidencia, [
+                        IncidenciaEstadoEnum::ANULADA->value,
+                        IncidenciaEstadoEnum::RESUELTA->value,
+                    ])
+                    && $incidencia->vehiculo
+                    && $incidencia->vehiculo->estado !== VehiculoEstadoEnum::MANTENIMIENTO->value
+                ) {
+                    $incidencia->vehiculo->update([
+                        'estado' => VehiculoEstadoEnum::ENPROCESO->value,
+                    ]);
                 }
             });
 
@@ -260,7 +242,7 @@ class IncidenciaController extends Controller
     }
 
     /**
-     * Remove the specified resource from storage
+     * Remove the specified resource from storage.
      */
     public function destroy(string $id)
     {
@@ -284,20 +266,13 @@ class IncidenciaController extends Controller
             }
 
             DB::transaction(function () use ($incidencia) {
-                // Revertir el cobro al contrato si el responsable era CLIENTE
-                if (
-                    $incidencia->responsable_tipo === IncidenciaTipoResponsableEnum::CLIENTE->value
-                    && $incidencia->contrato
-                    && $incidencia->costo
-                ) {
-                    $incidencia->contrato->update([
-                        'monto_total_renta' => $incidencia->contrato->monto_total_renta - $incidencia->costo,
-                    ]);
-                }
-
                 $incidencia->update([
                     'estado_incidencia' => IncidenciaEstadoEnum::ANULADA->value,
                 ]);
+
+                if ($incidencia->contrato) {
+                    $incidencia->contrato->recalcularTotalYEstadoPago();
+                }
             });
 
             return response()->json([

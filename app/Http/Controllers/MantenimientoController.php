@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Enums\EstadoMantenimientoEnum;
 use App\Enums\IncidenciaEstadoEnum;
 use App\Enums\RolEnum;
+use App\Enums\TipoIncidenciaEnum;
 use App\Enums\VehiculoEstadoEnum;
 use App\Http\Requests\MantenimientoController\StoreMantenimientoRequest;
 use App\Http\Requests\MantenimientoController\UpdateMantenimientoRequest;
@@ -269,8 +270,19 @@ class MantenimientoController extends Controller
                     $estadoAnterior === EstadoMantenimientoEnum::ACTIVO->value
                     && $estadoNuevo === EstadoMantenimientoEnum::CANCELADO->value
                 ) {
+                    $incidencia = $mantenimiento->incidencia;
+
+                    $danioPendiente = $incidencia
+                        && $incidencia->tipo_incidencia === TipoIncidenciaEnum::DANIO_MECANICO->value
+                        && !in_array($incidencia->estado_incidencia, [
+                            IncidenciaEstadoEnum::RESUELTA->value,
+                            IncidenciaEstadoEnum::ANULADA->value,
+                        ]);
+
                     $mantenimiento->vehiculo->update([
-                        'estado' => VehiculoEstadoEnum::DISPONIBLE->value,
+                        'estado' => $danioPendiente
+                            ? VehiculoEstadoEnum::ENPROCESO->value
+                            : VehiculoEstadoEnum::DISPONIBLE->value,
                     ]);
                 }
             });
@@ -300,10 +312,10 @@ class MantenimientoController extends Controller
     /**
      * Remove the specified resource from storage (Anulación lógica).
      */
-   public function destroy(string $id)
+    public function destroy(string $id)
     {
         try {
-            $mantenimiento = Mantenimiento::with('vehiculo')->findOrFail($id);
+            $mantenimiento = Mantenimiento::with(['vehiculo', 'incidencia'])->findOrFail($id);
 
             if ($mantenimiento->estado === EstadoMantenimientoEnum::CANCELADO->value) {
                 return response()->json([
@@ -327,8 +339,19 @@ class MantenimientoController extends Controller
                 ]);
 
                 if ($estadoAnterior === EstadoMantenimientoEnum::ACTIVO->value) {
+                    $incidencia = $mantenimiento->incidencia;
+
+                    $danioPendiente = $incidencia
+                        && $incidencia->tipo_incidencia === TipoIncidenciaEnum::DANIO_MECANICO->value
+                        && !in_array($incidencia->estado_incidencia, [
+                            IncidenciaEstadoEnum::RESUELTA->value,
+                            IncidenciaEstadoEnum::ANULADA->value,
+                        ]);
+
                     $mantenimiento->vehiculo->update([
-                        'estado' => VehiculoEstadoEnum::DISPONIBLE->value,
+                        'estado' => $danioPendiente
+                            ? VehiculoEstadoEnum::ENPROCESO->value
+                            : VehiculoEstadoEnum::DISPONIBLE->value,
                     ]);
                 }
             });
