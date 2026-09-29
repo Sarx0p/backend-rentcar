@@ -32,7 +32,7 @@ class CambiarVehiculoRequest extends FormRequest
             ]),
             'motivo'                    => 'required|string|max:500',
             'nivel_combustible_entrega' => 'required|string|max:50',
-            'costo'                     => 'nullable|numeric|min:0',
+            'costo'                     => 'nullable|numeric|min:0|max:999999.99',
         ];
     }
 
@@ -49,6 +49,7 @@ class CambiarVehiculoRequest extends FormRequest
             'nivel_combustible_entrega.max'      => 'El nivel de combustible no puede exceder los 50 caracteres.',
             'costo.numeric'                      => 'El costo debe ser un número válido.',
             'costo.min'                          => 'El costo no puede ser negativo.',
+            'costo.max'                          => 'El costo no puede ser mayor a 999,999.99.',
         ];
     }
 

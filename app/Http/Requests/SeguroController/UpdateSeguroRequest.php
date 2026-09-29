@@ -74,7 +74,7 @@ class UpdateSeguroRequest extends FormRequest
     {
         throw new HttpResponseException(response()->json([
             'status'  => 'error',
-            'message' => 'No tienes permiso para actualizar usuarios.',
+            'message' => 'No tienes permiso para actualizar seguros.',
         ], 403));
     }
 

@@ -28,7 +28,7 @@ class StorePagoRequest extends FormRequest
     {
         return [
             'contrato_id' => 'required|exists:contratos,id',
-            'monto'       => 'required|numeric|min:0.01',
+            'monto'       => 'required|numeric|min:0.01|max:999999.99',
             'metodo_pago' => 'required|in:' . implode(',', array_column(MetodoPagoEnum::cases(), 'value')),
             'fecha_pago'  => 'required|date',
         ];
@@ -41,6 +41,7 @@ class StorePagoRequest extends FormRequest
             'contrato_id.exists'   => 'El contrato indicado no existe.',
             'monto.required'       => 'El monto es obligatorio.',
             'monto.min'            => 'El monto debe ser mayor a 0.',
+            'monto.max'            => 'El monto no puede ser mayor a 999,999.99.',
             'metodo_pago.required' => 'El método de pago es obligatorio.',
             'metodo_pago.in'       => 'El método de pago no es válido.',
             'fecha_pago.required'  => 'La fecha de pago es obligatoria.',

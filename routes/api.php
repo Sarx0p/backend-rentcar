@@ -39,6 +39,10 @@ Route::prefix('admin')->middleware(['auth:api', 'estado.activo', 'role:ADMINISTR
 
     Route::middleware(['role:ADMINISTRADOR'])->group(function () {
         Route::apiResource('usuarios', UsuarioController::class);
+        // Crear, editar y eliminar propietarios y seguros es solo del administrador
+        // (sus Requests ya lo exigen); el empleado solo consulta (index y show).
+        Route::apiResource('propietarios', PropietarioController::class)->except(['index', 'show']);
+        Route::apiResource('seguros', SeguroController::class)->except(['index', 'show']);
     });
 
     Route::get('/dashboard/resumen', [DashboardController::class, 'resumen']);
@@ -48,7 +52,8 @@ Route::prefix('admin')->middleware(['auth:api', 'estado.activo', 'role:ADMINISTR
     Route::get('/marcas/{marcaId}/modelos', [ModeloController::class, 'porMarca']);
     Route::apiResource('categorias', CategoriaController::class);
 
-    Route::apiResource('clientes', ClienteController::class);
+    // Los clientes no se eliminan: sin ruta DELETE (destroy estaba vacío y respondía 200).
+    Route::apiResource('clientes', ClienteController::class)->except(['destroy']);
     Route::get('clientes/{id}/licencia-vigente', [ClienteController::class, 'licenciaVigente']);
     Route::apiResource('reservas', ReservaController::class)->except(['destroy']);
 
@@ -67,8 +72,8 @@ Route::prefix('admin')->middleware(['auth:api', 'estado.activo', 'role:ADMINISTR
     Route::apiResource('cierres-renta', CierreRentaController::class)->only(['index', 'show', 'store']);
     Route::apiResource('cancelaciones', CancelarController::class)->only(['index', 'show', 'store']);
 
-    Route::apiResource('propietarios', PropietarioController::class);
-    Route::apiResource('seguros', SeguroController::class);
+    Route::apiResource('propietarios', PropietarioController::class)->only(['index', 'show']);
+    Route::apiResource('seguros', SeguroController::class)->only(['index', 'show']);
     Route::apiResource('mantenimientos', MantenimientoController::class);
     Route::get('/departamentos', [DepartamentoController::class, 'index']);
     Route::get('/departamentos/{departamentoId}/municipios', [DepartamentoController::class, 'porDepartamento']);

@@ -99,8 +99,10 @@ class CargoAdicionalController extends Controller
                 'contrato_id'    => 'required|exists:contratos,id',
                 'tipo_cargo'     => 'required|in:' . implode(',', array_column(CargoAdicionalTipoEnum::cases(), 'value')),
                 'descripcion'    => 'sometimes|string|nullable',
-                'monto'          => 'required|numeric|min:0.01',
+                'monto'          => 'required|numeric|min:0.01|max:999999.99',
                 'fecha_registro' => 'required|date',
+            ], [
+                'monto.max' => 'El monto no puede ser mayor a 999,999.99.',
             ]);
 
             $contrato = Contrato::findOrFail($request->contrato_id);
@@ -230,9 +232,11 @@ class CargoAdicionalController extends Controller
             $request->validate([
                 'tipo_cargo'     => 'sometimes|in:' . implode(',', array_column(CargoAdicionalTipoEnum::cases(), 'value')),
                 'descripcion'    => 'sometimes|string|nullable',
-                'monto'          => 'sometimes|numeric|min:0.01',
+                'monto'          => 'sometimes|numeric|min:0.01|max:999999.99',
                 'fecha_registro' => 'sometimes|date',
                 'estado_cargo'   => 'sometimes|in:' . implode(',', array_column(CargoAdicionalEstadoEnum::cases(), 'value')),
+            ], [
+                'monto.max' => 'El monto no puede ser mayor a 999,999.99.',
             ]);
 
             DB::transaction(function () use ($request, $cargo, $contrato) {

@@ -31,7 +31,7 @@ class StoreIncidenciaRequest extends FormRequest
             'responsable_tipo' => 'required|in:' . implode(',', array_column(IncidenciaTipoResponsableEnum::cases(), 'value')),
             'descripcion'      => 'nullable|string|max:500',
             'fecha'            => 'required|date',
-            'costo'            => 'nullable|numeric|min:0',
+            'costo'            => 'nullable|numeric|min:0|max:999999.99',
         ];
     }
 
@@ -63,6 +63,7 @@ class StoreIncidenciaRequest extends FormRequest
             'responsable_tipo.in'       => 'El responsable no es válido.',
             'fecha.required'            => 'La fecha es obligatoria.',
             'costo.numeric'             => 'El costo debe ser un valor numérico.',
+            'costo.max'                 => 'El costo no puede ser mayor a 999,999.99.',
         ];
     }
 

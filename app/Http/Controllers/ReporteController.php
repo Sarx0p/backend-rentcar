@@ -180,6 +180,12 @@ class ReporteController extends Controller
             $fechaFin    = $request->fecha_fin ?? now()->endOfMonth()->format('Y-m-d');
 
             $propietarioBusqueda = trim((string) ($request->input('propietario') ?? ''));
+            // Filtro exacto elegido de la lista del frontend; el de nombre busca por coincidencia parcial.
+            $propietarioId = $request->integer('propietario_id');
+
+            if ($propietarioId && $propietarioBusqueda === '') {
+                $propietarioBusqueda = (string) (Propietario::whereKey($propietarioId)->value('nombre') ?? '');
+            }
 
             // Porcentaje que cobra la administración sobre los ingresos (0 a 100)
             $porcentajeAdmin = (float) ($request->input('porcentaje_administracion') ?? 0);
@@ -193,8 +199,12 @@ class ReporteController extends Controller
 
             $propietarios = Propietario::with('vehiculos.modelo.marca')
                 ->where('estado', EstadoPropietarioEnum::ACTIVO->value)
-                ->when($propietarioBusqueda !== '', function ($query) use ($propietarioBusqueda) {
-                    $query->where('nombre', 'like', "%{$propietarioBusqueda}%");
+                ->when($propietarioId, function ($query) use ($propietarioId) {
+                    $query->whereKey($propietarioId);
+                }, function ($query) use ($propietarioBusqueda) {
+                    $query->when($propietarioBusqueda !== '', function ($q) use ($propietarioBusqueda) {
+                        $q->where('nombre', 'like', "%{$propietarioBusqueda}%");
+                    });
                 })
                 ->get()
                 ->map(function ($propietario) use ($fechaInicio, $fechaFin, $porcentajeAdmin) {
@@ -362,6 +372,7 @@ class ReporteController extends Controller
                 ->count();
 
             $totalGastosIncidencias = Incidencia::where('responsable_tipo', IncidenciaTipoResponsableEnum::NEGOCIO->value)
+                ->where('estado_incidencia', '!=', IncidenciaEstadoEnum::ANULADA->value)
                 ->whereDate('fecha', '>=', $fechaInicio)
                 ->whereDate('fecha', '<=', $fechaFin)
                 ->sum('costo');
@@ -407,11 +418,21 @@ class ReporteController extends Controller
                 ?? $request->input('propietarios')
                 ?? ''
             ));
+            // Filtro exacto elegido de la lista del frontend; el de nombre busca por coincidencia parcial.
+            $propietarioId = $request->integer('propietario_id');
+
+            if ($propietarioId && $propietarioBusqueda === '') {
+                $propietarioBusqueda = (string) (Propietario::whereKey($propietarioId)->value('nombre') ?? '');
+            }
 
             $vehiculos = Vehiculo::with(['modelo.marca', 'propietario'])
-                ->when($propietarioBusqueda !== '', function ($query) use ($propietarioBusqueda) {
-                    $query->whereHas('propietario', function ($q) use ($propietarioBusqueda) {
-                        $q->where('nombre', 'like', "%{$propietarioBusqueda}%");
+                ->when($propietarioId, function ($query) use ($propietarioId) {
+                    $query->where('propietario_id', $propietarioId);
+                }, function ($query) use ($propietarioBusqueda) {
+                    $query->when($propietarioBusqueda !== '', function ($q) use ($propietarioBusqueda) {
+                        $q->whereHas('propietario', function ($p) use ($propietarioBusqueda) {
+                            $p->where('nombre', 'like', "%{$propietarioBusqueda}%");
+                        });
                     });
                 })
                 ->get()
@@ -442,7 +463,9 @@ class ReporteController extends Controller
             $totalGeneral = $vehiculos->sum('ingresos');
 
             $propietario = null;
-            if ($propietarioBusqueda !== '' && $vehiculos->isNotEmpty()) {
+            if ($propietarioId) {
+                $propietario = Propietario::find($propietarioId);
+            } elseif ($propietarioBusqueda !== '' && $vehiculos->isNotEmpty()) {
                 $propietario = optional($vehiculos->first()['vehiculo'])->propietario;
             }
 
@@ -491,6 +514,7 @@ class ReporteController extends Controller
                 ->map(function ($vehiculo) use ($fechaInicio, $fechaFin) {
                     $gastoIncidenciasNegocio = Incidencia::where('vehiculo_id', $vehiculo->id)
                         ->where('responsable_tipo', IncidenciaTipoResponsableEnum::NEGOCIO->value)
+                        ->where('estado_incidencia', '!=', IncidenciaEstadoEnum::ANULADA->value)
                         ->whereDate('fecha', '>=', $fechaInicio)
                         ->whereDate('fecha', '<=', $fechaFin)
                         ->sum('costo');
@@ -553,6 +577,7 @@ class ReporteController extends Controller
 
                     $gastoIncidencias = Incidencia::where('vehiculo_id', $vehiculo->id)
                         ->where('responsable_tipo', IncidenciaTipoResponsableEnum::NEGOCIO->value)
+                        ->where('estado_incidencia', '!=', IncidenciaEstadoEnum::ANULADA->value)
                         ->whereDate('fecha', '>=', $fechaInicio)
                         ->whereDate('fecha', '<=', $fechaFin)
                         ->sum('costo');
