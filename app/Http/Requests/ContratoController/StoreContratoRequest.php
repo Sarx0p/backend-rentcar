@@ -22,7 +22,6 @@ class StoreContratoRequest extends FormRequest
         return [
             'reserva_id'                => 'required|exists:reservas,id|unique:contratos,reserva_id,',
             'fecha_hora_entrega'        => 'required|date',
-            'fecha_hora_devolucion'     => 'required|date|after:fecha_hora_entrega',
             'precio_por_dia'            => 'sometimes|numeric|min:0.1',
             'nivel_combustible_entrega' => 'required|string|max:50',
             'monto_descuento'           => 'sometimes|numeric|min:0',

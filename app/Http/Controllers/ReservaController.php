@@ -18,6 +18,7 @@ use App\Enums\EstadoContratoEnum;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Carbon\Carbon;
 
 class ReservaController extends Controller
 {
@@ -285,8 +286,16 @@ class ReservaController extends Controller
             }
 
             if ($request->has('fecha_inicio') || $request->has('fecha_fin')) {
-                $inicioEvaluar = $request->fecha_inicio ?? $reserva->fecha_inicio;
-                $finEvaluar = $request->fecha_fin ?? $reserva->fecha_fin;
+                $inicioEvaluar = Carbon::parse($request->fecha_inicio ?? $reserva->fecha_inicio)->toDateString();
+                $finEvaluar    = Carbon::parse($request->fecha_fin ?? $reserva->fecha_fin)->toDateString();
+
+                // Se compara con la fecha guardada cuando solo se envía una de las dos
+                if ($finEvaluar <= $inicioEvaluar) {
+                    return response()->json([
+                        'status'  => 'error',
+                        'message' => 'La fecha de fin debe ser posterior a la fecha de inicio',
+                    ], 422);
+                }
 
                 $traslapada = Reserva::where('vehiculo_id', $reserva->vehiculo_id)
                     ->where('id', '!=', $id)
