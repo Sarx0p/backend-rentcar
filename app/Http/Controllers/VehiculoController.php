@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\EstadoContratoEnum;
 use App\Enums\EstadoReservaEnum;
 use App\Enums\IncidenciaEstadoEnum;
 use App\Enums\RolEnum;
@@ -12,6 +13,7 @@ use App\Http\Requests\VehiculoController\UpdateVehiculoRequest;
 use App\Models\Vehiculo;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class VehiculoController extends Controller
 {
@@ -52,6 +54,13 @@ class VehiculoController extends Controller
                             $q->whereNotIn('estado', [EstadoReservaEnum::CANCELADA->value])
                                 ->whereDate('fecha_inicio', '<', $request->fecha_fin)
                                 ->whereDate('fecha_fin', '>', $request->fecha_inicio);
+                        });
+
+                        // Tambien se excluyen los vehiculos con contratos activos en esas fechas (incluye contratos directos)
+                        $query->whereDoesntHave('contratos', function ($q) use ($request) {
+                            $q->where('estado_contrato', EstadoContratoEnum::ACTIVO->value)
+                                ->where('fecha_hora_entrega', '<', $request->fecha_fin)
+                                ->where('fecha_hora_devolucion', '>', $request->fecha_inicio);
                         });
                     }
                 )
@@ -336,6 +345,12 @@ class VehiculoController extends Controller
                 'message' => 'Vehiculo restaurado a disponible correctamente.',
                 'data'    => $vehiculo,
             ], 200);
+        } catch (ValidationException $e) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Error de validación',
+                'errors'  => $e->errors(),
+            ], 422);
         } catch (\Exception $e) {
             return response()->json([
                 "status"  => "Errors",

@@ -27,7 +27,7 @@ class UpdateReservaRequest extends FormRequest
     {
         return [
             'fecha_inicio' => 'sometimes|date|after_or_equal:tomorrow',
-            'fecha_fin'    => 'sometimes|date|after:fecha_inicio',
+            'fecha_fin'    => 'sometimes|date',
         ];
     }
 
@@ -40,7 +40,6 @@ class UpdateReservaRequest extends FormRequest
             'fecha_inicio.date'           => 'La fecha de inicio no tiene un formato válido.',
             'fecha_inicio.after_or_equal' => 'La fecha de inicio debe ser al menos desde el día de mañana.',
             'fecha_fin.date'              => 'La fecha de fin no tiene un formato válido.',
-            'fecha_fin.after'             => 'La fecha de fin debe ser posterior a la fecha de inicio.',
         ];
     }
 

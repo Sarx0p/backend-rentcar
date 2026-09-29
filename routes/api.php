@@ -58,6 +58,8 @@ Route::prefix('admin')->middleware(['auth:api', 'estado.activo', 'role:ADMINISTR
 
     Route::get('contratos/{id}/pdf', [ContratoController::class, 'generarPdf']);
     Route::post('contratos/directo', [ContratoController::class, 'storeDirecto']);
+    Route::post('contratos/{id}/cambiar-vehiculo', [ContratoController::class, 'cambiarVehiculo']);
+    Route::patch('contratos/{id}/anular', [ContratoController::class, 'anular']);
     Route::apiResource('contratos', ContratoController::class)->only(['index', 'show', 'store']);
     Route::apiResource('pagos', PagoController::class)->only(['index', 'show', 'store', 'destroy']);
     Route::apiResource('cargos-adicionales', CargoAdicionalController::class)->only(['index', 'show', 'store', 'update', 'destroy']);

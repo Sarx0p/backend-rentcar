@@ -2,12 +2,15 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\EstadoContratoEnum;
 use App\Enums\IncidenciaEstadoEnum;
+use App\Enums\IncidenciaTipoResponsableEnum;
 use App\Enums\RolEnum;
 use App\Enums\TipoIncidenciaEnum;
 use App\Enums\VehiculoEstadoEnum;
 use App\Http\Requests\IncidenciaController\StoreIncidenciaRequest;
 use App\Http\Requests\IncidenciaController\UpdateIncidenciaRequest;
+use App\Models\Contrato;
 use App\Models\Incidencia;
 use App\Models\Vehiculo;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -86,6 +89,37 @@ class IncidenciaController extends Controller
     public function store(StoreIncidenciaRequest $request)
     {
         try {
+            // Si el responsable es el CLIENTE, debe existir un contrato al cual cobrarle
+            if (
+                $request->responsable_tipo === IncidenciaTipoResponsableEnum::CLIENTE->value
+                && !$request->filled('contrato_id')
+            ) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'Para cobrar la incidencia al cliente debe indicar el contrato',
+                ], 422);
+            }
+
+            if ($request->filled('contrato_id')) {
+                $contrato = Contrato::findOrFail($request->contrato_id);
+
+                // El contrato debe pertenecer al mismo vehículo de la incidencia
+                if ((int) $contrato->vehiculo_id !== (int) $request->vehiculo_id) {
+                    return response()->json([
+                        'status'  => 'error',
+                        'message' => 'El contrato seleccionado no pertenece a este vehículo',
+                    ], 422);
+                }
+
+                // Solo se registran incidencias en contratos activos
+                if ($contrato->estado_contrato !== EstadoContratoEnum::ACTIVO->value) {
+                    return response()->json([
+                        'status'  => 'error',
+                        'message' => 'Solo se pueden registrar incidencias en contratos ACTIVOS',
+                    ], 422);
+                }
+            }
+
             $incidencia = DB::transaction(function () use ($request) {
                 $incidencia = Incidencia::create([
                     'vehiculo_id'       => $request->vehiculo_id,
@@ -102,7 +136,11 @@ class IncidenciaController extends Controller
                 if ($request->tipo_incidencia === TipoIncidenciaEnum::DANIO_MECANICO->value) {
                     $vehiculo = Vehiculo::find($request->vehiculo_id);
 
-                    if ($vehiculo && $vehiculo->estado !== VehiculoEstadoEnum::MANTENIMIENTO->value) {
+                    // Si el cliente todavia tiene el vehiculo (RENTADO) se queda asi, el cierre lo pasa a EN PROCESO
+                    if ($vehiculo && !in_array($vehiculo->estado, [
+                        VehiculoEstadoEnum::MANTENIMIENTO->value,
+                        VehiculoEstadoEnum::RENTADO->value,
+                    ])) {
                         $vehiculo->update([
                             'estado' => VehiculoEstadoEnum::ENPROCESO->value,
                         ]);
@@ -210,7 +248,10 @@ class IncidenciaController extends Controller
                         IncidenciaEstadoEnum::RESUELTA->value,
                     ])
                     && $incidencia->vehiculo
-                    && $incidencia->vehiculo->estado !== VehiculoEstadoEnum::MANTENIMIENTO->value
+                    && !in_array($incidencia->vehiculo->estado, [
+                        VehiculoEstadoEnum::MANTENIMIENTO->value,
+                        VehiculoEstadoEnum::RENTADO->value,
+                    ])
                 ) {
                     $incidencia->vehiculo->update([
                         'estado' => VehiculoEstadoEnum::ENPROCESO->value,

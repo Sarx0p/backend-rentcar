@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Enums\RolEnum;
 use App\Enums\EstadoTransaccionEnum;
 use App\Enums\EstadoPagoEnum;
+use App\Enums\EstadoContratoEnum;
 use App\Enums\VehiculoEstadoEnum;
 use App\Enums\IncidenciaTipoResponsableEnum;
 use App\Enums\EstadoPropietarioEnum;
@@ -298,7 +299,8 @@ class ReporteController extends Controller
                 ->whereDate('fecha_pago', '<=', $fechaFin)
                 ->sum('monto');
 
-            $totalContratos = Contrato::whereDate('fecha_hora_entrega', '>=', $fechaInicio)
+            $totalContratos = Contrato::where('estado_contrato', '!=', EstadoContratoEnum::ANULADO->value)
+                ->whereDate('fecha_hora_entrega', '>=', $fechaInicio)
                 ->whereDate('fecha_hora_entrega', '<=', $fechaFin)
                 ->count();
 
@@ -378,6 +380,7 @@ class ReporteController extends Controller
                         ->sum('monto');
 
                     $rentas = Contrato::where('vehiculo_id', $vehiculo->id)
+                        ->where('estado_contrato', '!=', EstadoContratoEnum::ANULADO->value)
                         ->whereDate('fecha_hora_entrega', '>=', $fechaInicio)
                         ->whereDate('fecha_hora_entrega', '<=', $fechaFin)
                         ->count();
@@ -566,6 +569,7 @@ class ReporteController extends Controller
                 },
             ])
                 ->where('estado_pago', '!=', EstadoPagoEnum::PAGADO->value)
+                ->where('estado_contrato', '!=', EstadoContratoEnum::ANULADO->value)
                 ->get()
                 ->map(function ($contrato) {
                     $totalPagado = $contrato->pagos->sum('monto');

@@ -11,6 +11,7 @@ use App\Enums\EstadoReservaEnum;
 use App\Enums\EstadoTransaccionEnum;
 use App\Enums\IncidenciaEstadoEnum;
 use App\Enums\RolEnum;
+use App\Enums\TipoIncidenciaEnum;
 use App\Enums\VehiculoEstadoEnum;
 use App\Http\Requests\CierreRentaController\StoreCierreRentaRequest;
 use App\Models\CargoAdicional;
@@ -224,9 +225,20 @@ class CierreRentaController extends Controller
                 ]);
 
                 // Solo se libera si sigue RENTADO (no pisar EN_PROCESO ni MANTENIMIENTO)
+                // Si tiene un daño mecánico pendiente pasa a EN PROCESO en lugar de DISPONIBLE
                 if ($contrato->vehiculo->estado === VehiculoEstadoEnum::RENTADO->value) {
+                    $danioMecanicoPendiente = $contrato->vehiculo->incidencias()
+                        ->where('tipo_incidencia', TipoIncidenciaEnum::DANIO_MECANICO->value)
+                        ->whereNotIn('estado_incidencia', [
+                            IncidenciaEstadoEnum::RESUELTA->value,
+                            IncidenciaEstadoEnum::ANULADA->value,
+                        ])
+                        ->exists();
+
                     $contrato->vehiculo->update([
-                        'estado' => VehiculoEstadoEnum::DISPONIBLE->value,
+                        'estado' => $danioMecanicoPendiente
+                            ? VehiculoEstadoEnum::ENPROCESO->value
+                            : VehiculoEstadoEnum::DISPONIBLE->value,
                     ]);
                 }
 

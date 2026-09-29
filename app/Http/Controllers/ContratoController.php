@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Enums\RolEnum;
 use App\Enums\EstadoContratoEnum;
+use App\Enums\CargoAdicionalEstadoEnum;
 use App\Enums\EstadoPagoEnum;
 use App\Enums\EstadoReservaEnum;
 use App\Enums\VehiculoEstadoEnum;
@@ -11,12 +12,15 @@ use App\Enums\IncidenciaEstadoEnum;
 use App\Enums\TipoIncidenciaEnum;
 use App\Http\Requests\ContratoController\StoreContratoRequest;
 use App\Http\Requests\ContratoController\StoreContratoDirectoRequest;
+use App\Http\Requests\ContratoController\CambiarVehiculoRequest;
 use App\Models\Contrato;
 use App\Models\Reserva;
 use App\Models\Cliente;
 use App\Models\Vehiculo;
+use App\Models\Incidencia;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\DB;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
@@ -178,6 +182,16 @@ class ContratoController extends Controller
                 return response()->json([
                     'status'  => 'error',
                     'message' => 'Este cliente ya tiene un contrato activo. No se puede generar otro hasta cerrarlo.',
+                ], 422);
+            }
+
+            // El descuento no puede ser mayor que el total de la renta
+            $subtotal = $dias * (float) $vehiculo->categoria->precio_dia;
+
+            if (($request->monto_descuento ?? 0) > $subtotal) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'El descuento no puede ser mayor que el total de la renta ($' . number_format($subtotal, 2) . ')',
                 ], 422);
             }
 
@@ -359,6 +373,16 @@ class ContratoController extends Controller
                 ], 422);
             }
 
+            // El descuento no puede ser mayor que el total de la renta
+            $subtotal = $request->dias_acordados * (float) $vehiculo->categoria->precio_dia;
+
+            if (($request->monto_descuento ?? 0) > $subtotal) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'El descuento no puede ser mayor que el total de la renta ($' . number_format($subtotal, 2) . ')',
+                ], 422);
+            }
+
             $incidenciasEsteticas = $vehiculo->incidencias()
                 ->where('estado_incidencia', '!=', IncidenciaEstadoEnum::RESUELTA->value)
                 ->where('tipo_incidencia', TipoIncidenciaEnum::DANIO_ESTETICO->value)
@@ -443,6 +467,239 @@ class ContratoController extends Controller
                 'status'  => 'error',
                 'message' => 'Cliente o vehículo no encontrado',
             ], 404);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Error interno del servidor',
+            ], 500);
+        }
+    }
+
+    /**
+     * Cambia el vehículo de un contrato activo por desperfecto mecánico
+     * sin culpa del cliente (responsable NEGOCIO o TERCERO).
+     */
+    public function cambiarVehiculo(CambiarVehiculoRequest $request, string $id)
+    {
+        try {
+            $contrato = Contrato::with('vehiculo')->findOrFail($id);
+
+            if ($contrato->estado_contrato !== EstadoContratoEnum::ACTIVO->value) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'Solo se puede cambiar el vehículo de un contrato ACTIVO',
+                ], 422);
+            }
+
+            $vehiculoAnterior = $contrato->vehiculo;
+            $vehiculoNuevo    = Vehiculo::findOrFail($request->vehiculo_nuevo_id);
+
+            if ((int) $vehiculoNuevo->id === (int) $vehiculoAnterior->id) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'El vehículo de reemplazo debe ser distinto al actual',
+                ], 422);
+            }
+
+            if ($vehiculoNuevo->estado !== VehiculoEstadoEnum::DISPONIBLE->value) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'El vehículo de reemplazo no está disponible, estado actual: ' . $vehiculoNuevo->estado,
+                ], 422);
+            }
+
+            // El vehículo nuevo no debe tener reservas en lo que le queda al contrato
+            $ahora = now();
+
+            $reservaTraslapada = Reserva::where('vehiculo_id', $vehiculoNuevo->id)
+                ->whereIn('estado', [EstadoReservaEnum::PENDIENTE->value, EstadoReservaEnum::CONFIRMADA->value])
+                ->where(function ($query) use ($ahora, $contrato) {
+                    $query->where('fecha_inicio', '<', $contrato->fecha_hora_devolucion)
+                        ->where('fecha_fin', '>', $ahora);
+                })
+                ->exists();
+
+            if ($reservaTraslapada) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'El vehículo de reemplazo tiene una reserva que se traslapa con el resto del contrato',
+                ], 422);
+            }
+
+            $contrato = DB::transaction(function () use ($request, $contrato, $vehiculoAnterior, $vehiculoNuevo, $ahora) {
+
+                // 1. Incidencia del vehículo dañado (no se le cobra al cliente)
+                $incidencia = Incidencia::create([
+                    'vehiculo_id'       => $vehiculoAnterior->id,
+                    'contrato_id'       => $contrato->id,
+                    'usuario_id'        => auth('api')->id(),
+                    'tipo_incidencia'   => TipoIncidenciaEnum::DANIO_MECANICO->value,
+                    'responsable_tipo'  => $request->responsable_tipo,
+                    'estado_incidencia' => IncidenciaEstadoEnum::REPORTADA->value,
+                    'descripcion'       => $request->motivo,
+                    'fecha'             => $ahora->toDateString(),
+                    'costo'             => $request->costo,
+                ]);
+
+                // 2. Estados de los vehículos
+                $vehiculoAnterior->update(['estado' => VehiculoEstadoEnum::ENPROCESO->value]);
+                $vehiculoNuevo->update(['estado' => VehiculoEstadoEnum::RENTADO->value]);
+
+                // 3. Historial del cambio dentro del contrato
+                $info = $contrato->info_registro ?? [];
+                $info['cambios_vehiculo'][] = [
+                    'fecha'                     => $ahora->toDateTimeString(),
+                    'vehiculo_anterior'         => [
+                        'id'    => $vehiculoAnterior->id,
+                        'placa' => $vehiculoAnterior->placa,
+                    ],
+                    'vehiculo_nuevo'            => [
+                        'id'    => $vehiculoNuevo->id,
+                        'placa' => $vehiculoNuevo->placa,
+                        'color' => $vehiculoNuevo->color,
+                        'anio'  => $vehiculoNuevo->anio,
+                    ],
+                    'incidencia_id'             => $incidencia->id,
+                    'responsable_tipo'          => $request->responsable_tipo,
+                    'nivel_combustible_entrega' => $request->nivel_combustible_entrega,
+                    'motivo'                    => $request->motivo,
+                    'usuario_id'                => auth('api')->id(),
+                ];
+
+                // 4. El contrato pasa al vehículo nuevo, el precio NO cambia
+                $contrato->update([
+                    'vehiculo_id'   => $vehiculoNuevo->id,
+                    'info_registro' => $info,
+                ]);
+
+                return $contrato;
+            });
+
+            $contrato->load([
+                'cliente:id,nombre,dui',
+                'vehiculo.modelo.marca',
+            ]);
+
+            return response()->json([
+                'status'  => 'success',
+                'message' => 'Vehículo cambiado con éxito, el precio del contrato se mantiene',
+                'data'    => $contrato,
+            ], 201);
+        } catch (ModelNotFoundException $e) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Contrato o vehículo no encontrado',
+            ], 404);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Error interno del servidor',
+            ], 500);
+        }
+    }
+
+    /**
+     * Anula un contrato ACTIVO creado por error.
+     * Solo si no tiene pagos confirmados, cargos ni incidencias vigentes.
+     */
+    public function anular(Request $request, string $id)
+    {
+        try {
+            $userAuth = auth('api')->user();
+
+            if (!$userAuth->hasRole(RolEnum::ADMINISTRADOR->value)) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'No tienes permiso para anular contratos',
+                ], 403);
+            }
+
+            $request->validate([
+                'motivo' => 'required|string|max:500',
+            ], [
+                'motivo.required' => 'Debe indicar el motivo de la anulación.',
+                'motivo.max'      => 'El motivo no puede exceder los 500 caracteres.',
+            ]);
+
+            $contrato = Contrato::with(['vehiculo', 'reserva'])->findOrFail($id);
+
+            if ($contrato->estado_contrato !== EstadoContratoEnum::ACTIVO->value) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'Solo se puede anular un contrato en estado ACTIVO',
+                ], 422);
+            }
+
+            if ($contrato->montoPagado() > 0) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'El contrato tiene pagos confirmados, primero debe cancelarlos',
+                ], 422);
+            }
+
+            $tieneCargos = $contrato->cargosAdicionales()
+                ->where('estado_cargo', '!=', CargoAdicionalEstadoEnum::ANULADO->value)
+                ->exists();
+
+            $tieneIncidencias = $contrato->incidencias()
+                ->where('estado_incidencia', '!=', IncidenciaEstadoEnum::ANULADA->value)
+                ->exists();
+
+            if ($tieneCargos || $tieneIncidencias) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'El contrato tiene cargos o incidencias vigentes, primero debe anularlos',
+                ], 422);
+            }
+
+            DB::transaction(function () use ($request, $contrato, $userAuth) {
+                // Se guarda el registro de la anulación dentro del contrato
+                $info = $contrato->info_registro ?? [];
+                $info['anulacion'] = [
+                    'fecha'      => now()->toDateTimeString(),
+                    'motivo'     => $request->motivo,
+                    'usuario_id' => $userAuth->id,
+                    'reserva_id' => $contrato->reserva_id,
+                ];
+
+                // La reserva vuelve a PENDIENTE para poder generar el contrato correcto
+                if ($contrato->reserva) {
+                    $contrato->reserva->update([
+                        'estado' => EstadoReservaEnum::PENDIENTE->value,
+                    ]);
+                }
+
+                // Solo se libera si sigue RENTADO
+                if ($contrato->vehiculo->estado === VehiculoEstadoEnum::RENTADO->value) {
+                    $contrato->vehiculo->update([
+                        'estado' => VehiculoEstadoEnum::DISPONIBLE->value,
+                    ]);
+                }
+
+                // Se libera reserva_id porque es único en contratos
+                $contrato->update([
+                    'estado_contrato' => EstadoContratoEnum::ANULADO->value,
+                    'reserva_id'      => null,
+                    'info_registro'   => $info,
+                ]);
+            });
+
+            return response()->json([
+                'status'  => 'success',
+                'message' => 'Contrato anulado correctamente',
+                'data'    => $contrato->fresh(['cliente:id,nombre,dui', 'vehiculo:id,placa,color,estado']),
+            ], 200);
+        } catch (ModelNotFoundException $e) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Contrato no encontrado',
+            ], 404);
+        } catch (ValidationException $e) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Error de validación',
+                'errors'  => $e->errors(),
+            ], 422);
         } catch (\Exception $e) {
             return response()->json([
                 'status'  => 'error',
