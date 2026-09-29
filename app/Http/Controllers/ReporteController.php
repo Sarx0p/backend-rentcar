@@ -11,6 +11,10 @@ use App\Enums\IncidenciaTipoResponsableEnum;
 use App\Enums\EstadoPropietarioEnum;
 use App\Models\Pago;
 use App\Models\Vehiculo;
+use App\Enums\EstadoMantenimientoEnum;
+use App\Enums\IncidenciaEstadoEnum;
+use App\Enums\TipoPropietarioEnum;
+use App\Models\Mantenimiento;
 use App\Models\Cliente;
 use App\Models\Cancelacion;
 use App\Models\Contrato;
@@ -177,13 +181,23 @@ class ReporteController extends Controller
 
             $propietarioBusqueda = trim((string) ($request->input('propietario') ?? ''));
 
+            // Porcentaje que cobra la administración sobre los ingresos (0 a 100)
+            $porcentajeAdmin = (float) ($request->input('porcentaje_administracion') ?? 0);
+
+            if ($porcentajeAdmin < 0 || $porcentajeAdmin > 100) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'El porcentaje de administración debe estar entre 0 y 100',
+                ], 422);
+            }
+
             $propietarios = Propietario::with('vehiculos.modelo.marca')
                 ->where('estado', EstadoPropietarioEnum::ACTIVO->value)
                 ->when($propietarioBusqueda !== '', function ($query) use ($propietarioBusqueda) {
                     $query->where('nombre', 'like', "%{$propietarioBusqueda}%");
                 })
                 ->get()
-                ->map(function ($propietario) use ($fechaInicio, $fechaFin) {
+                ->map(function ($propietario) use ($fechaInicio, $fechaFin, $porcentajeAdmin) {
                     $vehiculoIds = $propietario->vehiculos->pluck('id');
 
                     $ingresos = Pago::whereHas('contrato', function ($q) use ($vehiculoIds) {
@@ -194,37 +208,68 @@ class ReporteController extends Controller
                         ->whereDate('fecha_pago', '<=', $fechaFin)
                         ->sum('monto');
 
+                    $mantenimientos = Mantenimiento::whereIn('vehiculo_id', $vehiculoIds)
+                        ->where('estado', '!=', EstadoMantenimientoEnum::CANCELADO->value)
+                        ->whereDate('fecha', '>=', $fechaInicio)
+                        ->whereDate('fecha', '<=', $fechaFin)
+                        ->get(['id', 'vehiculo_id', 'tipo_mantenimiento', 'descripcion', 'costo', 'fecha', 'lugar']);
+
+                    $incidenciasReparadas = Mantenimiento::whereIn('vehiculo_id', $vehiculoIds)
+                        ->whereNotNull('incidencia_id')
+                        ->where('estado', '!=', EstadoMantenimientoEnum::CANCELADO->value)
+                        ->pluck('incidencia_id');
+
                     $incidenciasNegocio = Incidencia::whereIn('vehiculo_id', $vehiculoIds)
                         ->where('responsable_tipo', IncidenciaTipoResponsableEnum::NEGOCIO->value)
+                        ->where('estado_incidencia', '!=', IncidenciaEstadoEnum::ANULADA->value)
+                        ->whereNotIn('id', $incidenciasReparadas)
                         ->whereDate('fecha', '>=', $fechaInicio)
                         ->whereDate('fecha', '<=', $fechaFin)
                         ->get(['id', 'vehiculo_id', 'tipo_incidencia', 'descripcion', 'costo', 'fecha']);
 
-                    $gastoIncidencias = $incidenciasNegocio->sum('costo');
-                    $gastoTotal       = $gastoIncidencias;
+                    $gastoIncidencias    = $incidenciasNegocio->sum('costo');
+                    $gastoMantenimientos = $mantenimientos->sum('costo');
+                    $gastoTotal          = $gastoIncidencias + $gastoMantenimientos;
+
+                    $aplicaAdministracion = $propietario->tipo_propietario !== TipoPropietarioEnum::PROPIO->value;
+
+                    $montoAdministracion = $aplicaAdministracion
+                        ? round($ingresos * $porcentajeAdmin / 100, 2)
+                        : 0;
 
                     return [
-                        'propietario'         => $propietario,
-                        'num_vehiculos'       => $vehiculoIds->count(),
-                        'ingresos'            => $ingresos,
-                        'gasto_incidencias'   => $gastoIncidencias,
-                        'incidencias_detalle' => $incidenciasNegocio,
-                        'gasto_total'         => $gastoTotal,
-                        'resultado_neto'      => $ingresos - $gastoTotal,
+                        'propietario'            => $propietario,
+                        'num_vehiculos'          => $vehiculoIds->count(),
+                        'ingresos'               => $ingresos,
+                        'gasto_incidencias'      => $gastoIncidencias,
+                        'incidencias_detalle'    => $incidenciasNegocio,
+                        'gasto_mantenimientos'   => $gastoMantenimientos,
+                        'mantenimientos_detalle' => $mantenimientos,
+                        'gasto_total'            => $gastoTotal,
+                        'aplica_administracion'  => $aplicaAdministracion,
+                        'monto_administracion'   => $montoAdministracion,
+                        'resultado_neto'         => $ingresos - $gastoTotal - $montoAdministracion,
                     ];
                 })
                 ->sortByDesc('resultado_neto')
                 ->values();
 
-            $totalIngresos = $propietarios->sum('ingresos');
-            $totalGastos   = $propietarios->sum('gasto_total');
-            $totalNeto     = $propietarios->sum('resultado_neto');
+            $totalIngresos       = $propietarios->sum('ingresos');
+            $totalIncidencias    = $propietarios->sum('gasto_incidencias');
+            $totalMantenimientos = $propietarios->sum('gasto_mantenimientos');
+            $totalGastos         = $propietarios->sum('gasto_total');
+            $totalAdministracion = $propietarios->sum('monto_administracion');
+            $totalNeto           = $propietarios->sum('resultado_neto');
 
             $pdf = Pdf::loadView('reportes.resultado-neto-por-propietario', [
                 'propietarios'        => $propietarios,
                 'totalIngresos'       => $totalIngresos,
+                'totalIncidencias'    => $totalIncidencias,
+                'totalMantenimientos' => $totalMantenimientos,
                 'totalGastos'         => $totalGastos,
+                'totalAdministracion' => $totalAdministracion,
                 'totalNeto'           => $totalNeto,
+                'porcentajeAdmin'     => $porcentajeAdmin,
                 'fechaInicio'         => $fechaInicio,
                 'fechaFin'            => $fechaFin,
                 'propietarioBusqueda' => $propietarioBusqueda,

@@ -32,6 +32,10 @@
             <div class="card-value">${{ number_format($totalGastos ?? 0, 2) }}</div>
         </div>
         <div class="card">
+            <div class="card-label">Administración ({{ number_format($porcentajeAdmin ?? 0, 2) }}%)</div>
+            <div class="card-value">${{ number_format($totalAdministracion ?? 0, 2) }}</div>
+        </div>
+        <div class="card">
             <div class="card-label">Resultado neto</div>
             <div class="card-value">${{ number_format($totalNeto ?? 0, 2) }}</div>
         </div>
@@ -48,7 +52,9 @@
                 <th>Vehículos</th>
                 <th class="right">Ingresos</th>
                 <th class="right">Gasto Incidencias</th>
+                <th class="right">Gasto Mantenimientos</th>
                 <th class="right">Gasto Total</th>
+                <th class="right">Administración ({{ number_format($porcentajeAdmin ?? 0, 2) }}%)</th>
                 <th class="right">Resultado Neto</th>
             </tr>
         </thead>
@@ -59,20 +65,30 @@
                     <td>{{ $item['num_vehiculos'] }}</td>
                     <td class="right">${{ number_format($item['ingresos'], 2) }}</td>
                     <td class="right">${{ number_format($item['gasto_incidencias'], 2) }}</td>
+                    <td class="right">${{ number_format($item['gasto_mantenimientos'], 2) }}</td>
                     <td class="right">${{ number_format($item['gasto_total'], 2) }}</td>
+                    <td class="right">
+                        @if($item['aplica_administracion'])
+                            ${{ number_format($item['monto_administracion'], 2) }}
+                        @else
+                            No aplica
+                        @endif
+                    </td>
                     <td class="right">${{ number_format($item['resultado_neto'], 2) }}</td>
                 </tr>
             @empty
                 <tr>
-                    <td colspan="6">No hay propietarios registrados.</td>
+                    <td colspan="8">No hay propietarios registrados.</td>
                 </tr>
             @endforelse
 
             <tr class="total-destacado">
                 <td colspan="2">Total general</td>
                 <td class="right">${{ number_format($totalIngresos ?? 0, 2) }}</td>
-                <td></td>
+                <td class="right">${{ number_format($totalIncidencias ?? 0, 2) }}</td>
+                <td class="right">${{ number_format($totalMantenimientos ?? 0, 2) }}</td>
                 <td class="right">${{ number_format($totalGastos ?? 0, 2) }}</td>
+                <td class="right">${{ number_format($totalAdministracion ?? 0, 2) }}</td>
                 <td class="right">${{ number_format($totalNeto ?? 0, 2) }}</td>
             </tr>
         </tbody>
@@ -101,6 +117,36 @@
                             <td>{{ $inc->descripcion }}</td>
                             <td>{{ \Carbon\Carbon::parse($inc->fecha)->format('d/m/Y') }}</td>
                             <td class="right">${{ number_format($inc->costo, 2) }}</td>
+                        </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        @endif
+
+        @if(isset($item['mantenimientos_detalle']) && $item['mantenimientos_detalle']->isNotEmpty())
+            <div class="seccion-titulo">
+                Mantenimientos — {{ $item['propietario']->nombre ?? 'N/A' }}
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Vehículo</th>
+                        <th>Tipo</th>
+                        <th>Descripción</th>
+                        <th>Lugar</th>
+                        <th>Fecha</th>
+                        <th class="right">Costo</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach($item['mantenimientos_detalle'] as $mant)
+                        <tr>
+                            <td>{{ $mant->vehiculo_id }}</td>
+                            <td>{{ $mant->tipo_mantenimiento }}</td>
+                            <td>{{ $mant->descripcion }}</td>
+                            <td>{{ $mant->lugar }}</td>
+                            <td>{{ \Carbon\Carbon::parse($mant->fecha)->format('d/m/Y') }}</td>
+                            <td class="right">${{ number_format($mant->costo, 2) }}</td>
                         </tr>
                     @endforeach
                 </tbody>
