@@ -90,7 +90,7 @@ class ReporteController extends Controller
     public function estadoFlota(Request $request)
     {
         try {
-            if (!$this->tienePermiso()) {
+            if (!$this->tienePermiso(true)) {
                 return response()->json([
                     'status'  => 'error',
                     'message' => 'No tienes permiso para ver este reporte',
@@ -131,7 +131,7 @@ class ReporteController extends Controller
     public function licenciasPorVencer(Request $request)
     {
         try {
-            if (!$this->tienePermiso()) {
+            if (!$this->tienePermiso(true)) {
                 return response()->json([
                     'status'  => 'error',
                     'message' => 'No tienes permiso para ver este reporte',
@@ -299,7 +299,7 @@ class ReporteController extends Controller
     public function reservasCanceladas(Request $request)
     {
         try {
-            if (!$this->tienePermiso()) {
+            if (!$this->tienePermiso(true)) {
                 return response()->json([
                     'status'  => 'error',
                     'message' => 'No tienes permiso para ver este reporte',
