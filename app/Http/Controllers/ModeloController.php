@@ -31,14 +31,8 @@ class ModeloController extends Controller
                 ], 403);
             }
 
+            // Sin registros responde 200 con data: [], igual que los demás listados.
             $modelos = Modelo::with('marca')->orderBy('nombre')->get();
-
-            if ($modelos->isEmpty()) {
-                return response()->json([
-                    'status'  => 'error',
-                    'message' => 'No hay modelos registrados.',
-                ], 404);
-            }
 
             return response()->json([
                 'status' => 'success',
@@ -80,13 +74,6 @@ class ModeloController extends Controller
                 ->where('marca_id', $marcaId)
                 ->orderBy('nombre')
                 ->get();
-
-            if ($modelos->isEmpty()) {
-                return response()->json([
-                    'status'  => 'error',
-                    'message' => 'No existen modelos para esta marca.',
-                ], 404);
-            }
 
             return response()->json([
                 'status' => 'success',

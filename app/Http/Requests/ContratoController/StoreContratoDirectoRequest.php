@@ -29,7 +29,7 @@ class StoreContratoDirectoRequest extends FormRequest
             'dias_acordados'            => 'required|integer|min:1',
             'precio_por_dia'            => 'sometimes|numeric|min:0.1',
             'nivel_combustible_entrega' => 'required|string|max:50',
-            'monto_descuento'           => 'sometimes|numeric|min:0',
+            'monto_descuento'           => 'sometimes|numeric|min:0|max:999999.99',
             'observaciones_entrega'     => 'sometimes|nullable|string|max:500',
             'observaciones'             => 'sometimes|nullable|string|max:500',
         ];
@@ -49,6 +49,7 @@ class StoreContratoDirectoRequest extends FormRequest
             'precio_por_dia.min'                 => 'El precio por día tiene que ser mayor que 0.',
             'nivel_combustible_entrega.required' => 'El nivel de combustible de entrega es obligatorio.',
             'nivel_combustible_entrega.max'      => 'El nivel de combustible no puede exceder los 50 caracteres.',
+            'monto_descuento.max'                => 'El descuento no puede ser mayor a 999,999.99.',
         ];
     }
 

@@ -29,14 +29,8 @@ class CategoriaController extends Controller
                 ], 403);
             }
 
+            // Sin registros responde 200 con data: [], igual que los demás listados.
             $categorias = Categoria::orderBy('nombre')->get();
-
-            if ($categorias->isEmpty()) {
-                return response()->json([
-                    'status'  => 'error',
-                    'message' => 'No hay categorias registradas.',
-                ], 404);
-            }
 
             return response()->json([
                 'status' => 'success',

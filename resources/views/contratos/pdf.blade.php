@@ -108,7 +108,8 @@
         </div>
         <div class="campo" style="width:33%">
             <span class="campo-label">Monto total: </span>
-            <span class="campo-valor">${{ number_format($contrato->monto_total_renta, 2) }}</span>
+            {{-- Monto pactado al firmar; monto_total_renta sube luego con cargos e incidencias. --}}
+            <span class="campo-valor">${{ number_format(($contrato->precio_por_dia * $contrato->dias_acordados) - $contrato->monto_descuento, 2) }}</span>
         </div>
     </div>
 
@@ -116,7 +117,8 @@
     <div class="campo" style="width:100%">
         <span class="campo-label">Observaciones del vehículo: </span>
         <span class="campo-valor" style="min-width:400px; font-size: 11px;">
-            {{ \Illuminate\Support\Str::limit($contrato->incidencias->pluck('descripcion')->implode(', '), 110, '...') }}
+            {{-- Estado del vehículo al entregarlo (ya incluye los daños estéticos previos). --}}
+            {{ \Illuminate\Support\Str::limit($contrato->observaciones_entrega ?? '', 110, '...') }}
         </span>
     </div>
     </div>

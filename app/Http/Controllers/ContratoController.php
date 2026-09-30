@@ -37,7 +37,8 @@ class ContratoController extends Controller
 
             if (
                 !$userAuth->hasRole(RolEnum::ADMINISTRADOR->value) &&
-                !$userAuth->hasRole(RolEnum::EMPLEADO->value)
+                !$userAuth->hasRole(RolEnum::EMPLEADO->value) &&
+                !$userAuth->hasRole(RolEnum::CONTADOR->value)
             ) {
                 return response()->json([
                     'status'  => 'error',
@@ -718,7 +719,8 @@ class ContratoController extends Controller
 
             if (
                 !$userAuth->hasRole(RolEnum::ADMINISTRADOR->value) &&
-                !$userAuth->hasRole(RolEnum::EMPLEADO->value)
+                !$userAuth->hasRole(RolEnum::EMPLEADO->value) &&
+                !$userAuth->hasRole(RolEnum::CONTADOR->value)
             ) {
                 return response()->json([
                     'status'  => 'error',

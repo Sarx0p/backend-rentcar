@@ -68,7 +68,7 @@ class StoreSeguroRequest extends FormRequest
     {
         throw new HttpResponseException(response()->json([
             'status'  => 'error',
-            'message' => 'No tienes permiso para actualizar usuarios.',
+            'message' => 'No tienes permiso para registrar seguros.',
         ], 403));
     }
 
