@@ -10,7 +10,7 @@
     <div class="header">
         <div class="header-logo">
             <strong>El Guayabo</strong><br>
-            <small>RENT CAR</small>
+            <small>RENTA CAR</small>
         </div>
         <div class="header-title">
             <h1>RENTACARS "EL GUAYABO"</h1>
