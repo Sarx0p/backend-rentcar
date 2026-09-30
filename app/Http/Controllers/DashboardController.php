@@ -18,7 +18,7 @@ class DashboardController extends Controller
         $userAuth = auth('api')->user();
         if (
             !$userAuth->hasRole(RolEnum::ADMINISTRADOR->value) &&
-            !$userAuth->hasRole(RolEnum::EMPLEADO->value)
+            !$userAuth->hasRole(RolEnum::CONTADOR->value)
         ) {
             return response()->json([
                 'status'  => 'error',

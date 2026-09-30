@@ -36,7 +36,7 @@ class UpdateIncidenciaRequest extends FormRequest
             'estado_incidencia' => 'sometimes|in:' . implode(',', array_column(IncidenciaEstadoEnum::cases(), 'value')),
             'descripcion'       => 'sometimes|nullable|string|max:500',
             'fecha'             => 'sometimes|date',
-            'costo'             => 'sometimes|nullable|numeric|min:0',
+            'costo'             => 'sometimes|nullable|numeric|min:0|max:999999.99',
         ];
     }
 
@@ -76,6 +76,7 @@ class UpdateIncidenciaRequest extends FormRequest
             'responsable_tipo.in'  => 'El responsable no es válido.',
             'estado_incidencia.in' => 'El estado de la incidencia no es válido.',
             'costo.numeric'        => 'El costo debe ser un valor numérico.',
+            'costo.max'            => 'El costo no puede ser mayor a 999,999.99.',
         ];
     }
 

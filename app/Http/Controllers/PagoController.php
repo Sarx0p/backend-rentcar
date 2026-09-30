@@ -29,7 +29,8 @@ class PagoController extends Controller
 
             if (
                 !$userAuth->hasRole(RolEnum::ADMINISTRADOR->value) &&
-                !$userAuth->hasRole(RolEnum::EMPLEADO->value)
+                !$userAuth->hasRole(RolEnum::EMPLEADO->value) &&
+                !$userAuth->hasRole(RolEnum::CONTADOR->value)
             ) {
                 return response()->json([
                     'status'  => 'error',
@@ -167,7 +168,8 @@ class PagoController extends Controller
 
             if (
                 !$userAuth->hasRole(RolEnum::ADMINISTRADOR->value) &&
-                !$userAuth->hasRole(RolEnum::EMPLEADO->value)
+                !$userAuth->hasRole(RolEnum::EMPLEADO->value) &&
+                !$userAuth->hasRole(RolEnum::CONTADOR->value)
             ) {
                 return response()->json([
                     'status'  => 'error',
@@ -215,7 +217,8 @@ class PagoController extends Controller
 
             if (
                 !$userAuth->hasRole(RolEnum::ADMINISTRADOR->value) &&
-                !$userAuth->hasRole(RolEnum::EMPLEADO->value)
+                !$userAuth->hasRole(RolEnum::EMPLEADO->value) &&
+                !$userAuth->hasRole(RolEnum::CONTADOR->value)
             ) {
                 return response()->json([
                     'status'  => 'error',
