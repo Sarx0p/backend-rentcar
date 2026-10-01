@@ -39,11 +39,13 @@ class CancelarController extends Controller
                 'reserva.vehiculo:id,placa,color',
             ])
                 ->when($request->search, function ($query, $search) {
-                    $query->where('motivo', 'like', '%' . $search . '%')
-                        ->orWhereHas('reserva.cliente', function ($q) use ($search) {
-                            $q->where('nombre', 'like', '%' . $search . '%')
-                                ->orWhere('dui', 'like', '%' . $search . '%');
-                        });
+                    $query->where(function ($q) use ($search) {
+                        $q->where('motivo', 'like', '%' . $search . '%')
+                            ->orWhereHas('reserva.cliente', function ($q2) use ($search) {
+                                $q2->where('nombre', 'like', '%' . $search . '%')
+                                    ->orWhere('dui', 'like', '%' . $search . '%');
+                            });
+                    });
                 })
                 ->when($request->fecha_inicio && $request->fecha_fin, function ($query) use ($request) {
                     $query->whereDate('fecha_cancelacion', '>=', $request->fecha_inicio)

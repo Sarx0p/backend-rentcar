@@ -40,6 +40,8 @@ class ReservaController extends Controller
                 ], 403);
             }
 
+            Reserva::vencerPendientes($userAuth->id);
+
             $reservas = Reserva::with([
                 'cliente:id,nombre,dui,telefono,numero_licencia,vencimiento_licencia',
                 'vehiculo:id,placa,color,anio,estado,modelo_id,categoria_id',

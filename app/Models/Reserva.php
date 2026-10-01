@@ -2,7 +2,9 @@
 
 namespace App\Models;
 
+use App\Enums\EstadoReservaEnum;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
@@ -53,5 +55,30 @@ class Reserva extends Model
     public function contrato(): HasOne
     {
         return $this->hasOne(Contrato::class, 'reserva_id');
+    }
+
+    // pendientes que ya pasaron su dia de inicio sin contrato, ya no se pueden usar
+    public static function vencerPendientes(int $usuarioId): int
+    {
+        $vencidas = self::where('estado', EstadoReservaEnum::PENDIENTE->value)
+            ->whereDate('fecha_inicio', '<', now()->toDateString())
+            ->whereDoesntHave('contrato')
+            ->whereDoesntHave('cancelacion')
+            ->get();
+
+        foreach ($vencidas as $reserva) {
+            DB::transaction(function () use ($reserva, $usuarioId) {
+                Cancelacion::create([
+                    'fecha_cancelacion' => now(),
+                    'motivo'            => 'Vencida: el cliente no se presento el dia de inicio',
+                    'usuario_id'        => $usuarioId,
+                    'reserva_id'        => $reserva->id,
+                ]);
+
+                $reserva->update(['estado' => EstadoReservaEnum::CANCELADA->value]);
+            });
+        }
+
+        return $vencidas->count();
     }
 }

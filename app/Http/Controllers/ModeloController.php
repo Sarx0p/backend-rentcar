@@ -31,7 +31,6 @@ class ModeloController extends Controller
                 ], 403);
             }
 
-            // Sin registros responde 200 con data: [], igual que los demás listados.
             $modelos = Modelo::with('marca')->orderBy('nombre')->get();
 
             return response()->json([

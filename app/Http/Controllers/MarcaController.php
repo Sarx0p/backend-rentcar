@@ -30,7 +30,6 @@ class MarcaController extends Controller
                 ], 403);
             }
 
-            // Sin registros responde 200 con data: [], igual que los demás listados.
             $marcas = Marca::orderBy('nombre')->get();
 
             return response()->json([

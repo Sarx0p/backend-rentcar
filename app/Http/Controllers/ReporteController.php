@@ -29,6 +29,38 @@ class ReporteController extends Controller
     /**
      * Chequeo de permiso reutilizable para reportes.
      */
+    // gastos del negocio: mantenimientos no cancelados + incidencias del negocio que no tengan ya un mantenimiento
+    private function gastosDeVehiculos($vehiculoIds, $fechaInicio, $fechaFin): array
+    {
+        $mantenimientos = Mantenimiento::query()
+            ->when($vehiculoIds !== null, fn ($q) => $q->whereIn('vehiculo_id', $vehiculoIds))
+            ->where('estado', '!=', EstadoMantenimientoEnum::CANCELADO->value)
+            ->whereDate('fecha', '>=', $fechaInicio)
+            ->whereDate('fecha', '<=', $fechaFin)
+            ->sum('costo');
+
+        $incidenciasReparadas = Mantenimiento::query()
+            ->when($vehiculoIds !== null, fn ($q) => $q->whereIn('vehiculo_id', $vehiculoIds))
+            ->whereNotNull('incidencia_id')
+            ->where('estado', '!=', EstadoMantenimientoEnum::CANCELADO->value)
+            ->pluck('incidencia_id');
+
+        $incidencias = Incidencia::query()
+            ->when($vehiculoIds !== null, fn ($q) => $q->whereIn('vehiculo_id', $vehiculoIds))
+            ->where('responsable_tipo', IncidenciaTipoResponsableEnum::NEGOCIO->value)
+            ->where('estado_incidencia', '!=', IncidenciaEstadoEnum::ANULADA->value)
+            ->whereNotIn('id', $incidenciasReparadas)
+            ->whereDate('fecha', '>=', $fechaInicio)
+            ->whereDate('fecha', '<=', $fechaFin)
+            ->sum('costo');
+
+        return [
+            'incidencias'    => (float) $incidencias,
+            'mantenimientos' => (float) $mantenimientos,
+            'total'          => (float) $incidencias + (float) $mantenimientos,
+        ];
+    }
+
     private function tienePermiso($incluirContador = false): bool
     {
         $userAuth = auth('api')->user();
@@ -164,7 +196,7 @@ class ReporteController extends Controller
     }
 
     /**
-     * Resultado neto por propietario: ingresos - gastos por incidencias del negocio.
+     * Resultado neto por propietario: ingresos - gastos.
      */
     public function resultadoNetoPorPropietario(Request $request)
     {
@@ -180,7 +212,6 @@ class ReporteController extends Controller
             $fechaFin    = $request->fecha_fin ?? now()->endOfMonth()->format('Y-m-d');
 
             $propietarioBusqueda = trim((string) ($request->input('propietario') ?? ''));
-            // Filtro exacto elegido de la lista del frontend; el de nombre busca por coincidencia parcial.
             $propietarioId = $request->integer('propietario_id');
 
             if ($propietarioId && $propietarioBusqueda === '') {
@@ -371,11 +402,10 @@ class ReporteController extends Controller
                 ->whereDate('created_at', '<=', $fechaFin)
                 ->count();
 
-            $totalGastosIncidencias = Incidencia::where('responsable_tipo', IncidenciaTipoResponsableEnum::NEGOCIO->value)
-                ->where('estado_incidencia', '!=', IncidenciaEstadoEnum::ANULADA->value)
-                ->whereDate('fecha', '>=', $fechaInicio)
-                ->whereDate('fecha', '<=', $fechaFin)
-                ->sum('costo');
+            $gastos = $this->gastosDeVehiculos(null, $fechaInicio, $fechaFin);
+            $totalGastosIncidencias    = $gastos['incidencias'];
+            $totalGastosMantenimientos = $gastos['mantenimientos'];
+            $totalGastos               = $gastos['total'];
 
             $pdf = Pdf::loadView('reportes.desempeno-general', [
                 'fechaInicio'            => $fechaInicio,
@@ -386,7 +416,9 @@ class ReporteController extends Controller
                 'vehiculosRentados'      => $vehiculosRentados,
                 'tasaOcupacion'          => $tasaOcupacion,
                 'totalClientesNuevos'    => $totalClientesNuevos,
-                'totalGastosIncidencias' => $totalGastosIncidencias,
+                'totalGastosIncidencias'    => $totalGastosIncidencias,
+                'totalGastosMantenimientos' => $totalGastosMantenimientos,
+                'totalGastos'               => $totalGastos,
             ]);
 
             $pdf->setPaper('letter', 'portrait');
@@ -418,7 +450,6 @@ class ReporteController extends Controller
                 ?? $request->input('propietarios')
                 ?? ''
             ));
-            // Filtro exacto elegido de la lista del frontend; el de nombre busca por coincidencia parcial.
             $propietarioId = $request->integer('propietario_id');
 
             if ($propietarioId && $propietarioBusqueda === '') {
@@ -494,7 +525,7 @@ class ReporteController extends Controller
     }
 
     /**
-     * Gastos por vehículo: incidencias asumidas por el negocio.
+     * Gastos por vehículo: incidencias del negocio y mantenimientos.
      */
     public function gastosPorVehiculo(Request $request)
     {
@@ -512,17 +543,13 @@ class ReporteController extends Controller
             $vehiculos = Vehiculo::with(['modelo.marca'])
                 ->get()
                 ->map(function ($vehiculo) use ($fechaInicio, $fechaFin) {
-                    $gastoIncidenciasNegocio = Incidencia::where('vehiculo_id', $vehiculo->id)
-                        ->where('responsable_tipo', IncidenciaTipoResponsableEnum::NEGOCIO->value)
-                        ->where('estado_incidencia', '!=', IncidenciaEstadoEnum::ANULADA->value)
-                        ->whereDate('fecha', '>=', $fechaInicio)
-                        ->whereDate('fecha', '<=', $fechaFin)
-                        ->sum('costo');
+                    $gastos = $this->gastosDeVehiculos([$vehiculo->id], $fechaInicio, $fechaFin);
 
                     return [
                         'vehiculo'                  => $vehiculo,
-                        'gasto_incidencias_negocio' => $gastoIncidenciasNegocio,
-                        'gasto_total'               => $gastoIncidenciasNegocio,
+                        'gasto_incidencias_negocio' => $gastos['incidencias'],
+                        'gasto_mantenimientos'      => $gastos['mantenimientos'],
+                        'gasto_total'               => $gastos['total'],
                     ];
                 })
                 ->sortByDesc('gasto_total')
@@ -549,7 +576,7 @@ class ReporteController extends Controller
     }
 
     /**
-     * Resultado neto por vehículo: ingresos - gastos por incidencias.
+     * Resultado neto por vehículo: ingresos - gastos.
      */
     public function resultadoNetoPorVehiculo(Request $request)
     {
@@ -575,14 +602,7 @@ class ReporteController extends Controller
                         ->whereDate('fecha_pago', '<=', $fechaFin)
                         ->sum('monto');
 
-                    $gastoIncidencias = Incidencia::where('vehiculo_id', $vehiculo->id)
-                        ->where('responsable_tipo', IncidenciaTipoResponsableEnum::NEGOCIO->value)
-                        ->where('estado_incidencia', '!=', IncidenciaEstadoEnum::ANULADA->value)
-                        ->whereDate('fecha', '>=', $fechaInicio)
-                        ->whereDate('fecha', '<=', $fechaFin)
-                        ->sum('costo');
-
-                    $gastoTotal = $gastoIncidencias;
+                    $gastoTotal = $this->gastosDeVehiculos([$vehiculo->id], $fechaInicio, $fechaFin)['total'];
 
                     return [
                         'vehiculo'       => $vehiculo,

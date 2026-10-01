@@ -35,8 +35,10 @@ class PropietarioController extends Controller
             $propietarios = Propietario::query()
                 ->where('estado', EstadoPropietarioEnum::ACTIVO->value)
                 ->when($request->search, function ($query, $search) {
-                    $query->where('nombre', 'like', "%{$search}%")
-                        ->orWhere('telefono', 'like', "%{$search}%");
+                    $query->where(function ($q) use ($search) {
+                        $q->where('nombre', 'like', "%{$search}%")
+                            ->orWhere('telefono', 'like', "%{$search}%");
+                    });
                 })
                 ->orderBy('nombre')
                 ->get();
