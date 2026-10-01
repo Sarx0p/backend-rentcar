@@ -39,8 +39,6 @@ Route::prefix('admin')->middleware(['auth:api', 'estado.activo'])->group(functio
 
     Route::middleware(['role:ADMINISTRADOR'])->group(function () {
         Route::apiResource('usuarios', UsuarioController::class);
-        // Crear, editar y eliminar propietarios y seguros es solo del administrador
-        // (sus Requests ya lo exigen); el empleado solo consulta (index y show).
         Route::apiResource('propietarios', PropietarioController::class)->except(['index', 'show']);
         Route::apiResource('seguros', SeguroController::class)->except(['index', 'show']);
     });
@@ -77,7 +75,6 @@ Route::prefix('admin')->middleware(['auth:api', 'estado.activo'])->group(functio
         Route::get('/marcas/{marcaId}/modelos', [ModeloController::class, 'porMarca']);
         Route::apiResource('categorias', CategoriaController::class);
 
-        // Los clientes no se eliminan: sin ruta DELETE (destroy estaba vacío y respondía 200).
         Route::apiResource('clientes', ClienteController::class)->except(['destroy']);
         Route::get('clientes/{id}/licencia-vigente', [ClienteController::class, 'licenciaVigente']);
         Route::apiResource('reservas', ReservaController::class)->except(['destroy']);

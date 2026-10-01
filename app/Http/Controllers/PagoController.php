@@ -136,6 +136,8 @@ class PagoController extends Controller
                         : EstadoPagoEnum::PARCIAL->value,
                 ]);
 
+                $this->actualizarDeudaCierre($contrato, (float) $totalPagado);
+
                 return $pago;
             });
 
@@ -287,6 +289,8 @@ class PagoController extends Controller
                     $contrato->update([
                         'estado_pago' => $nuevoEstadoPago,
                     ]);
+
+                    $this->actualizarDeudaCierre($contrato, (float) $totalPagadoActual);
                 }
             });
 
@@ -308,6 +312,17 @@ class PagoController extends Controller
                 'status'  => 'error',
                 'message' => 'Error interno del servidor',
             ], 500);
+        }
+    }
+
+    private function actualizarDeudaCierre(Contrato $contrato, float $totalPagado): void
+    {
+        $cierre = $contrato->cierreRenta()->first();
+
+        if ($cierre && $cierre->estado === CierreRentaEstadoEnum::FINALIZADO_CON_DEUDA->value) {
+            $cierre->update([
+                'monto_deuda' => max(0, (float) $contrato->monto_total_renta - $totalPagado),
+            ]);
         }
     }
 }
