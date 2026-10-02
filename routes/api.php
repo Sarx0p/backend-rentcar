@@ -27,6 +27,8 @@ use App\Http\Controllers\HistorialController;
 
 Route::prefix('auth')->group(function () {
     Route::post('login', [AuthController::class, 'login']);
+    Route::post('olvide-password', [AuthController::class, 'olvidePassword'])->middleware('throttle:5,1');
+    Route::post('restablecer-password', [AuthController::class, 'restablecerPassword'])->middleware('throttle:5,1');
 
     Route::middleware(['auth:api', 'estado.activo'])->group(function () {
         Route::get('me',       [AuthController::class, 'me']);
@@ -39,18 +41,14 @@ Route::prefix('admin')->middleware(['auth:api', 'estado.activo'])->group(functio
 
     Route::middleware(['role:ADMINISTRADOR'])->group(function () {
         Route::apiResource('usuarios', UsuarioController::class);
-        // Crear, editar y eliminar propietarios y seguros es solo del administrador
-        // (sus Requests ya lo exigen); el empleado solo consulta (index y show).
         Route::apiResource('propietarios', PropietarioController::class)->except(['index', 'show']);
         Route::apiResource('seguros', SeguroController::class)->except(['index', 'show']);
     });
 
-    // el empleado no ve el dashboard
     Route::middleware(['role:ADMINISTRADOR|CONTADOR'])->group(function () {
         Route::get('/dashboard/resumen', [DashboardController::class, 'resumen']);
     });
 
-    // el contador entra solo a pagos y reportes, lo demas lo lee para esas pantallas
     Route::middleware(['role:ADMINISTRADOR|EMPLEADO|CONTADOR'])->group(function () {
         Route::apiResource('pagos', PagoController::class)->only(['index', 'show', 'store', 'destroy']);
         Route::apiResource('contratos', ContratoController::class)->only(['index', 'show']);
