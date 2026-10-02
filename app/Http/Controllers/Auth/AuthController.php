@@ -5,6 +5,14 @@ namespace App\Http\Controllers\Auth;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use App\Enums\UsuarioEstadoEnum;
+use App\Mail\RecuperarPasswordMail;
+use App\Models\User;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
 
 class AuthController extends Controller
 {
@@ -63,5 +71,61 @@ class AuthController extends Controller
     {
 
         return $this->responseWithToken(auth('api')->refresh());
+    }
+
+    public function olvidePassword(Request $request)
+    {
+
+        $request->validate(['correo' => 'required|email']);
+
+        $user = User::where('correo', $request->correo)->first();
+
+        if ($user && $user->estado === UsuarioEstadoEnum::ACTIVO->value) {
+            $token = Str::random(64);
+
+            DB::table('password_reset_tokens')->updateOrInsert(
+                ['correo' => $user->correo],
+                ['token' => Hash::make($token), 'created_at' => now()]
+            );
+
+            $url = config('app.frontend_url') . '/restablecer-password?token=' . $token . '&correo=' . urlencode($user->correo);
+
+            Mail::to($user->correo)->send(new RecuperarPasswordMail($user, $url));
+        }
+
+        return response()->json([
+            'message' => 'Si el correo está registrado, recibirás un enlace para restablecer tu contraseña.',
+        ], 200);
+    }
+
+    public function restablecerPassword(Request $request)
+    {
+        $request->validate([
+            'correo'   => 'required|email',
+            'token'    => 'required|string',
+            'password' => 'required|string|min:8|confirmed',
+        ]);
+
+        $registro = DB::table('password_reset_tokens')->where('correo', $request->correo)->first();
+
+        if (
+            !$registro
+            || !Hash::check($request->token, $registro->token)
+            || Carbon::parse($registro->created_at)->addMinutes(60)->isPast()
+        ) {
+            return response()->json(['message' => 'El enlace no es válido o ya venció.'], 422);
+        }
+
+        $user = User::where('correo', $request->correo)->first();
+        if (!$user) {
+            return response()->json(['message' => 'El enlace no es válido o ya venció.'], 422);
+        }
+
+        $user->password = $request->password;
+        $user->save();
+
+        DB::table('password_reset_tokens')->where('correo', $request->correo)->delete();
+
+        return response()->json(['message' => 'Contraseña actualizada correctamente.'], 200);
     }
 }
