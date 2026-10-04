@@ -89,7 +89,6 @@ class IncidenciaController extends Controller
     public function store(StoreIncidenciaRequest $request)
     {
         try {
-            // Si el responsable es el CLIENTE, debe existir un contrato al cual cobrarle
             if (
                 $request->responsable_tipo === IncidenciaTipoResponsableEnum::CLIENTE->value
                 && !$request->filled('contrato_id')
@@ -103,7 +102,6 @@ class IncidenciaController extends Controller
             if ($request->filled('contrato_id')) {
                 $contrato = Contrato::findOrFail($request->contrato_id);
 
-                // El contrato debe pertenecer al mismo vehículo de la incidencia
                 if ((int) $contrato->vehiculo_id !== (int) $request->vehiculo_id) {
                     return response()->json([
                         'status'  => 'error',
@@ -111,7 +109,6 @@ class IncidenciaController extends Controller
                     ], 422);
                 }
 
-                // Solo se registran incidencias en contratos activos
                 if ($contrato->estado_contrato !== EstadoContratoEnum::ACTIVO->value) {
                     return response()->json([
                         'status'  => 'error',
@@ -136,7 +133,6 @@ class IncidenciaController extends Controller
                 if ($request->tipo_incidencia === TipoIncidenciaEnum::DANIO_MECANICO->value) {
                     $vehiculo = Vehiculo::find($request->vehiculo_id);
 
-                    // Si el cliente todavia tiene el vehiculo (RENTADO) se queda asi, el cierre lo pasa a EN PROCESO
                     if ($vehiculo && !in_array($vehiculo->estado, [
                         VehiculoEstadoEnum::MANTENIMIENTO->value,
                         VehiculoEstadoEnum::RENTADO->value,
@@ -147,8 +143,6 @@ class IncidenciaController extends Controller
                     }
                 }
 
-                // El total del contrato y el estado de pago se recalculan
-                // con base en cargos vigentes + incidencias del cliente.
                 if ($incidencia->contrato) {
                     $incidencia->contrato->recalcularTotalYEstadoPago();
                 }
@@ -234,12 +228,10 @@ class IncidenciaController extends Controller
 
                 $incidencia->refresh();
 
-                // El total y el estado de pago se recalculan con el estado actual.
                 if ($incidencia->contrato) {
                     $incidencia->contrato->recalcularTotalYEstadoPago();
                 }
 
-                // Si la incidencia pasó a DANIO MECANICO, el vehículo entra a EN PROCESO.
                 if (
                     $tipoAnterior !== TipoIncidenciaEnum::DANIO_MECANICO->value
                     && $incidencia->tipo_incidencia === TipoIncidenciaEnum::DANIO_MECANICO->value
