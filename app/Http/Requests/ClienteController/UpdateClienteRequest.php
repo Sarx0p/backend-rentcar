@@ -24,7 +24,7 @@ class UpdateClienteRequest extends FormRequest
         $id = $this->route('cliente');
 
         return [
-            'nombre'               => 'sometimes|string|max:100',
+            'nombre'               => ['sometimes', 'string', 'max:100', "regex:/^\pL[\pL\s'-]*$/u"],
             'dui'                  => ['sometimes', 'string', 'max:20', Rule::unique('clientes', 'dui')->ignore($id), new DuiValido()],
             'vencimiento_dui'      => 'sometimes|date|after:today',
             'numero_licencia'      => ['sometimes', 'string', 'max:30', Rule::unique('clientes', 'numero_licencia')->ignore($id)],
@@ -37,6 +37,8 @@ class UpdateClienteRequest extends FormRequest
     public function messages(): array
     {
         return [
+            'nombre.regex'                  => 'El nombre solo puede llevar letras y espacios, sin números.',
+            'nombre.max'                    => 'El nombre no puede tener más de 100 caracteres.',
             'dui.unique'                  => 'Ya existe otro cliente registrado con ese DUI.',
             'numero_licencia.unique'      => 'Ya existe otro cliente registrado con ese número de licencia.',
             'vencimiento_dui.after'       => 'El DUI debe estar vigente (posterior a hoy).',

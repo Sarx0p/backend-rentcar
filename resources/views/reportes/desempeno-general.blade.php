@@ -73,9 +73,17 @@
                 <td>Clientes nuevos registrados</td>
                 <td>{{ $totalClientesNuevos ?? 0 }}</td>
             </tr>
-            <tr class="total-destacado">
-                <td>Gastos por incidencias</td>
+            <tr>
+                <td>Gastos por incidencias del negocio</td>
                 <td>${{ number_format($totalGastosIncidencias ?? 0, 2) }}</td>
+            </tr>
+            <tr>
+                <td>Gastos por mantenimientos</td>
+                <td>${{ number_format($totalGastosMantenimientos ?? 0, 2) }}</td>
+            </tr>
+            <tr class="total-destacado">
+                <td>Gastos totales</td>
+                <td>${{ number_format($totalGastos ?? 0, 2) }}</td>
             </tr>
         </tbody>
     </table>

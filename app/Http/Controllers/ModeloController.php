@@ -31,7 +31,6 @@ class ModeloController extends Controller
                 ], 403);
             }
 
-            // Sin registros responde 200 con data: [], igual que los demás listados.
             $modelos = Modelo::with('marca')->orderBy('nombre')->get();
 
             return response()->json([
@@ -107,10 +106,12 @@ class ModeloController extends Controller
                     'required',
                     'string',
                     'min:2',
-                    'max:100',
+                'max:50',
                     Rule::unique('modelos', 'nombre')->where(fn ($query) => $query->where('marca_id', $request->marca_id)),
                 ],
                 'marca_id' => 'required|integer|exists:marcas,id',
+            ], [
+                'nombre.max' => 'El nombre del modelo no puede tener más de 50 caracteres.',
             ]);
 
             DB::beginTransaction();
@@ -204,12 +205,14 @@ class ModeloController extends Controller
                     'required',
                     'string',
                     'min:2',
-                    'max:100',
+                    'max:50',
                     Rule::unique('modelos', 'nombre')
                         ->where(fn ($query) => $query->where('marca_id', $request->marca_id ?? $modelo->marca_id))
                         ->ignore($modelo->id),
                 ],
                 'marca_id' => 'sometimes|integer|exists:marcas,id',
+            ], [
+                'nombre.max' => 'El nombre del modelo no puede tener más de 50 caracteres.',
             ]);
 
             DB::beginTransaction();

@@ -3,6 +3,7 @@
 namespace App\Http\Requests\ContratoController;
 
 use App\Enums\RolEnum;
+use App\Support\RangoFechas;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Http\Exceptions\HttpResponseException;
@@ -26,13 +27,19 @@ class StoreContratoDirectoRequest extends FormRequest
         return [
             'cliente_id'                => 'required|exists:clientes,id',
             'vehiculo_id'               => 'required|exists:vehiculos,id',
-            'dias_acordados'            => 'required|integer|min:1',
+            // la devolución (hoy + días) no puede pasar la fecha máxima permitida
+            'dias_acordados'            => 'required|integer|min:1|max:' . $this->diasMaximos(),
             'precio_por_dia'            => 'sometimes|numeric|min:0.1',
             'nivel_combustible_entrega' => 'required|string|max:50',
             'monto_descuento'           => 'sometimes|numeric|min:0|max:999999.99',
             'observaciones_entrega'     => 'sometimes|nullable|string|max:500',
             'observaciones'             => 'sometimes|nullable|string|max:500',
         ];
+    }
+
+    private function diasMaximos(): int
+    {
+        return (int) now()->startOfDay()->diffInDays(RangoFechas::fechaMaxima()->startOfDay());
     }
 
     public function messages(): array
@@ -45,6 +52,7 @@ class StoreContratoDirectoRequest extends FormRequest
             'dias_acordados.required'            => 'Debe indicar los días acordados.',
             'dias_acordados.integer'             => 'Los días acordados deben ser un número entero.',
             'dias_acordados.min'                 => 'Los días acordados deben ser al menos 1.',
+            'dias_acordados.max'                 => 'La devolución no puede ser posterior al ' . RangoFechas::fechaMaxima()->format('d/m/Y') . ' (máximo ' . $this->diasMaximos() . ' días).',
             'precio_por_dia.numeric'             => 'El precio por día debe ser un número válido.',
             'precio_por_dia.min'                 => 'El precio por día tiene que ser mayor que 0.',
             'nivel_combustible_entrega.required' => 'El nivel de combustible de entrega es obligatorio.',

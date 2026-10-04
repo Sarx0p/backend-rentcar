@@ -3,6 +3,7 @@
 namespace App\Http\Requests\VehiculoController;
 
 use App\Enums\RolEnum;
+use App\Models\Categoria;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Http\Exceptions\HttpResponseException;
@@ -57,6 +58,28 @@ class StoreVehiculoRequest extends FormRequest
             'modelo_id.required'           => 'Debe seleccionar un modelo.',
             'modelo_id.exists'             => 'El modelo seleccionado no existe.',
         ];
+    }
+
+    /**
+     * La capacidad del vehículo tiene que estar dentro del rango de pasajeros de su categoría.
+     */
+    public function withValidator($validator): void
+    {
+        $validator->after(function ($validator) {
+            if ($validator->errors()->hasAny(['capacidad_pasajeros', 'categoria_id'])) {
+                return;
+            }
+
+            $categoria = Categoria::find($this->categoria_id);
+            $capacidad = (int) $this->capacidad_pasajeros;
+
+            if ($categoria && ($capacidad < $categoria->capacidad_minima || $capacidad > $categoria->capacidad_maxima)) {
+                $validator->errors()->add(
+                    'capacidad_pasajeros',
+                    "La categoría {$categoria->nombre} acepta de {$categoria->capacidad_minima} a {$categoria->capacidad_maxima} pasajeros."
+                );
+            }
+        });
     }
 
     /**

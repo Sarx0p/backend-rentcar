@@ -75,7 +75,6 @@ Route::prefix('admin')->middleware(['auth:api', 'estado.activo'])->group(functio
         Route::get('/marcas/{marcaId}/modelos', [ModeloController::class, 'porMarca']);
         Route::apiResource('categorias', CategoriaController::class);
 
-        // Los clientes no se eliminan: sin ruta DELETE (destroy estaba vacío y respondía 200).
         Route::apiResource('clientes', ClienteController::class)->except(['destroy']);
         Route::get('clientes/{id}/licencia-vigente', [ClienteController::class, 'licenciaVigente']);
         Route::apiResource('reservas', ReservaController::class)->except(['destroy']);

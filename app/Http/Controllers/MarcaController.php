@@ -30,7 +30,7 @@ class MarcaController extends Controller
                 ], 403);
             }
 
-             $marcas = Marca::orderBy('nombre')->get();
+            $marcas = Marca::orderBy('nombre')->get();
 
             return response()->json([
                 'status' => 'success',
@@ -60,7 +60,10 @@ class MarcaController extends Controller
             }
 
             $request->validate([
-                'nombre' => 'required|string|min:2|max:80|unique:marcas,nombre',
+                'nombre' => ['required', 'string', 'min:2', 'max:50', "regex:/^\pL[\pL\s.'&-]*$/u", 'unique:marcas,nombre'],
+            ], [
+                'nombre.max'   => 'El nombre de la marca no puede tener más de 50 caracteres.',
+                'nombre.regex' => 'El nombre de la marca solo puede llevar letras, espacios, punto o guion.',
             ]);
 
             DB::beginTransaction();
@@ -145,7 +148,10 @@ class MarcaController extends Controller
             }
 
             $request->validate([
-                'nombre' => ['required', 'string', 'min:2', 'max:80', Rule::unique('marcas', 'nombre')->ignore($id)],
+                'nombre' => ['required', 'string', 'min:2', 'max:50', "regex:/^\pL[\pL\s.'&-]*$/u", Rule::unique('marcas', 'nombre')->ignore($id)],
+            ], [
+                'nombre.max'   => 'El nombre de la marca no puede tener más de 50 caracteres.',
+                'nombre.regex' => 'El nombre de la marca solo puede llevar letras, espacios, punto o guion.',
             ]);
 
             $marca = Marca::findOrFail($id);
