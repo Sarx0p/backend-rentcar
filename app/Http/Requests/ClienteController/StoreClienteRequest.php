@@ -21,7 +21,7 @@ class StoreClienteRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'nombre'               => 'required|string|max:100',
+            'nombre'               => ['required', 'string', 'max:100', "regex:/^\pL[\pL\s'-]*$/u"],
             'dui'                  => ['required', 'string', 'max:20', 'unique:clientes,dui', new DuiValido()],
             'vencimiento_dui'      => 'required|date|after:today',
             'numero_licencia'      => 'required|string|max:30|unique:clientes,numero_licencia',
@@ -34,6 +34,8 @@ class StoreClienteRequest extends FormRequest
     public function messages(): array
     {
         return [
+            'nombre.regex'                  => 'El nombre solo puede llevar letras y espacios, sin números.',
+            'nombre.max'                    => 'El nombre no puede tener más de 100 caracteres.',
             'nombre.required'               => 'El nombre es obligatorio.',
             'dui.required'                   => 'El DUI es obligatorio.',
             'dui.unique'                     => 'Ya existe un cliente registrado con ese DUI.',

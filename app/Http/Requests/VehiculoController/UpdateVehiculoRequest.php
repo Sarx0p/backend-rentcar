@@ -3,7 +3,7 @@
 namespace App\Http\Requests\VehiculoController;
 
 use App\Enums\RolEnum;
-use App\Models\Modelo;
+use App\Models\Categoria;
 use App\Models\Vehiculo;
 use Illuminate\Validation\Rule;
 use Illuminate\Foundation\Http\FormRequest;
@@ -49,28 +49,28 @@ class UpdateVehiculoRequest extends FormRequest
     }
 
     /**
-     * La capacidad del vehículo no puede pasar la capacidad máxima de su modelo.
-     * Si no se envía el modelo o la capacidad, se usan los que ya tiene el vehículo.
+     * La capacidad del vehículo tiene que estar dentro del rango de pasajeros de su categoría.
+     * Si no se envía la categoría o la capacidad, se usan las que ya tiene el vehículo.
      */
     public function withValidator($validator): void
     {
         $validator->after(function ($validator) {
-            if (!$this->hasAny(['capacidad_pasajeros', 'modelo_id'])) {
+            if (!$this->hasAny(['capacidad_pasajeros', 'categoria_id'])) {
                 return;
             }
 
-            if ($validator->errors()->hasAny(['capacidad_pasajeros', 'modelo_id'])) {
+            if ($validator->errors()->hasAny(['capacidad_pasajeros', 'categoria_id'])) {
                 return;
             }
 
             $vehiculo = Vehiculo::find($this->route('vehiculo'));
-            $modelo = Modelo::find($this->input('modelo_id', $vehiculo?->modelo_id));
-            $capacidad = $this->input('capacidad_pasajeros', $vehiculo?->capacidad_pasajeros);
+            $categoria = Categoria::find($this->input('categoria_id', $vehiculo?->categoria_id));
+            $capacidad = (int) $this->input('capacidad_pasajeros', $vehiculo?->capacidad_pasajeros);
 
-            if ($modelo && $capacidad > $modelo->capacidad_maxima) {
+            if ($categoria && ($capacidad < $categoria->capacidad_minima || $capacidad > $categoria->capacidad_maxima)) {
                 $validator->errors()->add(
                     'capacidad_pasajeros',
-                    "El modelo {$modelo->nombre} acepta máximo {$modelo->capacidad_maxima} pasajeros."
+                    "La categoría {$categoria->nombre} acepta de {$categoria->capacidad_minima} a {$categoria->capacidad_maxima} pasajeros."
                 );
             }
         });

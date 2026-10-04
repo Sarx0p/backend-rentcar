@@ -106,24 +106,19 @@ class ModeloController extends Controller
                     'required',
                     'string',
                     'min:2',
-                    'max:100',
+                'max:50',
                     Rule::unique('modelos', 'nombre')->where(fn ($query) => $query->where('marca_id', $request->marca_id)),
                 ],
-                'marca_id'         => 'required|integer|exists:marcas,id',
-                'capacidad_maxima' => 'required|integer|min:1|max:15',
+                'marca_id' => 'required|integer|exists:marcas,id',
             ], [
-                'capacidad_maxima.required' => 'La capacidad máxima de pasajeros es obligatoria.',
-                'capacidad_maxima.integer'  => 'La capacidad máxima debe ser un número entero.',
-                'capacidad_maxima.min'      => 'La capacidad máxima debe ser de al menos 1 pasajero.',
-                'capacidad_maxima.max'      => 'La capacidad máxima no puede ser mayor a 15 pasajeros.',
+                'nombre.max' => 'El nombre del modelo no puede tener más de 50 caracteres.',
             ]);
 
             DB::beginTransaction();
 
             $modelo = Modelo::create([
-                'nombre'           => $request->nombre,
-                'marca_id'         => $request->marca_id,
-                'capacidad_maxima' => $request->capacidad_maxima,
+                'nombre'   => $request->nombre,
+                'marca_id' => $request->marca_id,
             ]);
 
             DB::commit();
@@ -210,33 +205,19 @@ class ModeloController extends Controller
                     'required',
                     'string',
                     'min:2',
-                    'max:100',
+                    'max:50',
                     Rule::unique('modelos', 'nombre')
                         ->where(fn ($query) => $query->where('marca_id', $request->marca_id ?? $modelo->marca_id))
                         ->ignore($modelo->id),
                 ],
-                'marca_id'         => 'sometimes|integer|exists:marcas,id',
-                'capacidad_maxima' => 'sometimes|integer|min:1|max:15',
+                'marca_id' => 'sometimes|integer|exists:marcas,id',
             ], [
-                'capacidad_maxima.integer' => 'La capacidad máxima debe ser un número entero.',
-                'capacidad_maxima.min'     => 'La capacidad máxima debe ser de al menos 1 pasajero.',
-                'capacidad_maxima.max'     => 'La capacidad máxima no puede ser mayor a 15 pasajeros.',
+                'nombre.max' => 'El nombre del modelo no puede tener más de 50 caracteres.',
             ]);
-
-            // No se puede bajar el máximo por debajo de un vehículo ya registrado con este modelo
-            if ($request->has('capacidad_maxima')) {
-                $mayorCapacidad = $modelo->vehiculos()->max('capacidad_pasajeros');
-
-                if ($mayorCapacidad && $request->capacidad_maxima < $mayorCapacidad) {
-                    throw ValidationException::withMessages([
-                        'capacidad_maxima' => ["Hay vehículos de este modelo con {$mayorCapacidad} pasajeros. La capacidad máxima no puede ser menor."],
-                    ]);
-                }
-            }
 
             DB::beginTransaction();
 
-            $modelo->update($request->only(['nombre', 'marca_id', 'capacidad_maxima']));
+            $modelo->update($request->only(['nombre', 'marca_id']));
 
             DB::commit();
 

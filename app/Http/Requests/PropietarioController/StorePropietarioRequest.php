@@ -22,7 +22,7 @@ class StorePropietarioRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'nombre'           => 'required|string|max:100',
+            'nombre'           => ['required', 'string', 'max:100', "regex:/^\pL[\pL\s'-]*$/u"],
             'telefono'         => 'required|string|max:25|unique:propietarios,telefono',
             'tipo_propietario' => 'required|in:' . implode(',', array_column(TipoPropietarioEnum::cases(), 'value')),
         ];
@@ -55,6 +55,8 @@ class StorePropietarioRequest extends FormRequest
     public function messages(): array
     {
         return [
+            'nombre.regex'                  => 'El nombre solo puede llevar letras y espacios, sin números.',
+            'nombre.max'                    => 'El nombre no puede tener más de 100 caracteres.',
             'nombre.required'           => 'El nombre es obligatorio.',
             'telefono.required'         => 'El teléfono es obligatorio.',
             'telefono.unique'           => 'Ya existe un propietario registrado con ese número de teléfono.',

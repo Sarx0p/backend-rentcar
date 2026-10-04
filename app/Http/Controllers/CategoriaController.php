@@ -11,6 +11,24 @@ use Illuminate\Validation\ValidationException;
 
 class CategoriaController extends Controller
 {
+    private function mensajesValidacion(): array
+    {
+        return [
+            'nombre.max'               => 'El nombre de la categoría no puede tener más de 50 caracteres.',
+            'nombre.regex'             => 'El nombre de la categoría solo puede llevar letras y espacios.',
+            'precio_dia.unique'        => 'Ya existe una categoría con ese precio por día.',
+            'capacidad_minima.required' => 'El mínimo de pasajeros es obligatorio.',
+            'capacidad_maxima.required' => 'El máximo de pasajeros es obligatorio.',
+            'capacidad_minima.integer' => 'El mínimo de pasajeros debe ser un número entero.',
+            'capacidad_maxima.integer' => 'El máximo de pasajeros debe ser un número entero.',
+            'capacidad_minima.min'     => 'El mínimo de pasajeros debe ser al menos 1.',
+            'capacidad_maxima.min'     => 'El máximo de pasajeros debe ser al menos 1.',
+            'capacidad_minima.max'     => 'El mínimo de pasajeros no puede ser mayor a 15.',
+            'capacidad_maxima.max'     => 'El máximo de pasajeros no puede ser mayor a 15.',
+            'capacidad_maxima.gte'     => 'El máximo de pasajeros no puede ser menor que el mínimo.',
+        ];
+    }
+
     /**
      * Display a listing of the resource.
      */
@@ -59,17 +77,19 @@ class CategoriaController extends Controller
             }
 
             $request->validate([
-                'nombre'     => ['required', 'string', 'min:2', 'max:80', 'regex:/[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]/', 'unique:categorias,nombre'],
-                'precio_dia' => ['required', 'numeric', 'min:1', 'unique:categorias,precio_dia'],
-            ], [
-                'precio_dia.unique' => 'Ya existe una categoría con ese precio por día.',
-            ]);
+                'nombre'           => ['required', 'string', 'min:2', 'max:50', "regex:/^\pL[\pL\s'-]*$/u", 'unique:categorias,nombre'],
+                'precio_dia'       => ['required', 'numeric', 'min:1', 'unique:categorias,precio_dia'],
+                'capacidad_minima' => 'required|integer|min:1|max:15',
+                'capacidad_maxima' => 'required|integer|min:1|max:15|gte:capacidad_minima',
+            ], $this->mensajesValidacion());
 
             DB::beginTransaction();
 
             $categoria = Categoria::create([
-                'nombre'     => $request->nombre,
-                'precio_dia' => $request->precio_dia,
+                'nombre'           => $request->nombre,
+                'precio_dia'       => $request->precio_dia,
+                'capacidad_minima' => $request->capacidad_minima,
+                'capacidad_maxima' => $request->capacidad_maxima,
             ]);
 
             DB::commit();
@@ -150,11 +170,11 @@ class CategoriaController extends Controller
             }
 
             $request->validate([
-                'nombre'     => ['required', 'string', 'min:2', 'max:80', 'regex:/[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]/', Rule::unique('categorias', 'nombre')->ignore($id)],
-                'precio_dia' => ['required', 'numeric', 'min:1', Rule::unique('categorias', 'precio_dia')->ignore($id)],
-            ], [
-                'precio_dia.unique' => 'Ya existe una categoría con ese precio por día.',
-            ]);
+                'nombre'           => ['required', 'string', 'min:2', 'max:50', "regex:/^\pL[\pL\s'-]*$/u", Rule::unique('categorias', 'nombre')->ignore($id)],
+                'precio_dia'       => ['required', 'numeric', 'min:1', Rule::unique('categorias', 'precio_dia')->ignore($id)],
+                'capacidad_minima' => 'sometimes|integer|min:1|max:15',
+                'capacidad_maxima' => 'sometimes|integer|min:1|max:15',
+            ], $this->mensajesValidacion());
 
             $categoria = Categoria::find($id);
 
@@ -165,7 +185,32 @@ class CategoriaController extends Controller
                 ], 404);
             }
 
-            $categoria->update($request->only(['nombre', 'precio_dia']));
+            // El rango nuevo tiene que ser válido y seguir incluyendo a los vehículos ya registrados
+            $minimo = (int) $request->input('capacidad_minima', $categoria->capacidad_minima);
+            $maximo = (int) $request->input('capacidad_maxima', $categoria->capacidad_maxima);
+
+            if ($maximo < $minimo) {
+                throw ValidationException::withMessages([
+                    'capacidad_maxima' => ['El máximo de pasajeros no puede ser menor que el mínimo.'],
+                ]);
+            }
+
+            $menorRegistrado = $categoria->vehiculos()->min('capacidad_pasajeros');
+            $mayorRegistrado = $categoria->vehiculos()->max('capacidad_pasajeros');
+
+            if ($menorRegistrado && $menorRegistrado < $minimo) {
+                throw ValidationException::withMessages([
+                    'capacidad_minima' => ["Hay vehículos de esta categoría con {$menorRegistrado} pasajeros. El mínimo no puede ser mayor."],
+                ]);
+            }
+
+            if ($mayorRegistrado && $mayorRegistrado > $maximo) {
+                throw ValidationException::withMessages([
+                    'capacidad_maxima' => ["Hay vehículos de esta categoría con {$mayorRegistrado} pasajeros. El máximo no puede ser menor."],
+                ]);
+            }
+
+            $categoria->update($request->only(['nombre', 'precio_dia', 'capacidad_minima', 'capacidad_maxima']));
 
             return response()->json([
                 'status'  => 'success',

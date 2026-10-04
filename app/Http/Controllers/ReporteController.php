@@ -61,7 +61,8 @@ class ReporteController extends Controller
         ];
     }
 
-    private function tienePermiso($incluirContador = false): bool
+    // El empleado solo entra a reportes sin dinero (estado de flota, licencias, reservas canceladas)
+    private function tienePermiso($incluirContador = false, $incluirEmpleado = true): bool
     {
         $userAuth = auth('api')->user();
 
@@ -70,7 +71,7 @@ class ReporteController extends Controller
         }
 
         $permitido = $userAuth->hasRole(RolEnum::ADMINISTRADOR->value)
-            || $userAuth->hasRole(RolEnum::EMPLEADO->value);
+            || ($incluirEmpleado && $userAuth->hasRole(RolEnum::EMPLEADO->value));
 
         if ($incluirContador) {
             $permitido = $permitido || $userAuth->hasRole(RolEnum::CONTADOR->value);
@@ -82,7 +83,7 @@ class ReporteController extends Controller
     public function ingresos(Request $request)
     {
         try {
-            if (!$this->tienePermiso(true)) {
+            if (!$this->tienePermiso(true, false)) {
                 return response()->json([
                     'status'  => 'error',
                     'message' => 'No tienes permiso para ver este reporte',
@@ -201,7 +202,7 @@ class ReporteController extends Controller
     public function resultadoNetoPorPropietario(Request $request)
     {
         try {
-            if (!$this->tienePermiso(true)) {
+            if (!$this->tienePermiso(true, false)) {
                 return response()->json([
                     'status'  => 'error',
                     'message' => 'No tienes permiso para ver este reporte',
@@ -370,7 +371,7 @@ class ReporteController extends Controller
     public function desempenoGeneral(Request $request)
     {
         try {
-            if (!$this->tienePermiso(true)) {
+            if (!$this->tienePermiso(true, false)) {
                 return response()->json([
                     'status'  => 'error',
                     'message' => 'No tienes permiso para ver este reporte',
@@ -435,7 +436,7 @@ class ReporteController extends Controller
     public function ingresosPorVehiculo(Request $request)
     {
         try {
-            if (!$this->tienePermiso(true)) {
+            if (!$this->tienePermiso(true, false)) {
                 return response()->json([
                     'status'  => 'error',
                     'message' => 'No tienes permiso para ver este reporte',
@@ -530,7 +531,7 @@ class ReporteController extends Controller
     public function gastosPorVehiculo(Request $request)
     {
         try {
-            if (!$this->tienePermiso(true)) {
+            if (!$this->tienePermiso(true, false)) {
                 return response()->json([
                     'status'  => 'error',
                     'message' => 'No tienes permiso para ver este reporte',
@@ -581,7 +582,7 @@ class ReporteController extends Controller
     public function resultadoNetoPorVehiculo(Request $request)
     {
         try {
-            if (!$this->tienePermiso(true)) {
+            if (!$this->tienePermiso(true, false)) {
                 return response()->json([
                     'status'  => 'error',
                     'message' => 'No tienes permiso para ver este reporte',
@@ -644,7 +645,7 @@ class ReporteController extends Controller
     public function saldosPendientes(Request $request)
     {
         try {
-            if (!$this->tienePermiso(true)) {
+            if (!$this->tienePermiso(true, false)) {
                 return response()->json([
                     'status'  => 'error',
                     'message' => 'No tienes permiso para ver este reporte',

@@ -3,6 +3,7 @@
 namespace App\Http\Requests\ReservaController;
 
 use App\Enums\RolEnum;
+use App\Support\RangoFechas;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Http\Exceptions\HttpResponseException;
@@ -28,8 +29,8 @@ class StoreReservaRequest extends FormRequest
         return [
             'cliente_id'   => 'required|exists:clientes,id',
             'vehiculo_id'  => 'required|exists:vehiculos,id',
-            'fecha_inicio' => 'required|date|after_or_equal:tomorrow',
-            'fecha_fin'    => 'required|date|after:fecha_inicio',
+            'fecha_inicio' => 'required|date|after_or_equal:tomorrow|before_or_equal:' . RangoFechas::fechaMaximaTexto(),
+            'fecha_fin'    => 'required|date|after:fecha_inicio|before_or_equal:' . RangoFechas::fechaMaximaTexto(),
         ];
     }
 
@@ -39,6 +40,8 @@ class StoreReservaRequest extends FormRequest
     public function messages(): array
     {
         return [
+            'fecha_inicio.before_or_equal' => RangoFechas::mensajeFechaMaxima(),
+            'fecha_fin.before_or_equal'    => RangoFechas::mensajeFechaMaxima(),
             'cliente_id.required'         => 'Debe seleccionar un cliente.',
             'cliente_id.exists'           => 'El cliente seleccionado no existe.',
             'vehiculo_id.required'        => 'Debe seleccionar un vehículo.',

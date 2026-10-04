@@ -13,6 +13,8 @@ class Categoria extends Model
     protected $fillable = [
         'nombre',
         'precio_dia',
+        'capacidad_minima',
+        'capacidad_maxima',
     ];
 
     protected $hidden = [
@@ -21,7 +23,9 @@ class Categoria extends Model
     ];
 
     protected $casts = [
-        'precio_dia' => 'decimal:2',
+        'precio_dia'       => 'decimal:2',
+        'capacidad_minima' => 'integer',
+        'capacidad_maxima' => 'integer',
     ];
 
     public function vehiculos(): HasMany
