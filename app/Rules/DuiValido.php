@@ -7,10 +7,7 @@ use Closure;
 
 class DuiValido implements ValidationRule
 {
-    /**
-     * Valida un DUI de El Salvador (formato 12345678-9)
-     * usando el algoritmo del dígito verificador.
-     */
+    
     public function validate(string $attribute, mixed $value, Closure $fail): void
     {
         if (!preg_match('/^\d{8}-\d{1}$/', $value)) {

@@ -19,10 +19,10 @@ class DatabaseSeeder extends Seeder
         ]);
 
         User::updateOrCreate(
-            ['correo' => 'test@gmail.com'],
+            ['correo' => 'marcosguardado184@gmail.com'],
             [
-                'nombre' => 'Test',
-                'apellido' => 'User',
+                'nombre' => 'Marcos',
+                'apellido' => 'Guardado',
                 'password' => bcrypt('12345678'),
                 'estado' => 'ACTIVO',
             ]
