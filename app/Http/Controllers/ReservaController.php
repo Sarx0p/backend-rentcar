@@ -325,6 +325,36 @@ class ReservaController extends Controller
                         'message' => 'No se puede actualizar: El vehículo tiene un contrato activo que se traslapa con esas fechas',
                     ], 422);
                 }
+
+                // las mismas validaciones del cliente que al crear la reserva
+                $clienteTraslapado = Reserva::where('cliente_id', $reserva->cliente_id)
+                    ->where('id', '!=', $id)
+                    ->whereNotIn('estado', [EstadoReservaEnum::CANCELADA->value])
+                    ->where(function ($query) use ($inicioEvaluar, $finEvaluar) {
+                        $query->where('fecha_inicio', '<', $finEvaluar)
+                            ->where('fecha_fin', '>', $inicioEvaluar);
+                    })->exists();
+
+                if ($clienteTraslapado) {
+                    return response()->json([
+                        'status'  => 'error',
+                        'message' => 'No se puede actualizar: El cliente ya tiene otra reserva en esas fechas',
+                    ], 422);
+                }
+
+                $clienteContratoTraslapado = Contrato::where('cliente_id', $reserva->cliente_id)
+                    ->where('estado_contrato', EstadoContratoEnum::ACTIVO->value)
+                    ->where(function ($query) use ($inicioEvaluar, $finEvaluar) {
+                        $query->where('fecha_hora_entrega', '<', $finEvaluar)
+                            ->where('fecha_hora_devolucion', '>', $inicioEvaluar);
+                    })->exists();
+
+                if ($clienteContratoTraslapado) {
+                    return response()->json([
+                        'status'  => 'error',
+                        'message' => 'No se puede actualizar: El cliente tiene un contrato activo que se traslapa con esas fechas',
+                    ], 422);
+                }
             }
 
             $reserva->update($request->only(['fecha_inicio', 'fecha_fin']));
