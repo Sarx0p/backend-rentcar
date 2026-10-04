@@ -78,12 +78,13 @@ class DatosPruebaSeeder extends Seeder
 
     private function crearMarcasYModelos()
     {
+        // modelo => capacidad máxima de pasajeros
         $marcas = [
-            'Toyota' => ['Corolla', 'Hilux'],
-            'Kia' => ['Picanto', 'Sportage'],
-            'Hyundai' => ['Accent', 'Tucson'],
-            'Nissan' => ['Versa'],
-            'Suzuki' => ['Swift'],
+            'Toyota' => ['Corolla' => 5, 'Hilux' => 5],
+            'Kia' => ['Picanto' => 4, 'Sportage' => 5],
+            'Hyundai' => ['Accent' => 5, 'Tucson' => 5],
+            'Nissan' => ['Versa' => 5],
+            'Suzuki' => ['Swift' => 5],
         ];
 
         $modelos = collect();
@@ -91,10 +92,10 @@ class DatosPruebaSeeder extends Seeder
         foreach ($marcas as $nombreMarca => $nombresModelos) {
             $marca = Marca::firstOrCreate(['nombre' => $nombreMarca]);
 
-            foreach ($nombresModelos as $nombreModelo) {
+            foreach ($nombresModelos as $nombreModelo => $capacidadMaxima) {
                 $modelos->push(Modelo::updateOrCreate(
                     ['nombre' => $nombreModelo, 'marca_id' => $marca->id],
-                    ['nombre' => $nombreModelo, 'marca_id' => $marca->id]
+                    ['nombre' => $nombreModelo, 'marca_id' => $marca->id, 'capacidad_maxima' => $capacidadMaxima]
                 ));
             }
         }
@@ -215,7 +216,7 @@ class DatosPruebaSeeder extends Seeder
                 [
                     'color' => $colores[$i % count($colores)],
                     'anio' => 2016 + ($i % 9),
-                    'capacidad_pasajeros' => $capacidades[$i],
+                    'capacidad_pasajeros' => min($capacidades[$i], $modelo->capacidad_maxima),
                     'estado' => VehiculoEstadoEnum::DISPONIBLE->value,
                     'observaciones' => 'Vehiculo de prueba disponible para flujos del sistema.',
                     'modelo_id' => $modelo->id,

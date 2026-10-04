@@ -14,11 +14,16 @@ class Modelo extends Model
     protected $fillable = [
         'nombre',
         'marca_id',
+        'capacidad_maxima',
     ];
 
     protected $hidden = [
         'created_at',
         'updated_at',
+    ];
+
+    protected $casts = [
+        'capacidad_maxima' => 'integer',
     ];
 
 

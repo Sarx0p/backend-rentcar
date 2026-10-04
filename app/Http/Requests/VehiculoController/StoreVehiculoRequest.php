@@ -3,6 +3,7 @@
 namespace App\Http\Requests\VehiculoController;
 
 use App\Enums\RolEnum;
+use App\Models\Modelo;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Http\Exceptions\HttpResponseException;
@@ -57,6 +58,27 @@ class StoreVehiculoRequest extends FormRequest
             'modelo_id.required'           => 'Debe seleccionar un modelo.',
             'modelo_id.exists'             => 'El modelo seleccionado no existe.',
         ];
+    }
+
+    /**
+     * La capacidad del vehículo no puede pasar la capacidad máxima de su modelo.
+     */
+    public function withValidator($validator): void
+    {
+        $validator->after(function ($validator) {
+            if ($validator->errors()->hasAny(['capacidad_pasajeros', 'modelo_id'])) {
+                return;
+            }
+
+            $modelo = Modelo::find($this->modelo_id);
+
+            if ($modelo && $this->capacidad_pasajeros > $modelo->capacidad_maxima) {
+                $validator->errors()->add(
+                    'capacidad_pasajeros',
+                    "El modelo {$modelo->nombre} acepta máximo {$modelo->capacidad_maxima} pasajeros."
+                );
+            }
+        });
     }
 
     /**

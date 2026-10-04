@@ -3,6 +3,8 @@
 namespace App\Http\Requests\VehiculoController;
 
 use App\Enums\RolEnum;
+use App\Models\Modelo;
+use App\Models\Vehiculo;
 use Illuminate\Validation\Rule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Contracts\Validation\Validator;
@@ -44,6 +46,34 @@ class UpdateVehiculoRequest extends FormRequest
             'categoria_id.exists'    => 'La categoría seleccionada no existe.',
             'modelo_id.exists'       => 'El modelo seleccionado no existe.',
         ];
+    }
+
+    /**
+     * La capacidad del vehículo no puede pasar la capacidad máxima de su modelo.
+     * Si no se envía el modelo o la capacidad, se usan los que ya tiene el vehículo.
+     */
+    public function withValidator($validator): void
+    {
+        $validator->after(function ($validator) {
+            if (!$this->hasAny(['capacidad_pasajeros', 'modelo_id'])) {
+                return;
+            }
+
+            if ($validator->errors()->hasAny(['capacidad_pasajeros', 'modelo_id'])) {
+                return;
+            }
+
+            $vehiculo = Vehiculo::find($this->route('vehiculo'));
+            $modelo = Modelo::find($this->input('modelo_id', $vehiculo?->modelo_id));
+            $capacidad = $this->input('capacidad_pasajeros', $vehiculo?->capacidad_pasajeros);
+
+            if ($modelo && $capacidad > $modelo->capacidad_maxima) {
+                $validator->errors()->add(
+                    'capacidad_pasajeros',
+                    "El modelo {$modelo->nombre} acepta máximo {$modelo->capacidad_maxima} pasajeros."
+                );
+            }
+        });
     }
 
     protected function failedAuthorization()

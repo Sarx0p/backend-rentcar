@@ -60,7 +60,9 @@ class CategoriaController extends Controller
 
             $request->validate([
                 'nombre'     => ['required', 'string', 'min:2', 'max:80', 'regex:/[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]/', 'unique:categorias,nombre'],
-                'precio_dia' => 'required|numeric|min:1',
+                'precio_dia' => ['required', 'numeric', 'min:1', 'unique:categorias,precio_dia'],
+            ], [
+                'precio_dia.unique' => 'Ya existe una categoría con ese precio por día.',
             ]);
 
             DB::beginTransaction();
@@ -149,7 +151,9 @@ class CategoriaController extends Controller
 
             $request->validate([
                 'nombre'     => ['required', 'string', 'min:2', 'max:80', 'regex:/[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]/', Rule::unique('categorias', 'nombre')->ignore($id)],
-                'precio_dia' => 'required|numeric|min:1',
+                'precio_dia' => ['required', 'numeric', 'min:1', Rule::unique('categorias', 'precio_dia')->ignore($id)],
+            ], [
+                'precio_dia.unique' => 'Ya existe una categoría con ese precio por día.',
             ]);
 
             $categoria = Categoria::find($id);

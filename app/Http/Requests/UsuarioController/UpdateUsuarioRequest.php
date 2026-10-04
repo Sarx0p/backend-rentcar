@@ -46,8 +46,8 @@ class UpdateUsuarioRequest extends FormRequest
         $id = $this->route('usuario');
 
         return [
-            'nombre'   => 'sometimes|string|max:100',
-            'apellido' => 'sometimes|string|max:100',
+            'nombre'   => ['sometimes', 'string', 'min:2', 'max:15', "regex:/^\pL[\pL\s'-]*$/u"],
+            'apellido' => ['sometimes', 'string', 'min:2', 'max:100', "regex:/^\pL[\pL\s'-]*$/u"],
             'correo'   => ['sometimes', 'email', 'max:150', Rule::unique('users', 'correo')->ignore($id)],
             'password' => 'sometimes|string|min:8|max:255',
             'estado'   => ['sometimes', Rule::enum(UsuarioEstadoEnum::class)],
@@ -59,6 +59,11 @@ class UpdateUsuarioRequest extends FormRequest
     public function messages(): array
     {
         return [
+            'nombre.regex'   => 'El nombre solo puede llevar letras y espacios.',
+            'nombre.min'     => 'El nombre debe tener al menos 2 letras.',
+            'nombre.max'     => 'El nombre no puede tener más de 15 caracteres.',
+            'apellido.regex' => 'El apellido solo puede llevar letras y espacios.',
+            'apellido.min'   => 'El apellido debe tener al menos 2 letras.',
             'correo.email'  => 'El correo no tiene un formato válido.',
             'correo.unique' => 'Ese correo ya está en uso por otro usuario.',
             'password.min'  => 'La contraseña debe tener al menos 8 caracteres.',

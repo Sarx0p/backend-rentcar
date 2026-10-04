@@ -104,10 +104,8 @@ class ReservaController extends Controller
 
             $vehiculo = Vehiculo::findOrFail($request->vehiculo_id);
 
-            if (in_array($vehiculo->estado, [
-                VehiculoEstadoEnum::MANTENIMIENTO->value,
-                VehiculoEstadoEnum::FUERA_SERVICIO->value,
-            ])) {
+            // un rentado se puede reservar para despues, el choque con su contrato se valida abajo
+            if (!in_array($vehiculo->estado, [VehiculoEstadoEnum::DISPONIBLE->value, VehiculoEstadoEnum::RENTADO->value])) {
                 return response()->json([
                     'status'  => 'error',
                     'message' => 'El vehículo no está disponible, estado actual: ' . $vehiculo->estado,
