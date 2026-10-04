@@ -39,8 +39,8 @@ class StoreUsuarioRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'nombre'   => 'required|string|max:100',
-            'apellido' => 'required|string|max:100',
+            'nombre'   => ['required', 'string', 'min:2', 'max:15', "regex:/^\pL[\pL\s'-]*$/u"],
+            'apellido' => ['required', 'string', 'min:2', 'max:100', "regex:/^\pL[\pL\s'-]*$/u"],
             'correo'   => 'required|email|max:150|unique:users,correo',
             'password' => 'required|string|min:8|max:255',
             'rol'      => ['required', Rule::enum(RolEnum::class)],
@@ -54,7 +54,12 @@ class StoreUsuarioRequest extends FormRequest
     {
         return [
             'nombre.required'   => 'El nombre es obligatorio.',
+            'nombre.regex'      => 'El nombre solo puede llevar letras y espacios.',
+            'nombre.min'        => 'El nombre debe tener al menos 2 letras.',
+            'nombre.max'        => 'El nombre no puede tener más de 15 caracteres.',
             'apellido.required' => 'El apellido es obligatorio.',
+            'apellido.regex'    => 'El apellido solo puede llevar letras y espacios.',
+            'apellido.min'      => 'El apellido debe tener al menos 2 letras.',
             'correo.required'   => 'El correo es obligatorio.',
             'correo.email'      => 'El correo no tiene un formato válido.',
             'correo.unique'     => 'Ya existe un usuario con ese correo electrónico.',

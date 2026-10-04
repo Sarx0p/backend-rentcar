@@ -50,6 +50,9 @@ class VehiculoController extends Controller
                 ->when(
                     $request->filled('fecha_inicio') && $request->filled('fecha_fin'),
                     function ($query) use ($request) {
+                        // un rentado si se lista, solo sale si su contrato choca con las fechas (lo quita el filtro de contratos)
+                        $query->whereIn('estado', [VehiculoEstadoEnum::DISPONIBLE->value, VehiculoEstadoEnum::RENTADO->value]);
+
                         $query->whereDoesntHave('reservas', function ($q) use ($request) {
                             $q->whereNotIn('estado', [EstadoReservaEnum::CANCELADA->value])
                                 ->whereDate('fecha_inicio', '<', $request->fecha_fin)
