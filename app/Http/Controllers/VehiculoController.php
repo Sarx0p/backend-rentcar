@@ -50,16 +50,12 @@ class VehiculoController extends Controller
                 ->when(
                     $request->filled('fecha_inicio') && $request->filled('fecha_fin'),
                     function ($query) use ($request) {
-                        // un rentado si se lista, solo sale si su contrato choca con las fechas (lo quita el filtro de contratos)
                         $query->whereIn('estado', [VehiculoEstadoEnum::DISPONIBLE->value, VehiculoEstadoEnum::RENTADO->value]);
-
                         $query->whereDoesntHave('reservas', function ($q) use ($request) {
                             $q->whereNotIn('estado', [EstadoReservaEnum::CANCELADA->value])
                                 ->whereDate('fecha_inicio', '<', $request->fecha_fin)
                                 ->whereDate('fecha_fin', '>', $request->fecha_inicio);
                         });
-
-                        // Tambien se excluyen los vehiculos con contratos activos en esas fechas (incluye contratos directos)
                         $query->whereDoesntHave('contratos', function ($q) use ($request) {
                             $q->where('estado_contrato', EstadoContratoEnum::ACTIVO->value)
                                 ->where('fecha_hora_entrega', '<', $request->fecha_fin)
@@ -182,6 +178,13 @@ class VehiculoController extends Controller
                     'status'  => 'error',
                     'message' => 'Vehiculo no encontrado.',
                 ], 404);
+            }
+
+            if($vehiculo->estado === VehiculoEstadoEnum::RENTADO->value){
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'El vehiculo se encuentra rentado no se puede editar'
+                ],422);
             }
 
             if ($request->has('estado')) {
