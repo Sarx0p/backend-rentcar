@@ -24,7 +24,7 @@ class VehiculoController extends Controller
                 ->withCount([
                     'incidencias as incidencias_esteticas_count' => function ($q) {
                         $q->where('estado_incidencia', '!=', IncidenciaEstadoEnum::RESUELTA->value)
-                          ->where('tipo_incidencia', TipoIncidenciaEnum::DANIO_ESTETICO->value);
+                            ->where('tipo_incidencia', TipoIncidenciaEnum::DANIO_ESTETICO->value);
                     }
                 ])
                 ->when($request->filled('estado'), function ($query) use ($request) {
@@ -138,16 +138,16 @@ class VehiculoController extends Controller
                 'categoria',
                 'incidencias' => function ($q) {
                     $q->where('estado_incidencia', '!=', IncidenciaEstadoEnum::RESUELTA->value)
-                      ->where('tipo_incidencia', TipoIncidenciaEnum::DANIO_ESTETICO->value);
+                        ->where('tipo_incidencia', TipoIncidenciaEnum::DANIO_ESTETICO->value);
                 }
             ])
-            ->withCount([
-                'incidencias as incidencias_esteticas_count' => function ($q) {
-                    $q->where('estado_incidencia', '!=', IncidenciaEstadoEnum::RESUELTA->value)
-                      ->where('tipo_incidencia', TipoIncidenciaEnum::DANIO_ESTETICO->value);
-                }
-            ])
-            ->find($id);
+                ->withCount([
+                    'incidencias as incidencias_esteticas_count' => function ($q) {
+                        $q->where('estado_incidencia', '!=', IncidenciaEstadoEnum::RESUELTA->value)
+                            ->where('tipo_incidencia', TipoIncidenciaEnum::DANIO_ESTETICO->value);
+                    }
+                ])
+                ->find($id);
 
             if (!$vehiculo) {
                 return response()->json([
@@ -180,11 +180,11 @@ class VehiculoController extends Controller
                 ], 404);
             }
 
-            if($vehiculo->estado === VehiculoEstadoEnum::RENTADO->value){
+            if ($vehiculo->estado === VehiculoEstadoEnum::RENTADO->value) {
                 return response()->json([
                     'status' => 'error',
                     'message' => 'El vehiculo se encuentra rentado no se puede editar'
-                ],422);
+                ], 422);
             }
 
             if ($request->has('estado')) {
@@ -229,11 +229,11 @@ class VehiculoController extends Controller
     public function destroy(string $id)
     {
         try {
-            $userAuth = auth('api')->user();
+            $user = auth('api')->user();
 
             if (
-                !$userAuth->hasRole(RolEnum::ADMINISTRADOR->value) &&
-                !$userAuth->hasRole(RolEnum::EMPLEADO->value)
+                !$user->hasRole(RolEnum::ADMINISTRADOR->value) &&
+                !$user->hasRole(RolEnum::EMPLEADO->value)
             ) {
                 return response()->json([
                     'status'  => 'error',
