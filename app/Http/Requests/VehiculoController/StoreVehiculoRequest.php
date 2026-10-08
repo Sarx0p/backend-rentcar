@@ -17,7 +17,7 @@ class StoreVehiculoRequest extends FormRequest
     {
         $user = auth('api')->user();
 
-        return $user->hasRole(RolEnum::ADMINISTRADOR->value) || $user->hasRole(RolEnum::EMPLEADO->value);
+        return $user->hasRole(RolEnum::ADMINISTRADOR->value);
     }
 
     /**

@@ -18,8 +18,7 @@ class StorePagoRequest extends FormRequest
         $user = auth('api')->user();
 
         return $user->hasRole(RolEnum::ADMINISTRADOR->value)
-            || $user->hasRole(RolEnum::EMPLEADO->value)
-            || $user->hasRole(RolEnum::CONTADOR->value);
+            || $user->hasRole(RolEnum::EMPLEADO->value);
     }
 
     /**
