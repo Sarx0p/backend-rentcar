@@ -126,6 +126,8 @@ class AuthController extends Controller
 
         DB::table('password_reset_tokens')->where('correo', $request->correo)->delete();
 
-        return response()->json(['message' => 'Contraseña actualizada correctamente.'], 200);
+        return response()->json([
+            'message' => 'Contraseña actualizada correctamente.'
+        ], 200);
     }
 }

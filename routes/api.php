@@ -50,7 +50,7 @@ Route::prefix('admin')->middleware(['auth:api', 'estado.activo'])->group(functio
     });
 
     Route::middleware(['role:ADMINISTRADOR|EMPLEADO|CONTADOR'])->group(function () {
-        Route::apiResource('pagos', PagoController::class)->only(['index', 'show', 'store', 'destroy']);
+        Route::apiResource('pagos', PagoController::class)->only(['index', 'show']);
         Route::apiResource('contratos', ContratoController::class)->only(['index', 'show']);
         Route::apiResource('cierres-renta', CierreRentaController::class)->only(['index', 'show']);
         Route::apiResource('propietarios', PropietarioController::class)->only(['index', 'show']);
@@ -70,19 +70,17 @@ Route::prefix('admin')->middleware(['auth:api', 'estado.activo'])->group(functio
     });
 
     Route::middleware(['role:ADMINISTRADOR|EMPLEADO'])->group(function () {
+        Route::apiResource('pagos', PagoController::class)->only(['store', 'destroy']);
         Route::apiResource('marcas', MarcaController::class);
         Route::apiResource('modelos', ModeloController::class)->except(['show', 'destroy']);
         Route::get('/marcas/{marcaId}/modelos', [ModeloController::class, 'porMarca']);
         Route::apiResource('categorias', CategoriaController::class);
-
         Route::apiResource('clientes', ClienteController::class)->except(['destroy']);
         Route::get('clientes/{id}/licencia-vigente', [ClienteController::class, 'licenciaVigente']);
         Route::apiResource('reservas', ReservaController::class)->except(['destroy']);
-
         Route::apiResource('vehiculos', VehiculoController::class);
         Route::get('/notificaciones', [NotificacionController::class, 'index']);
         Route::patch('/vehiculos/{id}/restaurar', [VehiculoController::class, 'restaurar']);
-
         Route::get('contratos/{id}/pdf', [ContratoController::class, 'generarPdf']);
         Route::post('contratos/directo', [ContratoController::class, 'storeDirecto']);
         Route::post('contratos/{id}/cambiar-vehiculo', [ContratoController::class, 'cambiarVehiculo']);
@@ -92,7 +90,6 @@ Route::prefix('admin')->middleware(['auth:api', 'estado.activo'])->group(functio
         Route::apiResource('incidencias', IncidenciaController::class)->only(['index', 'show', 'store', 'update', 'destroy']);
         Route::post('cierres-renta', [CierreRentaController::class, 'store'])->name('cierres-renta.store');
         Route::apiResource('cancelaciones', CancelarController::class)->only(['index', 'show', 'store']);
-
         Route::apiResource('seguros', SeguroController::class)->only(['index', 'show']);
         Route::apiResource('mantenimientos', MantenimientoController::class);
         Route::get('/departamentos', [DepartamentoController::class, 'index']);
