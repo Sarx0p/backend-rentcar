@@ -111,20 +111,18 @@ class CierreRentaController extends Controller
 
             $resultado = DB::transaction(function () use ($request, $contrato, $forzarConDeuda, $aplicarCargoRetraso) {
 
-                // 1. Horas de retraso: margen de 2 horas; pasado el margen se cobran todas las horas, redondeando hacia arriba
                 $fechaDevolucionAcordada = $contrato->fecha_hora_devolucion;
                 $fechaRecepcionReal      = Carbon::parse($request->fecha_hora_recepcion);
                 $fechaLimite             = $fechaDevolucionAcordada->copy()->addHours(2);
 
                 $horasRetraso = $fechaRecepcionReal->gt($fechaLimite)
-                    ? (int) ceil($fechaDevolucionAcordada->diffInMinutes($fechaRecepcionReal, false) / 60)
-                    : 0;
+                ? (int) ceil($fechaLimite->diffInMinutes($fechaRecepcionReal, false) / 60)
+                : 0;
 
                 $totalPagado = (float) $contrato->pagos()
                     ->where('estado_transaccion', EstadoTransaccionEnum::CONFIRMADO->value)
                     ->sum('monto');
 
-                // 2. Cargo por retraso: automático, una sola vez por contrato
                 $tarifaHoraRetraso = 5.00;
                 $montoRetraso      = 0;
 
@@ -159,7 +157,6 @@ class CierreRentaController extends Controller
                     }
                 }
 
-                // 3. Si quedó saldo y no se fuerza, el cierre queda en espera (el cargo ya quedó guardado)
                 if ($contrato->estado_pago !== EstadoPagoEnum::PAGADO->value && !$forzarConDeuda) {
                     $saldoPendiente = max(0, (float) $contrato->monto_total_renta - $totalPagado);
 
@@ -225,8 +222,7 @@ class CierreRentaController extends Controller
                     'monto_deuda'                 => $montoDeuda,
                 ]);
 
-                // Solo se libera si sigue RENTADO (no pisar EN_PROCESO ni MANTENIMIENTO)
-                // Si tiene un daño mecánico pendiente pasa a EN PROCESO en lugar de DISPONIBLE
+                
                 if ($contrato->vehiculo->estado === VehiculoEstadoEnum::RENTADO->value) {
                     $danioMecanicoPendiente = $contrato->vehiculo->incidencias()
                         ->where('tipo_incidencia', TipoIncidenciaEnum::DANIO_MECANICO->value)
