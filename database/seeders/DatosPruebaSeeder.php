@@ -63,19 +63,18 @@ class DatosPruebaSeeder extends Seeder
 
     private function crearCategorias()
     {
-        // capacidad_minima / capacidad_maxima = rango de pasajeros permitido en la categoría
+        // capacidad_maxima = máximo de pasajeros permitido en la categoría (el mínimo siempre es 1)
         $categorias = [
-            ['nombre' => 'Compacto', 'precio_dia' => 12.00, 'capacidad_minima' => 2, 'capacidad_maxima' => 5],
-            ['nombre' => 'Sedan', 'precio_dia' => 15.00, 'capacidad_minima' => 4, 'capacidad_maxima' => 5],
-            ['nombre' => 'SUV', 'precio_dia' => 25.00, 'capacidad_minima' => 5, 'capacidad_maxima' => 8],
-            ['nombre' => 'Pickup', 'precio_dia' => 30.00, 'capacidad_minima' => 2, 'capacidad_maxima' => 5],
+            ['nombre' => 'Compacto', 'precio_dia' => 12.00, 'capacidad_maxima' => 5],
+            ['nombre' => 'Sedan', 'precio_dia' => 15.00, 'capacidad_maxima' => 5],
+            ['nombre' => 'SUV', 'precio_dia' => 25.00, 'capacidad_maxima' => 8],
+            ['nombre' => 'Pickup', 'precio_dia' => 30.00, 'capacidad_maxima' => 5],
         ];
 
         return collect($categorias)->map(fn($categoria) => Categoria::updateOrCreate(
             ['nombre' => $categoria['nombre']],
             [
                 'precio_dia'       => $categoria['precio_dia'],
-                'capacidad_minima' => $categoria['capacidad_minima'],
                 'capacidad_maxima' => $categoria['capacidad_maxima'],
             ]
         ));
@@ -220,7 +219,7 @@ class DatosPruebaSeeder extends Seeder
                 [
                     'color' => $colores[$i % count($colores)],
                     'anio' => 2016 + ($i % 9),
-                    'capacidad_pasajeros' => max($categoria->capacidad_minima, min($capacidades[$i], $categoria->capacidad_maxima)),
+                    'capacidad_pasajeros' => min($capacidades[$i], $categoria->capacidad_maxima),
                     'estado' => VehiculoEstadoEnum::DISPONIBLE->value,
                     'observaciones' => 'Vehiculo de prueba disponible para flujos del sistema.',
                     'modelo_id' => $modelo->id,
