@@ -61,7 +61,7 @@ class StoreVehiculoRequest extends FormRequest
     }
 
     /**
-     * La capacidad del vehículo tiene que estar dentro del rango de pasajeros de su categoría.
+     * La capacidad del vehículo no puede pasar el máximo de pasajeros de su categoría.
      */
     public function withValidator($validator): void
     {
@@ -73,10 +73,10 @@ class StoreVehiculoRequest extends FormRequest
             $categoria = Categoria::find($this->categoria_id);
             $capacidad = (int) $this->capacidad_pasajeros;
 
-            if ($categoria && ($capacidad < $categoria->capacidad_minima || $capacidad > $categoria->capacidad_maxima)) {
+            if ($categoria && $capacidad > $categoria->capacidad_maxima) {
                 $validator->errors()->add(
                     'capacidad_pasajeros',
-                    "La categoría {$categoria->nombre} acepta de {$categoria->capacidad_minima} a {$categoria->capacidad_maxima} pasajeros."
+                    "La categoría {$categoria->nombre} acepta máximo {$categoria->capacidad_maxima} pasajeros."
                 );
             }
         });
