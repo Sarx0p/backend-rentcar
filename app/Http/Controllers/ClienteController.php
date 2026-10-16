@@ -57,7 +57,6 @@ class ClienteController extends Controller
     public function store(StoreClienteRequest $request)
     {
         try {
-            // authorize() y rules() ya se resolvieron automáticamente
             $cliente = Cliente::create($request->validated());
 
             $cliente->load('municipio:id,nombre,departamento_id', 'municipio.departamento:id,nombre');
@@ -128,7 +127,6 @@ class ClienteController extends Controller
     public function update(UpdateClienteRequest $request, string $id)
     {
         try {
-            // authorize() y rules() ya se resolvieron automáticamente
             $cliente = Cliente::findOrFail($id);
 
             $cliente->update($request->validated());

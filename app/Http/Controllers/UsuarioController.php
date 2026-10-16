@@ -67,7 +67,7 @@ class UsuarioController extends Controller
     public function store(StoreUsuarioRequest $request)
     {
         try {
-           
+
             $rolEnum = RolEnum::tryFrom($request->rol);
 
             if ($rolEnum === RolEnum::ADMINISTRADOR) {
@@ -131,7 +131,7 @@ class UsuarioController extends Controller
     public function update(UpdateUsuarioRequest $request, string $id)
     {
         try {
-          
+
             $usuario = User::with('roles')->findOrFail($id);
 
             if ($request->filled('rol')) {
@@ -154,7 +154,7 @@ class UsuarioController extends Controller
                 ], 403);
             }
 
-            // Reemplaze los 5 `if` por una sola asignación masiva haciendo la exepcion de el rol y el password 
+            // Reemplaze los 5 `if` por una sola asignación masiva haciendo la exepcion de el rol y el password
             $usuario->fill($request->safe()->except(['password', 'rol']));
 
             if ($request->filled('password')) {
@@ -193,7 +193,7 @@ class UsuarioController extends Controller
                 ], 403);
             }
 
-            $nuevoEstado = strtoupper($request->get('estado', 'INACTIVO'));
+            $nuevoEstado = strtoupper($request->get('estado', 'BLOQUEADO'));
 
             if (!UsuarioEstadoEnum::tryFrom($nuevoEstado)) {
                 return response()->json([

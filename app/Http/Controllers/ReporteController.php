@@ -22,6 +22,7 @@ use App\Models\Incidencia;
 use App\Models\Reserva;
 use App\Models\Propietario;
 use Illuminate\Http\Request;
+use App\Http\Requests\ReporteController\ReporteRequest;
 use Barryvdh\DomPDF\Facade\Pdf;
 
 class ReporteController extends Controller
@@ -80,7 +81,7 @@ class ReporteController extends Controller
         return $permitido;
     }
 
-    public function ingresos(Request $request)
+    public function ingresos(ReporteRequest $request)
     {
         try {
             if (!$this->tienePermiso(true, false)) {
@@ -120,7 +121,7 @@ class ReporteController extends Controller
         }
     }
 
-    public function estadoFlota(Request $request)
+    public function estadoFlota(ReporteRequest $request)
     {
         try {
             if (!$this->tienePermiso(true)) {
@@ -161,7 +162,7 @@ class ReporteController extends Controller
         }
     }
 
-    public function licenciasPorVencer(Request $request)
+    public function licenciasPorVencer(ReporteRequest $request)
     {
         try {
             if (!$this->tienePermiso(true)) {
@@ -199,7 +200,7 @@ class ReporteController extends Controller
     /**
      * Resultado neto por propietario: ingresos - gastos.
      */
-    public function resultadoNetoPorPropietario(Request $request)
+    public function resultadoNetoPorPropietario(ReporteRequest $request)
     {
         try {
             if (!$this->tienePermiso(true, false)) {
@@ -219,7 +220,6 @@ class ReporteController extends Controller
                 $propietarioBusqueda = (string) (Propietario::whereKey($propietarioId)->value('nombre') ?? '');
             }
 
-            // Porcentaje que cobra la administración sobre los ingresos (0 a 100)
             $porcentajeAdmin = (float) ($request->input('porcentaje_administracion') ?? 0);
 
             if ($porcentajeAdmin < 0 || $porcentajeAdmin > 100) {
@@ -328,7 +328,7 @@ class ReporteController extends Controller
         }
     }
 
-    public function reservasCanceladas(Request $request)
+    public function reservasCanceladas(ReporteRequest $request)
     {
         try {
             if (!$this->tienePermiso(true)) {
@@ -368,7 +368,7 @@ class ReporteController extends Controller
     /**
      * Desempeño general: resumen ejecutivo del negocio.
      */
-    public function desempenoGeneral(Request $request)
+    public function desempenoGeneral(ReporteRequest $request)
     {
         try {
             if (!$this->tienePermiso(true, false)) {
@@ -433,7 +433,7 @@ class ReporteController extends Controller
         }
     }
 
-    public function ingresosPorVehiculo(Request $request)
+    public function ingresosPorVehiculo(ReporteRequest $request)
     {
         try {
             if (!$this->tienePermiso(true, false)) {
@@ -528,7 +528,7 @@ class ReporteController extends Controller
     /**
      * Gastos por vehículo: incidencias del negocio y mantenimientos.
      */
-    public function gastosPorVehiculo(Request $request)
+    public function gastosPorVehiculo(ReporteRequest $request)
     {
         try {
             if (!$this->tienePermiso(true, false)) {
@@ -579,7 +579,7 @@ class ReporteController extends Controller
     /**
      * Resultado neto por vehículo: ingresos - gastos.
      */
-    public function resultadoNetoPorVehiculo(Request $request)
+    public function resultadoNetoPorVehiculo(ReporteRequest $request)
     {
         try {
             if (!$this->tienePermiso(true, false)) {
@@ -642,7 +642,7 @@ class ReporteController extends Controller
     /**
      * Saldos pendientes: contratos con pagos incompletos.
      */
-    public function saldosPendientes(Request $request)
+    public function saldosPendientes(ReporteRequest $request)
     {
         try {
             if (!$this->tienePermiso(true, false)) {

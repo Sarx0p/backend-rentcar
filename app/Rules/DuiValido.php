@@ -7,7 +7,7 @@ use Closure;
 
 class DuiValido implements ValidationRule
 {
-    
+
     public function validate(string $attribute, mixed $value, Closure $fail): void
     {
         if (!preg_match('/^\d{8}-\d{1}$/', $value)) {
@@ -28,6 +28,11 @@ class DuiValido implements ValidationRule
 
         if ((int) $digitos[8] !== $digitoVerificador) {
             $fail('El :attribute no es un DUI válido.');
+        }
+
+        if (count(array_unique($digitos)) === 1) {
+            $fail('Ingresa un DUI real, no una secuencia repetida.');
+            return;
         }
     }
 }

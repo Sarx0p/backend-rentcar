@@ -250,6 +250,13 @@ class VehiculoController extends Controller
                 ], 404);
             }
 
+            if($vehiculo->estado === VehiculoEstadoEnum::MANTENIMIENTO->value){
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'No se puede poner fuera de servicio porque está en mantenimiento.'
+                ],422);
+            }
+
             if ($vehiculo->estado === VehiculoEstadoEnum::FUERA_SERVICIO->value) {
                 return response()->json([
                     'status'  => 'error',
