@@ -3,6 +3,9 @@
 namespace App\Http\Requests\SeguroController;
 
 use App\Enums\RolEnum;
+use App\Enums\SeguroEstadoEnum;
+use App\Models\Seguro;
+use App\Rules\TextoValido;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
@@ -33,17 +36,43 @@ class UpdateSeguroRequest extends FormRequest
 
         return [
             'vehiculo_id'       => 'required|integer|exists:vehiculos,id',
-            'aseguradora'       => 'required|string|max:150',
-            'numero_poliza'     => 'required|string|max:50|unique:seguros,numero_poliza,' . $seguroId,
-            'fecha_inicio'      => 'required|date',
-            'fecha_vencimiento' => 'required|date|after:fecha_inicio',
-            'cobertura'         => 'nullable|string',
+            'aseguradora'       => ['required', 'string', 'max:150', new TextoValido(3, false, '.&-')],
+            'numero_poliza'     => ['required', 'string', 'max:50', 'regex:/^[A-Za-z0-9][A-Za-z0-9-]{2,48}[A-Za-z0-9]$/', 'not_regex:/^(.)\1+$/', 'unique:seguros,numero_poliza,' . $seguroId],
+            'fecha_inicio'      => 'required|date_format:Y-m-d',
+            'fecha_vencimiento' => 'required|date_format:Y-m-d|after:fecha_inicio',
+            'cobertura'         => 'nullable|string|max:1000',
         ];
     }
 
     /**
      * Get the error messages for the defined validation rules.
      */
+    /**
+     * Un vehículo no puede tener dos seguros vigentes en las mismas fechas.
+     */
+    public function withValidator($validator): void
+    {
+        $validator->after(function ($validator) {
+            if ($validator->errors()->hasAny(['vehiculo_id', 'fecha_inicio', 'fecha_vencimiento'])) {
+                return;
+            }
+
+            $traslape = Seguro::where('vehiculo_id', $this->input('vehiculo_id'))
+                ->where('estado', SeguroEstadoEnum::VIGENTE->value)
+                ->where('id', '!=', $this->route('seguro'))
+                ->where('fecha_inicio', '<', $this->input('fecha_vencimiento'))
+                ->where('fecha_vencimiento', '>', $this->input('fecha_inicio'))
+                ->exists();
+
+            if ($traslape) {
+                $validator->errors()->add(
+                    'fecha_inicio',
+                    'Este vehículo ya tiene un seguro vigente en esas fechas.'
+                );
+            }
+        });
+    }
+
     public function messages(): array
     {
         return [
@@ -59,6 +88,8 @@ class UpdateSeguroRequest extends FormRequest
             'numero_poliza.string'       => 'El número de póliza debe ser un formato de texto válido.',
             'numero_poliza.max'          => 'El número de póliza no debe exceder los 50 caracteres.',
             'numero_poliza.unique'       => 'Este número de póliza ya se encuentra registrado en otro vehículo.',
+            'numero_poliza.regex'        => 'El número de póliza solo puede llevar letras, números y guiones (de 4 a 50 caracteres, sin empezar ni terminar en guion).',
+            'numero_poliza.not_regex'    => 'El número de póliza no puede ser el mismo carácter repetido.',
 
             'fecha_inicio.required'      => 'La fecha de inicio de la póliza es obligatoria.',
             'fecha_inicio.date'          => 'La fecha de inicio debe ser una fecha válida.',
@@ -68,6 +99,9 @@ class UpdateSeguroRequest extends FormRequest
             'fecha_vencimiento.after'    => 'La fecha de vencimiento debe ser posterior a la fecha de inicio.',
 
             'cobertura.string'           => 'La descripción de la cobertura debe ser un texto válido.',
+            'cobertura.max'              => 'La cobertura no puede tener más de 1000 caracteres.',
+            'fecha_inicio.date_format'   => 'La fecha de inicio debe ser una fecha válida.',
+            'fecha_vencimiento.date_format' => 'La fecha de vencimiento debe ser una fecha válida.',
         ];
     }
     protected function failedAuthorization()

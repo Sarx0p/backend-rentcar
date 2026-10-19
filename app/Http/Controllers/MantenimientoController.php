@@ -126,10 +126,13 @@ class MantenimientoController extends Controller
                     ], 422);
                 }
 
-                if ($incidencia->estado_incidencia === IncidenciaEstadoEnum::RESUELTA->value) {
+                if (in_array($incidencia->estado_incidencia, [
+                    IncidenciaEstadoEnum::RESUELTA->value,
+                    IncidenciaEstadoEnum::ANULADA->value,
+                ])) {
                     return response()->json([
                         'status' => 'error',
-                        'message' => 'La incidencia seleccionada ya se encuentra resuelta',
+                        'message' => 'La incidencia seleccionada ya se encuentra ' . strtolower($incidencia->estado_incidencia),
                     ], 422);
                 }
             }
@@ -261,15 +264,26 @@ class MantenimientoController extends Controller
                     $estadoAnterior === EstadoMantenimientoEnum::ACTIVO->value
                     && $estadoNuevo === EstadoMantenimientoEnum::FINALIZADO->value
                 ) {
-                    $mantenimiento->vehiculo->update([
-                        'estado' => VehiculoEstadoEnum::DISPONIBLE->value,
-                    ]);
-
                     if ($mantenimiento->incidencia_id) {
                         $mantenimiento->incidencia?->update([
                             'estado_incidencia' => IncidenciaEstadoEnum::RESUELTA->value,
                         ]);
                     }
+
+                    // si el carro todavía tiene otros daños mecánicos sin resolver, no queda disponible
+                    $otroDanioPendiente = $mantenimiento->vehiculo->incidencias()
+                        ->where('tipo_incidencia', TipoIncidenciaEnum::DANIO_MECANICO->value)
+                        ->whereNotIn('estado_incidencia', [
+                            IncidenciaEstadoEnum::RESUELTA->value,
+                            IncidenciaEstadoEnum::ANULADA->value,
+                        ])
+                        ->exists();
+
+                    $mantenimiento->vehiculo->update([
+                        'estado' => $otroDanioPendiente
+                            ? VehiculoEstadoEnum::ENPROCESO->value
+                            : VehiculoEstadoEnum::DISPONIBLE->value,
+                    ]);
                 }
 
                 if (

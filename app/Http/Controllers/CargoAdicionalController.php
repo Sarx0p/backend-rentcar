@@ -45,7 +45,7 @@ class CargoAdicionalController extends Controller
                             ->orWhereHas('contrato', function ($q) use ($search) {
                                 $q->where('numero_contrato', 'like', '%' . $search . '%');
                             })
-                            ->orWhereHas('contrato.reserva.cliente', function ($q) use ($search) {
+                            ->orWhereHas('contrato.cliente', function ($q) use ($search) {
                                 $q->where('nombre', 'like', '%' . $search . '%')
                                     ->orWhere('dui', 'like', '%' . $search . '%');
                             });
@@ -98,11 +98,11 @@ class CargoAdicionalController extends Controller
             $request->validate([
                 'contrato_id'    => 'required|exists:contratos,id',
                 'tipo_cargo'     => 'required|in:' . implode(',', array_column(CargoAdicionalTipoEnum::cases(), 'value')),
-                'descripcion'    => 'sometimes|string|nullable',
+                'descripcion'    => 'sometimes|string|nullable|max:500',
                 'monto'          => 'required|numeric|min:0.01|max:999999.99',
-                'fecha_registro' => 'required|date',
             ], [
-                'monto.max' => 'El monto no puede ser mayor a 999,999.99.',
+                'monto.max'       => 'El monto no puede ser mayor a 999,999.99.',
+                'descripcion.max' => 'La descripción no puede tener más de 500 caracteres.',
             ]);
 
             $contrato = Contrato::findOrFail($request->contrato_id);
@@ -121,7 +121,7 @@ class CargoAdicionalController extends Controller
                     'tipo_cargo'     => $request->tipo_cargo,
                     'descripcion'    => $request->descripcion ?? null,
                     'monto'          => $request->monto,
-                    'fecha_registro' => $request->fecha_registro,
+                    'fecha_registro' => now(),
                     'estado_cargo'   => CargoAdicionalEstadoEnum::PENDIENTE->value,
                 ]);
 
@@ -231,12 +231,13 @@ class CargoAdicionalController extends Controller
 
             $request->validate([
                 'tipo_cargo'     => 'sometimes|in:' . implode(',', array_column(CargoAdicionalTipoEnum::cases(), 'value')),
-                'descripcion'    => 'sometimes|string|nullable',
+                'descripcion'    => 'sometimes|string|nullable|max:500',
                 'monto'          => 'sometimes|numeric|min:0.01|max:999999.99',
-                'fecha_registro' => 'sometimes|date',
-                'estado_cargo'   => 'sometimes|in:' . implode(',', array_column(CargoAdicionalEstadoEnum::cases(), 'value')),
+                'estado_cargo'   => 'sometimes|in:' . CargoAdicionalEstadoEnum::PENDIENTE->value . ',' . CargoAdicionalEstadoEnum::ANULADO->value,
             ], [
-                'monto.max' => 'El monto no puede ser mayor a 999,999.99.',
+                'monto.max'       => 'El monto no puede ser mayor a 999,999.99.',
+                'descripcion.max' => 'La descripción no puede tener más de 500 caracteres.',
+                'estado_cargo.in' => 'El estado del cargo solo se puede cambiar a PENDIENTE o ANULADO.',
             ]);
 
             DB::transaction(function () use ($request, $cargo, $contrato) {
@@ -244,7 +245,6 @@ class CargoAdicionalController extends Controller
                     'tipo_cargo',
                     'descripcion',
                     'monto',
-                    'fecha_registro',
                     'estado_cargo',
                 ]));
 

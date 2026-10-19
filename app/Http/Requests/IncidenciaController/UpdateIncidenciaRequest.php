@@ -35,7 +35,7 @@ class UpdateIncidenciaRequest extends FormRequest
             'responsable_tipo'  => 'sometimes|in:' . implode(',', array_column(IncidenciaTipoResponsableEnum::cases(), 'value')),
             'estado_incidencia' => 'sometimes|in:' . implode(',', array_column(IncidenciaEstadoEnum::cases(), 'value')),
             'descripcion'       => 'sometimes|nullable|string|max:500',
-            'fecha'             => 'sometimes|date',
+            'fecha'             => ['sometimes', 'date', 'before_or_equal:' . now()->endOfDay()->toDateTimeString()],
             'costo'             => 'sometimes|nullable|numeric|min:0|max:999999.99',
         ];
     }
@@ -72,6 +72,7 @@ class UpdateIncidenciaRequest extends FormRequest
     public function messages(): array
     {
         return [
+            'fecha.before_or_equal' => 'La fecha de la incidencia no puede ser en el futuro.',
             'tipo_incidencia.in'   => 'El tipo de incidencia no es válido.',
             'responsable_tipo.in'  => 'El responsable no es válido.',
             'estado_incidencia.in' => 'El estado de la incidencia no es válido.',

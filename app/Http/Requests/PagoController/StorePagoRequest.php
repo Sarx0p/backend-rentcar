@@ -4,6 +4,8 @@ namespace App\Http\Requests\PagoController;
 
 use App\Enums\RolEnum;
 use App\Enums\MetodoPagoEnum;
+use App\Models\Contrato;
+use Carbon\Carbon;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Http\Exceptions\HttpResponseException;
@@ -30,22 +32,44 @@ class StorePagoRequest extends FormRequest
             'contrato_id' => 'required|exists:contratos,id',
             'monto'       => 'required|numeric|min:0.01|max:999999.99',
             'metodo_pago' => 'required|in:' . implode(',', array_column(MetodoPagoEnum::cases(), 'value')),
-            'fecha_pago'  => 'required|date',
+            'fecha_pago'  => ['required', 'date', 'before_or_equal:' . now()->addMinutes(5)->toDateTimeString()],
         ];
+    }
+
+    /**
+     * Un pago no puede tener fecha anterior al día en que se entregó el vehículo.
+     */
+    public function withValidator($validator): void
+    {
+        $validator->after(function ($validator) {
+            if ($validator->errors()->hasAny(['contrato_id', 'fecha_pago'])) {
+                return;
+            }
+
+            $contrato = Contrato::find($this->input('contrato_id'));
+
+            if ($contrato && Carbon::parse($this->input('fecha_pago'))->lt($contrato->fecha_hora_entrega->copy()->startOfDay())) {
+                $validator->errors()->add(
+                    'fecha_pago',
+                    'La fecha de pago no puede ser anterior a la entrega del vehículo (' . $contrato->fecha_hora_entrega->format('d/m/Y') . ').'
+                );
+            }
+        });
     }
 
     public function messages(): array
     {
         return [
-            'contrato_id.required' => 'Debe indicar el contrato.',
-            'contrato_id.exists'   => 'El contrato indicado no existe.',
-            'monto.required'       => 'El monto es obligatorio.',
-            'monto.min'            => 'El monto debe ser mayor a 0.',
-            'monto.max'            => 'El monto no puede ser mayor a 999,999.99.',
-            'metodo_pago.required' => 'El método de pago es obligatorio.',
-            'metodo_pago.in'       => 'El método de pago no es válido.',
-            'fecha_pago.required'  => 'La fecha de pago es obligatoria.',
-            'fecha_pago.date'      => 'La fecha de pago no tiene un formato válido.',
+            'contrato_id.required'       => 'Debe indicar el contrato.',
+            'contrato_id.exists'         => 'El contrato indicado no existe.',
+            'monto.required'             => 'El monto es obligatorio.',
+            'monto.min'                  => 'El monto debe ser mayor a 0.',
+            'monto.max'                  => 'El monto no puede ser mayor a 999,999.99.',
+            'metodo_pago.required'       => 'El método de pago es obligatorio.',
+            'metodo_pago.in'             => 'El método de pago no es válido.',
+            'fecha_pago.required'        => 'La fecha de pago es obligatoria.',
+            'fecha_pago.date'            => 'La fecha de pago no tiene un formato válido.',
+            'fecha_pago.before_or_equal' => 'La fecha de pago no puede ser en el futuro.',
         ];
     }
 

@@ -3,6 +3,7 @@
 namespace App\Http\Requests\UsuarioController;
 
 use App\Enums\RolEnum;
+use App\Rules\NombrePersonaValido;
 use Illuminate\Validation\Rule;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
@@ -39,10 +40,10 @@ class StoreUsuarioRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'nombre'   => ['required', 'string', 'min:2', 'max:15', "regex:/^\pL[\pL\s'-]*$/u"],
-            'apellido' => ['required', 'string', 'min:2', 'max:100', "regex:/^\pL[\pL\s'-]*$/u"],
-            'correo'   => 'required|email|max:150|unique:users,correo',
-            'password' => 'required|string|min:8|max:255',
+            'nombre'   => ['required', 'string', 'min:2', 'max:15', new NombrePersonaValido(1)],
+            'apellido' => ['required', 'string', 'min:2', 'max:100', new NombrePersonaValido(1, 'apellido')],
+            'correo'   => 'required|email:rfc,filter|max:150|unique:users,correo',
+            'password' => ['required', 'string', 'min:8', 'max:255', 'regex:/[A-Za-z]/', 'regex:/\d/'],
             'rol'      => ['required', Rule::enum(RolEnum::class)],
         ];
     }
@@ -54,17 +55,17 @@ class StoreUsuarioRequest extends FormRequest
     {
         return [
             'nombre.required'   => 'El nombre es obligatorio.',
-            'nombre.regex'      => 'El nombre solo puede llevar letras y espacios.',
             'nombre.min'        => 'El nombre debe tener al menos 2 letras.',
             'nombre.max'        => 'El nombre no puede tener más de 15 caracteres.',
             'apellido.required' => 'El apellido es obligatorio.',
-            'apellido.regex'    => 'El apellido solo puede llevar letras y espacios.',
             'apellido.min'      => 'El apellido debe tener al menos 2 letras.',
             'correo.required'   => 'El correo es obligatorio.',
             'correo.email'      => 'El correo no tiene un formato válido.',
             'correo.unique'     => 'Ya existe un usuario con ese correo electrónico.',
             'password.required' => 'La contraseña es obligatoria.',
             'password.min'      => 'La contraseña debe tener al menos 8 caracteres.',
+            'password.max'      => 'La contraseña no puede tener más de 255 caracteres.',
+            'password.regex'    => 'La contraseña debe tener al menos una letra y un número.',
             'rol.required'      => 'El rol es obligatorio.',
         ];
     }

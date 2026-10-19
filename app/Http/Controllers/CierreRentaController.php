@@ -222,7 +222,7 @@ class CierreRentaController extends Controller
                     'monto_deuda'                 => $montoDeuda,
                 ]);
 
-                
+
                 if ($contrato->vehiculo->estado === VehiculoEstadoEnum::RENTADO->value) {
                     $danioMecanicoPendiente = $contrato->vehiculo->incidencias()
                         ->where('tipo_incidencia', TipoIncidenciaEnum::DANIO_MECANICO->value)
@@ -233,7 +233,7 @@ class CierreRentaController extends Controller
                         ->exists();
 
                     $contrato->vehiculo->update([
-                        'estado' => $danioMecanicoPendiente
+                        'estado' => ($danioMecanicoPendiente || $request->estado_vehiculo_recepcion === 'RECIBIDO CON DAÑOS')
                             ? VehiculoEstadoEnum::ENPROCESO->value
                             : VehiculoEstadoEnum::DISPONIBLE->value,
                     ]);

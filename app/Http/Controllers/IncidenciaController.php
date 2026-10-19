@@ -213,6 +213,13 @@ class IncidenciaController extends Controller
         try {
             $incidencia = Incidencia::with(['contrato', 'vehiculo'])->findOrFail($id);
 
+            if ($incidencia->contrato && $incidencia->contrato->estado_contrato !== EstadoContratoEnum::ACTIVO->value) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'No se puede modificar una incidencia de un contrato que ya está ' . $incidencia->contrato->estado_contrato . '.',
+                ], 422);
+            }
+
             DB::transaction(function () use ($request, $incidencia) {
                 $tipoAnterior   = $incidencia->tipo_incidencia;
                 $estadoAnterior = $incidencia->estado_incidencia;
@@ -296,6 +303,13 @@ class IncidenciaController extends Controller
                     'status'  => 'error',
                     'message' => 'La incidencia ya fue anulada anteriormente',
                 ], 409);
+            }
+
+            if ($incidencia->contrato && $incidencia->contrato->estado_contrato !== EstadoContratoEnum::ACTIVO->value) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'No se puede anular una incidencia de un contrato que ya está ' . $incidencia->contrato->estado_contrato . '.',
+                ], 422);
             }
 
             DB::transaction(function () use ($incidencia) {

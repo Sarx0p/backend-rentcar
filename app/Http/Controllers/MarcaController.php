@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Enums\RolEnum;
 use App\Models\Marca;
+use App\Rules\TextoValido;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -60,10 +61,9 @@ class MarcaController extends Controller
             }
 
             $request->validate([
-                'nombre' => ['required', 'string', 'min:2', 'max:50', "regex:/^\pL[\pL\s.'&-]*$/u", 'unique:marcas,nombre'],
+                'nombre' => ['required', 'string', 'min:2', 'max:50', new TextoValido(2, false, ".'&-"), 'unique:marcas,nombre'],
             ], [
                 'nombre.max'   => 'El nombre de la marca no puede tener más de 50 caracteres.',
-                'nombre.regex' => 'El nombre de la marca solo puede llevar letras, espacios, punto o guion.',
             ]);
 
             DB::beginTransaction();
@@ -148,10 +148,9 @@ class MarcaController extends Controller
             }
 
             $request->validate([
-                'nombre' => ['required', 'string', 'min:2', 'max:50', "regex:/^\pL[\pL\s.'&-]*$/u", Rule::unique('marcas', 'nombre')->ignore($id)],
+                'nombre' => ['required', 'string', 'min:2', 'max:50', new TextoValido(2, false, ".'&-"), Rule::unique('marcas', 'nombre')->ignore($id)],
             ], [
                 'nombre.max'   => 'El nombre de la marca no puede tener más de 50 caracteres.',
-                'nombre.regex' => 'El nombre de la marca solo puede llevar letras, espacios, punto o guion.',
             ]);
 
             $marca = Marca::findOrFail($id);

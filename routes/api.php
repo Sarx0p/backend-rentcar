@@ -26,14 +26,14 @@ use App\Http\Controllers\SeguroController;
 use App\Http\Controllers\HistorialController;
 
 Route::prefix('auth')->group(function () {
-    Route::post('login', [AuthController::class, 'login']);
+    Route::post('login', [AuthController::class, 'login'])->middleware('throttle:login');
     Route::post('olvide-password', [AuthController::class, 'olvidePassword'])->middleware('throttle:5,1');
     Route::post('restablecer-password', [AuthController::class, 'restablecerPassword'])->middleware('throttle:5,1');
+    Route::post('refresh', [AuthController::class, 'refresh']);
 
     Route::middleware(['auth:api', 'estado.activo'])->group(function () {
         Route::get('me',       [AuthController::class, 'me']);
         Route::post('logout',  [AuthController::class, 'logout']);
-        Route::post('refresh', [AuthController::class, 'refresh']);
     });
 });
 

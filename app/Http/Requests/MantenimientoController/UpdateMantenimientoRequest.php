@@ -5,6 +5,7 @@ namespace App\Http\Requests\MantenimientoController;
 use App\Enums\RolEnum;
 use App\Enums\TipoMantenimientoEnum;
 use App\Enums\EstadoMantenimientoEnum;
+use App\Rules\TextoValido;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Http\Exceptions\HttpResponseException;
@@ -42,7 +43,7 @@ class UpdateMantenimientoRequest extends FormRequest
             'tipo_mantenimiento' => 'sometimes|in:' . implode(',', array_column(TipoMantenimientoEnum::cases(), 'value')),
             'descripcion'        => 'sometimes|nullable|string|max:250',
             'costo'              => 'sometimes|numeric|min:0|max:999999.99|regex:/^\d+(\.\d{1,2})?$/',
-            'lugar'              => 'sometimes|string|max:150',
+            'lugar'              => ['sometimes', 'string', 'max:150', new TextoValido(3, true, '.,#-')],
             'estado'             => 'sometimes|in:' . implode(',', array_column(EstadoMantenimientoEnum::cases(), 'value')),
         ];
     }

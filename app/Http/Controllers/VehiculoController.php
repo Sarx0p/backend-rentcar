@@ -325,7 +325,12 @@ class VehiculoController extends Controller
             }
 
             $request->validate([
-                "motivo_restauracion" => "required|string|max:500",
+                "motivo_restauracion" => "required|string|min:5|max:500",
+            ], [
+                "motivo_restauracion.required" => "Debe indicar el motivo de la restauración.",
+                "motivo_restauracion.string"   => "El motivo de la restauración debe ser texto.",
+                "motivo_restauracion.min"      => "El motivo de la restauración debe tener al menos 5 caracteres.",
+                "motivo_restauracion.max"      => "El motivo de la restauración no puede exceder los 500 caracteres.",
             ]);
 
             $vehiculo = Vehiculo::find($id);

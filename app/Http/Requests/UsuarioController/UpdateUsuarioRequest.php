@@ -4,6 +4,7 @@ namespace App\Http\Requests\UsuarioController;
 
 use App\Enums\RolEnum;
 use App\Enums\UsuarioEstadoEnum;
+use App\Rules\NombrePersonaValido;
 use Illuminate\Validation\Rule;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
@@ -46,10 +47,10 @@ class UpdateUsuarioRequest extends FormRequest
         $id = $this->route('usuario');
 
         return [
-            'nombre'   => ['sometimes', 'string', 'min:2', 'max:15', "regex:/^\pL[\pL\s'-]*$/u"],
-            'apellido' => ['sometimes', 'string', 'min:2', 'max:100', "regex:/^\pL[\pL\s'-]*$/u"],
-            'correo'   => ['sometimes', 'email', 'max:150', Rule::unique('users', 'correo')->ignore($id)],
-            'password' => 'sometimes|string|min:8|max:255',
+            'nombre'   => ['sometimes', 'string', 'min:2', 'max:15', new NombrePersonaValido(1)],
+            'apellido' => ['sometimes', 'string', 'min:2', 'max:100', new NombrePersonaValido(1, 'apellido')],
+            'correo'   => ['sometimes', 'email:rfc,filter', 'max:150', Rule::unique('users', 'correo')->ignore($id)],
+            'password' => ['sometimes', 'string', 'min:8', 'max:255', 'regex:/[A-Za-z]/', 'regex:/\d/'],
             'estado'   => ['sometimes', Rule::enum(UsuarioEstadoEnum::class)],
             'rol'      => ['sometimes', Rule::enum(RolEnum::class)],
         ];
@@ -59,14 +60,14 @@ class UpdateUsuarioRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'nombre.regex'   => 'El nombre solo puede llevar letras y espacios.',
             'nombre.min'     => 'El nombre debe tener al menos 2 letras.',
             'nombre.max'     => 'El nombre no puede tener más de 15 caracteres.',
-            'apellido.regex' => 'El apellido solo puede llevar letras y espacios.',
             'apellido.min'   => 'El apellido debe tener al menos 2 letras.',
             'correo.email'  => 'El correo no tiene un formato válido.',
             'correo.unique' => 'Ese correo ya está en uso por otro usuario.',
             'password.min'  => 'La contraseña debe tener al menos 8 caracteres.',
+            'password.max'  => 'La contraseña no puede tener más de 255 caracteres.',
+            'password.regex' => 'La contraseña debe tener al menos una letra y un número.',
         ];
     }
 
