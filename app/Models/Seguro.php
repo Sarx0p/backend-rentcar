@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\SeguroEstadoEnum;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -32,5 +33,12 @@ class Seguro extends Model
     public function vehiculo(): BelongsTo
     {
         return $this->belongsTo(Vehiculo::class, 'vehiculo_id');
+    }
+
+    public static function vencerVigentes(): int
+    {
+        return self::where('estado', SeguroEstadoEnum::VIGENTE->value)
+            ->whereDate('fecha_vencimiento', '<=', now()->toDateString())
+            ->update(['estado' => SeguroEstadoEnum::VENCIDO->value]);
     }
 }

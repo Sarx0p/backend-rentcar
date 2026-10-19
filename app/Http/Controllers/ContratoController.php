@@ -69,10 +69,9 @@ class ContratoController extends Controller
                 ->orderByRaw("
                 CASE estado_contrato
                     WHEN 'ACTIVO' THEN 1
-                    WHEN 'VENCIDO' THEN 2
-                    WHEN 'PENDIENTE' THEN 3
-                    WHEN 'FINALIZADO' THEN 4
-                    WHEN 'ANULADO' THEN 5
+                    WHEN 'PENDIENTE' THEN 2
+                    WHEN 'FINALIZADO' THEN 3
+                    WHEN 'ANULADO' THEN 4
                     ELSE 99
                 END
             ")
@@ -186,7 +185,18 @@ class ContratoController extends Controller
                 ], 422);
             }
 
-            // El descuento no puede ser mayor que el total de la renta
+            $contratoConDeuda = Contrato::where('cliente_id', $reserva->cliente_id)
+                ->where('estado_contrato', EstadoContratoEnum::FINALIZADO->value)
+                ->where('estado_pago', '!=', EstadoPagoEnum::PAGADO->value)
+                ->first();
+
+            if ($contratoConDeuda) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'El cliente tiene un saldo pendiente en el contrato ' . $contratoConDeuda->numero_contrato . '. Debe pagarlo antes de rentar otro vehículo.',
+                ], 422);
+            }
+
             $subtotal = $dias * (float) $vehiculo->categoria->precio_dia;
 
             if (($request->monto_descuento ?? 0) > $subtotal) {
@@ -314,6 +324,18 @@ class ContratoController extends Controller
                 ], 422);
             }
 
+            $contratoConDeuda = Contrato::where('cliente_id', $cliente->id)
+                ->where('estado_contrato', EstadoContratoEnum::FINALIZADO->value)
+                ->where('estado_pago', '!=', EstadoPagoEnum::PAGADO->value)
+                ->first();
+
+            if ($contratoConDeuda) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'El cliente tiene un saldo pendiente en el contrato ' . $contratoConDeuda->numero_contrato . '. Debe pagarlo antes de rentar otro vehículo.',
+                ], 422);
+            }
+
             $vehiculo = Vehiculo::with(['modelo.marca', 'categoria'])->findOrFail($request->vehiculo_id);
 
             if ($vehiculo->estado !== VehiculoEstadoEnum::DISPONIBLE->value) {
@@ -322,12 +344,8 @@ class ContratoController extends Controller
                     'message' => 'El vehículo no está disponible, estado actual: ' . $vehiculo->estado,
                 ], 422);
             }
-
-            // Calcular fechas del nuevo contrato
             $fechaEntrega    = now();
             $fechaDevolucion = $fechaEntrega->copy()->addDays($request->dias_acordados);
-
-            // Validar traslape de fechas con contratos activos del mismo vehículo
             $contratoTraslapado = Contrato::where('vehiculo_id', $vehiculo->id)
                 ->where('estado_contrato', EstadoContratoEnum::ACTIVO->value)
                 ->where(function ($query) use ($fechaEntrega, $fechaDevolucion) {
@@ -343,7 +361,6 @@ class ContratoController extends Controller
                 ], 422);
             }
 
-            // Validar que no choque con una reserva futura del mismo vehículo
             $reservaTraslapada = Reserva::where('vehiculo_id', $vehiculo->id)
                 ->whereIn('estado', [EstadoReservaEnum::PENDIENTE->value, EstadoReservaEnum::CONFIRMADA->value])
                 ->where(function ($query) use ($fechaEntrega, $fechaDevolucion) {
@@ -373,8 +390,6 @@ class ContratoController extends Controller
                     'message' => 'Este cliente ya tiene una reserva activa que se traslapa con estas fechas. Genera el contrato desde esa reserva o cancélala primero.',
                 ], 422);
             }
-
-            // El descuento no puede ser mayor que el total de la renta
             $subtotal = $request->dias_acordados * (float) $vehiculo->categoria->precio_dia;
 
             if (($request->monto_descuento ?? 0) > $subtotal) {
@@ -476,10 +491,6 @@ class ContratoController extends Controller
         }
     }
 
-    /**
-     * Cambia el vehículo de un contrato activo por desperfecto mecánico
-     * sin culpa del cliente (responsable NEGOCIO o TERCERO).
-     */
     public function cambiarVehiculo(CambiarVehiculoRequest $request, string $id)
     {
         try {
@@ -509,7 +520,6 @@ class ContratoController extends Controller
                 ], 422);
             }
 
-            // El vehículo nuevo no debe tener reservas en lo que le queda al contrato
             $ahora = now();
 
             $reservaTraslapada = Reserva::where('vehiculo_id', $vehiculoNuevo->id)
@@ -528,8 +538,6 @@ class ContratoController extends Controller
             }
 
             $contrato = DB::transaction(function () use ($request, $contrato, $vehiculoAnterior, $vehiculoNuevo, $ahora) {
-
-                // 1. Incidencia del vehículo dañado (no se le cobra al cliente)
                 $incidencia = Incidencia::create([
                     'vehiculo_id'       => $vehiculoAnterior->id,
                     'contrato_id'       => $contrato->id,
@@ -541,12 +549,8 @@ class ContratoController extends Controller
                     'fecha'             => $ahora->toDateString(),
                     'costo'             => $request->costo,
                 ]);
-
-                // 2. Estados de los vehículos
                 $vehiculoAnterior->update(['estado' => VehiculoEstadoEnum::ENPROCESO->value]);
                 $vehiculoNuevo->update(['estado' => VehiculoEstadoEnum::RENTADO->value]);
-
-                // 3. Historial del cambio dentro del contrato
                 $info = $contrato->info_registro ?? [];
                 $info['cambios_vehiculo'][] = [
                     'fecha'                     => $ahora->toDateTimeString(),
@@ -566,8 +570,6 @@ class ContratoController extends Controller
                     'motivo'                    => $request->motivo,
                     'usuario_id'                => auth('api')->id(),
                 ];
-
-                // 4. El contrato pasa al vehículo nuevo, el precio NO cambia
                 $contrato->update([
                     'vehiculo_id'   => $vehiculoNuevo->id,
                     'info_registro' => $info,
@@ -599,10 +601,6 @@ class ContratoController extends Controller
         }
     }
 
-    /**
-     * Anula un contrato ACTIVO creado por error.
-     * Solo si no tiene pagos confirmados, cargos ni incidencias vigentes.
-     */
     public function anular(Request $request, string $id)
     {
         try {
@@ -616,9 +614,10 @@ class ContratoController extends Controller
             }
 
             $request->validate([
-                'motivo' => 'required|string|max:500',
+                'motivo' => 'required|string|min:5|max:500',
             ], [
                 'motivo.required' => 'Debe indicar el motivo de la anulación.',
+                'motivo.min'      => 'El motivo debe tener al menos 5 caracteres.',
                 'motivo.max'      => 'El motivo no puede exceder los 500 caracteres.',
             ]);
 
@@ -654,7 +653,6 @@ class ContratoController extends Controller
             }
 
             DB::transaction(function () use ($request, $contrato, $userAuth) {
-                // Se guarda el registro de la anulación dentro del contrato
                 $info = $contrato->info_registro ?? [];
                 $info['anulacion'] = [
                     'fecha'      => now()->toDateTimeString(),
@@ -662,22 +660,16 @@ class ContratoController extends Controller
                     'usuario_id' => $userAuth->id,
                     'reserva_id' => $contrato->reserva_id,
                 ];
-
-                // La reserva vuelve a PENDIENTE para poder generar el contrato correcto
                 if ($contrato->reserva) {
                     $contrato->reserva->update([
                         'estado' => EstadoReservaEnum::PENDIENTE->value,
                     ]);
                 }
-
-                // Solo se libera si sigue RENTADO
                 if ($contrato->vehiculo->estado === VehiculoEstadoEnum::RENTADO->value) {
                     $contrato->vehiculo->update([
                         'estado' => VehiculoEstadoEnum::DISPONIBLE->value,
                     ]);
                 }
-
-                // Se libera reserva_id porque es único en contratos
                 $contrato->update([
                     'estado_contrato' => EstadoContratoEnum::ANULADO->value,
                     'reserva_id'      => null,

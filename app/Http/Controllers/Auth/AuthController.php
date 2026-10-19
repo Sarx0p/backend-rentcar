@@ -12,12 +12,32 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
+use Tymon\JWTAuth\Exceptions\JWTException;
 
 class AuthController extends Controller
 {
     public function login(Request $request)
     {
+        $validacion = Validator::make($request->all(), [
+            'correo'   => 'required|email|max:150',
+            'password' => 'required|string|max:255',
+        ], [
+            'correo.required'   => 'El correo es obligatorio.',
+            'correo.email'      => 'Escribe un correo válido.',
+            'correo.max'        => 'El correo no puede tener más de 150 caracteres.',
+            'password.required' => 'La contraseña es obligatoria.',
+            'password.string'   => 'La contraseña no es válida.',
+            'password.max'      => 'La contraseña no puede tener más de 255 caracteres.',
+        ]);
+
+        if ($validacion->fails()) {
+            return response()->json([
+                'message' => $validacion->errors()->first(),
+                'errors'  => $validacion->errors(),
+            ], 422);
+        }
 
         $credenciales = [
             'correo'   => $request->input('correo'),
@@ -28,6 +48,14 @@ class AuthController extends Controller
             return response()->json([
                 'message' => 'Credenciales inválidas',
             ], 401);
+        }
+
+        if (auth('api')->user()->estado !== UsuarioEstadoEnum::ACTIVO->value) {
+            auth('api')->logout();
+
+            return response()->json([
+                'message' => 'Tu cuenta se encuentra bloqueada. Contacta al administrador.',
+            ], 403);
         }
 
         return $this->responseWithToken($token);
@@ -69,8 +97,31 @@ class AuthController extends Controller
 
     public function refresh()
     {
+        try {
+            $token = auth('api')->refresh();
+        } catch (JWTException $e) {
+            return response()->json([
+                'message' => 'Tu sesión expiró. Inicia sesión de nuevo.',
+            ], 401);
+        }
 
-        return $this->responseWithToken(auth('api')->refresh());
+        $user = auth('api')->setToken($token)->user();
+
+        if (!$user) {
+            return response()->json([
+                'message' => 'Tu sesión expiró. Inicia sesión de nuevo.',
+            ], 401);
+        }
+
+        if ($user->estado !== UsuarioEstadoEnum::ACTIVO->value) {
+            auth('api')->logout();
+
+            return response()->json([
+                'message' => 'Tu cuenta se encuentra bloqueada. Contacta al administrador.',
+            ], 403);
+        }
+
+        return $this->responseWithToken($token);
     }
 
     public function olvidePassword(Request $request)

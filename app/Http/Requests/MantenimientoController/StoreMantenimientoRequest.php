@@ -4,6 +4,7 @@ namespace App\Http\Requests\MantenimientoController;
 
 use App\Enums\RolEnum;
 use App\Enums\TipoMantenimientoEnum;
+use App\Rules\TextoValido;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Http\Exceptions\HttpResponseException;
@@ -34,7 +35,7 @@ class StoreMantenimientoRequest extends FormRequest
             'tipo_mantenimiento' => 'required|in:' . implode(',', array_column(TipoMantenimientoEnum::cases(), 'value')),
             'descripcion'        => 'nullable|string|max:250',
             'costo'              => 'required|numeric|min:0|max:999999.99|regex:/^\d+(\.\d{1,2})?$/',
-            'lugar'              => 'required|string|max:150',
+            'lugar'              => ['required', 'string', 'max:150', new TextoValido(3, true, '.,#-')],
         ];
     }
 

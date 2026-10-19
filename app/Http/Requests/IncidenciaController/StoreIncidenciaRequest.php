@@ -25,12 +25,11 @@ class StoreIncidenciaRequest extends FormRequest
     {
         return [
             'vehiculo_id'      => 'required|exists:vehiculos,id',
-            'incidencia_id'    => 'nullable|integer|exists:incidencias,id',
             'contrato_id'      => 'nullable|exists:contratos,id',
             'tipo_incidencia'  => 'required|in:' . implode(',', array_column(TipoIncidenciaEnum::cases(), 'value')),
             'responsable_tipo' => 'required|in:' . implode(',', array_column(IncidenciaTipoResponsableEnum::cases(), 'value')),
             'descripcion'      => 'nullable|string|max:500',
-            'fecha'            => 'required|date',
+            'fecha'            => ['required', 'date', 'before_or_equal:' . now()->endOfDay()->toDateTimeString()],
             'costo'            => 'nullable|numeric|min:0|max:999999.99',
         ];
     }
@@ -47,6 +46,13 @@ class StoreIncidenciaRequest extends FormRequest
                     'Debe indicar el contrato cuando el responsable es el CLIENTE.'
                 );
             }
+
+            if ($responsable === IncidenciaTipoResponsableEnum::CLIENTE->value && (float) $this->input('costo', 0) <= 0) {
+                $validator->errors()->add(
+                    'costo',
+                    'Si el responsable es el CLIENTE, indica el costo que se le va a cobrar.'
+                );
+            }
         });
     }
 
@@ -54,6 +60,7 @@ class StoreIncidenciaRequest extends FormRequest
     public function messages(): array
     {
         return [
+            'fecha.before_or_equal'     => 'La fecha de la incidencia no puede ser en el futuro.',
             'vehiculo_id.required'      => 'Debe seleccionar un vehículo.',
             'vehiculo_id.exists'        => 'El vehículo seleccionado no existe.',
             'contrato_id.exists'        => 'El contrato indicado no existe.',

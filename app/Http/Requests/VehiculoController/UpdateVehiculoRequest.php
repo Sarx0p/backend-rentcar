@@ -4,6 +4,8 @@ namespace App\Http\Requests\VehiculoController;
 
 use App\Enums\RolEnum;
 use App\Models\Categoria;
+use App\Rules\PlacaValida;
+use App\Rules\TextoValido;
 use App\Models\Vehiculo;
 use Illuminate\Validation\Rule;
 use Illuminate\Foundation\Http\FormRequest;
@@ -24,9 +26,9 @@ class UpdateVehiculoRequest extends FormRequest
         $id = $this->route('vehiculo');
 
         return [
-            'anio'                => 'sometimes|integer|min:1980|max:2050',
-            'color'               => 'sometimes|string|max:30',
-            'placa'               => ['sometimes', 'string', 'max:20', Rule::unique('vehiculos', 'placa')->ignore($id)],
+            'anio'                => 'sometimes|integer|min:1980|max:' . (now()->year + 1),
+            'color'               => ['sometimes', 'string', 'max:30', new TextoValido(3)],
+            'placa'               => ['sometimes', 'string', 'max:20', Rule::unique('vehiculos', 'placa')->ignore($id), new PlacaValida()],
             'capacidad_pasajeros' => 'sometimes|integer|min:1|max:255',
             'observaciones'       => 'sometimes|nullable|string|max:400',
             'propietario_id'      => 'sometimes|integer|exists:propietarios,id',
@@ -40,7 +42,7 @@ class UpdateVehiculoRequest extends FormRequest
         return [
             'anio.integer'           => 'El año debe ser un número entero.',
             'anio.min'               => 'El año no puede ser menor a 1980.',
-            'anio.max'               => 'El año no puede ser mayor a 2050.',
+            'anio.max'               => 'El año no puede ser mayor a ' . (now()->year + 1) . '.',
             'placa.unique'           => 'Ya existe un vehículo registrado con esa placa.',
             'propietario_id.exists'  => 'El propietario seleccionado no existe.',
             'categoria_id.exists'    => 'La categoría seleccionada no existe.',

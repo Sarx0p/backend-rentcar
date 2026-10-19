@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Enums\RolEnum;
 use App\Models\Modelo;
 use App\Models\Marca;
+use App\Rules\TextoValido;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -107,6 +108,7 @@ class ModeloController extends Controller
                     'string',
                     'min:2',
                 'max:50',
+                    new TextoValido(0, true, '-'),
                     Rule::unique('modelos', 'nombre')->where(fn ($query) => $query->where('marca_id', $request->marca_id)),
                 ],
                 'marca_id' => 'required|integer|exists:marcas,id',
@@ -206,6 +208,7 @@ class ModeloController extends Controller
                     'string',
                     'min:2',
                     'max:50',
+                    new TextoValido(0, true, '-'),
                     Rule::unique('modelos', 'nombre')
                         ->where(fn ($query) => $query->where('marca_id', $request->marca_id ?? $modelo->marca_id))
                         ->ignore($modelo->id),

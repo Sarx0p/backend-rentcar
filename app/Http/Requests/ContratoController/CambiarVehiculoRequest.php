@@ -30,8 +30,8 @@ class CambiarVehiculoRequest extends FormRequest
                 IncidenciaTipoResponsableEnum::NEGOCIO->value,
                 IncidenciaTipoResponsableEnum::TERCERO->value,
             ]),
-            'motivo'                    => 'required|string|max:500',
-            'nivel_combustible_entrega' => 'required|string|max:50',
+            'motivo'                    => 'required|string|min:5|max:500',
+            'nivel_combustible_entrega' => 'required|string|in:E,1/4,1/2,3/4,F',
             'costo'                     => 'nullable|numeric|min:0|max:999999.99',
         ];
     }
@@ -44,9 +44,10 @@ class CambiarVehiculoRequest extends FormRequest
             'responsable_tipo.required'          => 'Debe indicar el responsable del desperfecto.',
             'responsable_tipo.in'                => 'El cambio de vehículo solo aplica cuando el responsable es NEGOCIO o TERCERO.',
             'motivo.required'                    => 'Debe describir el desperfecto del vehículo.',
+            'motivo.min'                         => 'El motivo debe tener al menos 5 caracteres.',
             'motivo.max'                         => 'El motivo no puede exceder los 500 caracteres.',
             'nivel_combustible_entrega.required' => 'El nivel de combustible de entrega es obligatorio.',
-            'nivel_combustible_entrega.max'      => 'El nivel de combustible no puede exceder los 50 caracteres.',
+            'nivel_combustible_entrega.in'       => 'El nivel de combustible de entrega debe ser E, 1/4, 1/2, 3/4 o F.',
             'costo.numeric'                      => 'El costo debe ser un número válido.',
             'costo.min'                          => 'El costo no puede ser negativo.',
             'costo.max'                          => 'El costo no puede ser mayor a 999,999.99.',

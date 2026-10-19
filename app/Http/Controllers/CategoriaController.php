@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Enums\RolEnum;
 use App\Models\Categoria;
+use App\Rules\TextoValido;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -15,7 +16,9 @@ class CategoriaController extends Controller
     {
         return [
             'nombre.max'               => 'El nombre de la categoría no puede tener más de 50 caracteres.',
-            'nombre.regex'             => 'El nombre de la categoría solo puede llevar letras y espacios.',
+            'precio_dia.numeric'        => 'El precio por día debe ser un número.',
+            'precio_dia.min'            => 'El precio por día debe ser al menos $1.00.',
+            'precio_dia.max'            => 'El precio por día no puede ser mayor a $9,999.99.',
             'precio_dia.unique'         => 'Ya existe una categoría con ese precio por día.',
             'capacidad_maxima.required' => 'El máximo de pasajeros es obligatorio.',
             'capacidad_maxima.integer'  => 'El máximo de pasajeros debe ser un número entero.',
@@ -72,8 +75,8 @@ class CategoriaController extends Controller
             }
 
             $request->validate([
-                'nombre'           => ['required', 'string', 'min:2', 'max:50', "regex:/^\pL[\pL\s'-]*$/u", 'unique:categorias,nombre'],
-                'precio_dia'       => ['required', 'numeric', 'min:1', 'unique:categorias,precio_dia'],
+                'nombre'           => ['required', 'string', 'min:2', 'max:50', new TextoValido(3, false, '-'), 'unique:categorias,nombre'],
+                'precio_dia'       => ['required', 'numeric', 'min:1', 'max:9999.99', 'unique:categorias,precio_dia'],
                 'capacidad_maxima' => 'required|integer|min:1|max:15',
             ], $this->mensajesValidacion());
 
@@ -163,8 +166,8 @@ class CategoriaController extends Controller
             }
 
             $request->validate([
-                'nombre'           => ['required', 'string', 'min:2', 'max:50', "regex:/^\pL[\pL\s'-]*$/u", Rule::unique('categorias', 'nombre')->ignore($id)],
-                'precio_dia'       => ['required', 'numeric', 'min:1', Rule::unique('categorias', 'precio_dia')->ignore($id)],
+                'nombre'           => ['required', 'string', 'min:2', 'max:50', new TextoValido(3, false, '-'), Rule::unique('categorias', 'nombre')->ignore($id)],
+                'precio_dia'       => ['required', 'numeric', 'min:1', 'max:9999.99', Rule::unique('categorias', 'precio_dia')->ignore($id)],
                 'capacidad_maxima' => 'sometimes|integer|min:1|max:15',
             ], $this->mensajesValidacion());
 

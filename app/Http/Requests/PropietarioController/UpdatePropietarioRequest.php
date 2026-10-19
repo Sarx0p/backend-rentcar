@@ -6,6 +6,8 @@ use App\Enums\RolEnum;
 use App\Enums\TipoPropietarioEnum;
 use App\Enums\EstadoPropietarioEnum;
 use App\Models\Propietario;
+use App\Rules\NombrePersonaValido;
+use App\Rules\TelefonoValido;
 use Illuminate\Validation\Rule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Contracts\Validation\Validator;
@@ -25,8 +27,8 @@ class UpdatePropietarioRequest extends FormRequest
         $id = $this->route('propietario');
 
         return [
-            'nombre'           => ['sometimes', 'string', 'max:100', "regex:/^\pL[\pL\s'-]*$/u"],
-            'telefono'         => ['sometimes', 'string', 'max:25', Rule::unique('propietarios', 'telefono')->ignore($id)],
+            'nombre'           => ['sometimes', 'string', 'max:100', new NombrePersonaValido(1)],
+            'telefono'         => ['sometimes', 'string', 'max:25', Rule::unique('propietarios', 'telefono')->ignore($id), new TelefonoValido()],
             'tipo_propietario' => 'sometimes|in:' . implode(',', array_column(TipoPropietarioEnum::cases(), 'value')),
         ];
     }
@@ -57,7 +59,6 @@ class UpdatePropietarioRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'nombre.regex'                  => 'El nombre solo puede llevar letras y espacios, sin números.',
             'nombre.max'                    => 'El nombre no puede tener más de 100 caracteres.',
             'telefono.unique'     => 'Ya existe otro propietario registrado con ese número de teléfono.',
             'tipo_propietario.in' => 'El tipo de propietario no es válido.',

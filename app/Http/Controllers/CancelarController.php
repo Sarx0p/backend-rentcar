@@ -87,7 +87,13 @@ class CancelarController extends Controller
 
             $request->validate([
                 'reserva_id' => 'required|exists:reservas,id',
-                'motivo'     => 'required|string',
+                'motivo'     => 'required|string|min:3|max:500',
+            ], [
+                'reserva_id.required' => 'Debe indicar la reserva a cancelar.',
+                'reserva_id.exists'   => 'La reserva indicada no existe.',
+                'motivo.required'     => 'Debe indicar el motivo de la cancelación.',
+                'motivo.min'          => 'El motivo debe tener al menos 3 caracteres.',
+                'motivo.max'          => 'El motivo no puede tener más de 500 caracteres.',
             ]);
 
             $reserva = Reserva::with(['vehiculo', 'contrato'])->findOrFail($request->reserva_id);
@@ -152,8 +158,8 @@ class CancelarController extends Controller
         } catch (ValidationException $e) {
             return response()->json([
                 'status'  => 'error',
-                'message' => 'Error de validación',
-
+                'message' => $e->validator->errors()->first(),
+                'errors'  => $e->errors(),
             ], 422);
         } catch (\Exception $e) {
             return response()->json([

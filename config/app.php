@@ -55,6 +55,9 @@ return [
     'url' => env('APP_URL', 'http://localhost'),
     'frontend_url' => env('FRONTEND_URL', 'http://localhost:5173'),
 
+    // Desde cuándo hay datos en el sistema: los reportes no aceptan fechas anteriores
+    'reportes_fecha_inicio' => env('REPORTES_FECHA_INICIO', '2026-01-01'),
+
     /*
     |--------------------------------------------------------------------------
     | Application Timezone

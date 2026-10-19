@@ -15,6 +15,7 @@ use App\Models\Vehiculo;
 use App\Models\Cliente;
 use App\Models\Contrato;
 use App\Enums\EstadoContratoEnum;
+use App\Enums\EstadoPagoEnum;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -99,6 +100,18 @@ class ReservaController extends Controller
                 return response()->json([
                     'status'  => 'error',
                     'message' => 'El cliente tiene la licencia vencida, no puede hacer una reserva',
+                ], 422);
+            }
+
+            $contratoConDeuda = Contrato::where('cliente_id', $cliente->id)
+                ->where('estado_contrato', EstadoContratoEnum::FINALIZADO->value)
+                ->where('estado_pago', '!=', EstadoPagoEnum::PAGADO->value)
+                ->first();
+
+            if ($contratoConDeuda) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'El cliente tiene un saldo pendiente en el contrato ' . $contratoConDeuda->numero_contrato . '. Debe pagarlo antes de hacer otra reserva.',
                 ], 422);
             }
 

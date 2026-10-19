@@ -4,6 +4,8 @@ namespace App\Http\Requests\VehiculoController;
 
 use App\Enums\RolEnum;
 use App\Models\Categoria;
+use App\Rules\PlacaValida;
+use App\Rules\TextoValido;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Http\Exceptions\HttpResponseException;
@@ -26,9 +28,9 @@ class StoreVehiculoRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'anio'                => 'required|integer|min:1980|max:2050',
-            'color'               => 'required|string|max:30',
-            'placa'               => 'required|string|max:20|unique:vehiculos,placa',
+            'anio'                => 'required|integer|min:1980|max:' . (now()->year + 1),
+            'color'               => ['required', 'string', 'max:30', new TextoValido(3)],
+            'placa'               => ['required', 'string', 'max:20', 'unique:vehiculos,placa', new PlacaValida()],
             'capacidad_pasajeros' => 'required|integer|min:1|max:255',
             'observaciones'       => 'sometimes|nullable|string|max:400',
             'propietario_id'      => 'required|integer|exists:propietarios,id',
@@ -46,7 +48,7 @@ class StoreVehiculoRequest extends FormRequest
             'anio.required'                => 'El año es obligatorio.',
             'anio.integer'                 => 'El año debe ser un número entero.',
             'anio.min'                     => 'El año no puede ser menor a 1980.',
-            'anio.max'                     => 'El año no puede ser mayor a 2050.',
+            'anio.max'                     => 'El año no puede ser mayor a ' . (now()->year + 1) . '.',
             'color.required'               => 'El color es obligatorio.',
             'placa.required'               => 'La placa es obligatoria.',
             'placa.unique'                 => 'Ya existe un vehículo registrado con esa placa.',

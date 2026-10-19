@@ -47,6 +47,8 @@ class NotificacionController extends Controller
                     'cliente_id' => $cliente->id,
                 ]);
 
+            Seguro::vencerVigentes();
+
             $segurosPorVencer = Seguro::with('vehiculo:id,placa')
                 ->where('estado', SeguroEstadoEnum::VIGENTE->value)
                 ->whereBetween('fecha_vencimiento', [

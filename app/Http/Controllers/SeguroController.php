@@ -27,6 +27,8 @@ class SeguroController extends Controller
                 ], 403);
             }
 
+            Seguro::vencerVigentes();
+
             $seguros = Seguro::with(['vehiculo.propietario'])
                 ->where('estado', SeguroEstadoEnum::VIGENTE->value)
                 ->orderBy('fecha_vencimiento', 'asc')
@@ -95,6 +97,8 @@ class SeguroController extends Controller
                     'message' => 'No tienes permiso para ver los seguros',// error de sintaxis
                 ], 403);
             }
+
+            Seguro::vencerVigentes();
 
             $seguro = Seguro::with(['vehiculo.propietario'])->find($id);
 

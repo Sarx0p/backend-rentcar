@@ -27,10 +27,9 @@ class StoreContratoDirectoRequest extends FormRequest
         return [
             'cliente_id'                => 'required|exists:clientes,id',
             'vehiculo_id'               => 'required|exists:vehiculos,id',
-            // la devolución (hoy + días) no puede pasar la fecha máxima permitida
             'dias_acordados'            => 'required|integer|min:1|max:' . $this->diasMaximos(),
             'precio_por_dia'            => 'sometimes|numeric|min:0.1',
-            'nivel_combustible_entrega' => 'required|string|max:50',
+            'nivel_combustible_entrega' => 'required|string|in:E,1/4,1/2,3/4,F',
             'monto_descuento'           => 'sometimes|numeric|min:0|max:999999.99',
             'observaciones_entrega'     => 'sometimes|nullable|string|max:500',
             'observaciones'             => 'sometimes|nullable|string|max:500',
@@ -56,7 +55,7 @@ class StoreContratoDirectoRequest extends FormRequest
             'precio_por_dia.numeric'             => 'El precio por día debe ser un número válido.',
             'precio_por_dia.min'                 => 'El precio por día tiene que ser mayor que 0.',
             'nivel_combustible_entrega.required' => 'El nivel de combustible de entrega es obligatorio.',
-            'nivel_combustible_entrega.max'      => 'El nivel de combustible no puede exceder los 50 caracteres.',
+            'nivel_combustible_entrega.in'       => 'El nivel de combustible de entrega debe ser E, 1/4, 1/2, 3/4 o F.',
             'monto_descuento.max'                => 'El descuento no puede ser mayor a 999,999.99.',
         ];
     }

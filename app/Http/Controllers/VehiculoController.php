@@ -250,6 +250,13 @@ class VehiculoController extends Controller
                 ], 404);
             }
 
+            if($vehiculo->estado === VehiculoEstadoEnum::MANTENIMIENTO->value){
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'No se puede poner fuera de servicio porque está en mantenimiento.'
+                ],422);
+            }
+
             if ($vehiculo->estado === VehiculoEstadoEnum::FUERA_SERVICIO->value) {
                 return response()->json([
                     'status'  => 'error',
@@ -318,7 +325,12 @@ class VehiculoController extends Controller
             }
 
             $request->validate([
-                "motivo_restauracion" => "required|string|max:500",
+                "motivo_restauracion" => "required|string|min:5|max:500",
+            ], [
+                "motivo_restauracion.required" => "Debe indicar el motivo de la restauración.",
+                "motivo_restauracion.string"   => "El motivo de la restauración debe ser texto.",
+                "motivo_restauracion.min"      => "El motivo de la restauración debe tener al menos 5 caracteres.",
+                "motivo_restauracion.max"      => "El motivo de la restauración no puede exceder los 500 caracteres.",
             ]);
 
             $vehiculo = Vehiculo::find($id);
