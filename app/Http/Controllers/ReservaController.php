@@ -302,7 +302,6 @@ class ReservaController extends Controller
                 $inicioEvaluar = Carbon::parse($request->fecha_inicio ?? $reserva->fecha_inicio)->toDateString();
                 $finEvaluar    = Carbon::parse($request->fecha_fin ?? $reserva->fecha_fin)->toDateString();
 
-                // Se compara con la fecha guardada cuando solo se envía una de las dos
                 if ($finEvaluar <= $inicioEvaluar) {
                     return response()->json([
                         'status'  => 'error',
@@ -339,7 +338,6 @@ class ReservaController extends Controller
                     ], 422);
                 }
 
-                // las mismas validaciones del cliente que al crear la reserva
                 $clienteTraslapado = Reserva::where('cliente_id', $reserva->cliente_id)
                     ->where('id', '!=', $id)
                     ->whereNotIn('estado', [EstadoReservaEnum::CANCELADA->value])

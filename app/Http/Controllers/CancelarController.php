@@ -129,12 +129,6 @@ class CancelarController extends Controller
                     'estado' => EstadoReservaEnum::CANCELADA->value,
                 ]);
 
-                if ($reserva->vehiculo->estado === VehiculoEstadoEnum::RESERVADO->value) {
-                    $reserva->vehiculo->update([
-                        'estado' => VehiculoEstadoEnum::DISPONIBLE->value,
-                    ]);
-                }
-
                 return $cancelacion;
             });
 
@@ -150,6 +144,7 @@ class CancelarController extends Controller
                 'message' => 'Reserva cancelada con éxito',
                 'data'    => $cancelacion,
             ], 201);
+
         } catch (ModelNotFoundException $e) {
             return response()->json([
                 'status'  => 'error',
