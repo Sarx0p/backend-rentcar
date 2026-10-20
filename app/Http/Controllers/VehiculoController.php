@@ -257,6 +257,8 @@ class VehiculoController extends Controller
                 ],422);
             }
 
+            
+
             if ($vehiculo->estado === VehiculoEstadoEnum::FUERA_SERVICIO->value) {
                 return response()->json([
                     'status'  => 'error',
