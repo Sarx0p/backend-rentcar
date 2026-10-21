@@ -19,6 +19,7 @@ class CierreRenta extends Model
         'estado',
         'motivo_cierre_deuda',
         'monto_deuda',
+        'monto_devuelto',
         'contrato_id',
         'usuario_id',
     ];
@@ -33,6 +34,7 @@ class CierreRenta extends Model
         'horas_retraso'        => 'integer',
         'monto_extras'         => 'decimal:2',
         'monto_deuda'          => 'decimal:2',
+        'monto_devuelto'       => 'decimal:2',
     ];
 
 

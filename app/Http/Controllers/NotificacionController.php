@@ -48,6 +48,7 @@ class NotificacionController extends Controller
                 ]);
 
             Seguro::vencerVigentes();
+            Reserva::vencerPendientes($userAuth->id);
 
             $segurosPorVencer = Seguro::with('vehiculo:id,placa')
                 ->where('estado', SeguroEstadoEnum::VIGENTE->value)
@@ -75,6 +76,19 @@ class NotificacionController extends Controller
                     'contrato_id' => $contrato->id,
                 ]);
 
+            $saldosAFavor = Contrato::with('cliente:id,nombre')
+                ->where('estado_contrato', EstadoContratoEnum::ACTIVO->value)
+                ->where('estado_pago', EstadoPagoEnum::PAGADO->value)
+                ->get()
+                ->filter(fn ($contrato) => $contrato->saldoAFavor() > 0)
+                ->map(fn ($contrato) => [
+                    'tipo'      => 'SALDO_A_FAVOR',
+                    'prioridad' => 'MEDIA',
+                    'mensaje'   => "El contrato {$contrato->numero_contrato} de {$contrato->cliente->nombre} tiene un monto a devolver de $" . number_format($contrato->saldoAFavor(), 2),
+                    'contrato_id' => $contrato->id,
+                ])
+                ->values();
+
             $incidenciasPendientes = Incidencia::with('vehiculo:id,placa')
                 ->where('estado_incidencia', IncidenciaEstadoEnum::REPORTADA->value)
                 ->get()
@@ -100,6 +114,7 @@ class NotificacionController extends Controller
                 ->merge($licenciasPorVencer)
                 ->merge($segurosPorVencer)
                 ->merge($pagosPendientes)
+                ->merge($saldosAFavor)
                 ->merge($incidenciasPendientes)
                 ->merge($reservasRecientes)
                 ->sortBy(fn ($n) => match ($n['prioridad']) {

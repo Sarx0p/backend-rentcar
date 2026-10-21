@@ -29,6 +29,7 @@
                 <th>Marca / Modelo</th>
                 <th>Propietario</th>
                 <th class="right">Ingresos</th>
+                <th class="right">Devuelto</th>
                 <th class="right">Gastos</th>
                 <th class="right">Resultado Neto</th>
             </tr>
@@ -46,6 +47,7 @@
                     {{ optional($item['vehiculo']->propietario)->apellido }}
                 </td>
                 <td class="right">${{ number_format($item['ingresos'], 2) }}</td>
+                <td class="right">${{ number_format($item['devoluciones'], 2) }}</td>
                 <td class="right">${{ number_format($item['gastos'], 2) }}</td>
                 <td class="right" style="{{ $item['resultado_neto'] < 0 ? 'color:#b00000;' : '' }}">
                     ${{ number_format($item['resultado_neto'], 2) }}
@@ -56,6 +58,7 @@
             <tr class="total-destacado">
                 <td colspan="3">Totales</td>
                 <td class="right">${{ number_format($totalIngresos, 2) }}</td>
+                <td class="right">${{ number_format($totalDevoluciones, 2) }}</td>
                 <td class="right">${{ number_format($totalGastos, 2) }}</td>
                 <td class="right" style="{{ $totalNeto < 0 ? 'color:#b00000;' : '' }}">
                     ${{ number_format($totalNeto, 2) }}

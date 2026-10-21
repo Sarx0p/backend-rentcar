@@ -58,8 +58,8 @@ class VehiculoController extends Controller
                         });
                         $query->whereDoesntHave('contratos', function ($q) use ($request) {
                             $q->where('estado_contrato', EstadoContratoEnum::ACTIVO->value)
-                                ->where('fecha_hora_entrega', '<', $request->fecha_fin)
-                                ->where('fecha_hora_devolucion', '>', $request->fecha_inicio);
+                                ->whereDate('fecha_hora_entrega', '<', $request->fecha_fin)
+                                ->whereDate('fecha_hora_devolucion', '>', $request->fecha_inicio);
                         });
                     }
                 )

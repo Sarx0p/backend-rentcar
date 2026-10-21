@@ -14,6 +14,7 @@ use App\Models\Reserva;
 use App\Models\Vehiculo;
 use App\Models\Cliente;
 use App\Models\Contrato;
+use App\Models\Seguro;
 use App\Enums\EstadoContratoEnum;
 use App\Enums\EstadoPagoEnum;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -103,6 +104,29 @@ class ReservaController extends Controller
                 ], 422);
             }
 
+            if ($cliente->vencimiento_dui->isPast()) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'El cliente tiene el DUI vencido, no puede hacer una reserva',
+                ], 422);
+            }
+
+            $fechaFin = Carbon::parse($request->fecha_fin)->startOfDay();
+
+            if ($cliente->vencimiento_licencia->lte($fechaFin)) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'La licencia del cliente vence el ' . $cliente->vencimiento_licencia->format('d/m/Y') . ', antes de terminar la reserva',
+                ], 422);
+            }
+
+            if ($cliente->vencimiento_dui->lte($fechaFin)) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'El DUI del cliente vence el ' . $cliente->vencimiento_dui->format('d/m/Y') . ', antes de terminar la reserva',
+                ], 422);
+            }
+
             $contratoConDeuda = Contrato::where('cliente_id', $cliente->id)
                 ->where('estado_contrato', EstadoContratoEnum::FINALIZADO->value)
                 ->where('estado_pago', '!=', EstadoPagoEnum::PAGADO->value)
@@ -117,7 +141,6 @@ class ReservaController extends Controller
 
             $vehiculo = Vehiculo::findOrFail($request->vehiculo_id);
 
-            // un rentado se puede reservar para despues, el choque con su contrato se valida abajo
             if (!in_array($vehiculo->estado, [VehiculoEstadoEnum::DISPONIBLE->value, VehiculoEstadoEnum::RENTADO->value])) {
                 return response()->json([
                     'status'  => 'error',
@@ -125,7 +148,13 @@ class ReservaController extends Controller
                 ], 422);
             }
 
-            // 1. Validar traslape con otras RESERVAS del vehículo
+            if (Seguro::faltaCobertura($vehiculo->id, $request->fecha_inicio, $fechaFin->toDateString())) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'El vehículo no tiene un seguro vigente que cubra hasta el ' . $fechaFin->format('d/m/Y') . '. Renueva el seguro antes de reservarlo.',
+                ], 422);
+            }
+
             $traslapada = Reserva::where('vehiculo_id', $request->vehiculo_id)
                 ->whereNotIn('estado', [EstadoReservaEnum::CANCELADA->value])
                 ->where(function ($query) use ($request) {
@@ -149,8 +178,8 @@ class ReservaController extends Controller
             $contratoTraslapado = Contrato::where('vehiculo_id', $request->vehiculo_id)
                 ->where('estado_contrato', EstadoContratoEnum::ACTIVO->value)
                 ->where(function ($query) use ($request) {
-                    $query->where('fecha_hora_entrega', '<', $request->fecha_fin)
-                        ->where('fecha_hora_devolucion', '>', $request->fecha_inicio);
+                    $query->whereDate('fecha_hora_entrega', '<', $request->fecha_fin)
+                        ->whereDate('fecha_hora_devolucion', '>', $request->fecha_inicio);
                 })->exists();
 
             if ($contratoTraslapado) {
@@ -177,8 +206,8 @@ class ReservaController extends Controller
             $clienteContratoTraslapado = Contrato::where('cliente_id', $request->cliente_id)
                 ->where('estado_contrato', EstadoContratoEnum::ACTIVO->value)
                 ->where(function ($query) use ($request) {
-                    $query->where('fecha_hora_entrega', '<', $request->fecha_fin)
-                        ->where('fecha_hora_devolucion', '>', $request->fecha_inicio);
+                    $query->whereDate('fecha_hora_entrega', '<', $request->fecha_fin)
+                        ->whereDate('fecha_hora_devolucion', '>', $request->fecha_inicio);
                 })->exists();
 
             if ($clienteContratoTraslapado) {
@@ -188,7 +217,6 @@ class ReservaController extends Controller
                 ], 422);
             }
 
-            // Filtrar únicamente incidencias de daño estético pendientes (no resueltas)
             $incidenciasPendientes = Incidencia::where('vehiculo_id', $vehiculo->id)
                 ->where('estado_incidencia', '!=', IncidenciaEstadoEnum::RESUELTA->value)
                 ->where('tipo_incidencia', TipoIncidenciaEnum::DANIO_ESTETICO->value)
@@ -309,6 +337,23 @@ class ReservaController extends Controller
                     ], 422);
                 }
 
+                $cliente  = $reserva->cliente;
+                $fechaFin = Carbon::parse($finEvaluar)->startOfDay();
+
+                if ($cliente->vencimiento_licencia->lte($fechaFin)) {
+                    return response()->json([
+                        'status'  => 'error',
+                        'message' => 'La licencia del cliente vence el ' . $cliente->vencimiento_licencia->format('d/m/Y') . ', antes de terminar la reserva',
+                    ], 422);
+                }
+
+                if ($cliente->vencimiento_dui->lte($fechaFin)) {
+                    return response()->json([
+                        'status'  => 'error',
+                        'message' => 'El DUI del cliente vence el ' . $cliente->vencimiento_dui->format('d/m/Y') . ', antes de terminar la reserva',
+                    ], 422);
+                }
+
                 $traslapada = Reserva::where('vehiculo_id', $reserva->vehiculo_id)
                     ->where('id', '!=', $id)
                     ->whereNotIn('estado', [EstadoReservaEnum::CANCELADA->value])
@@ -327,8 +372,8 @@ class ReservaController extends Controller
                 $contratoTraslapado = Contrato::where('vehiculo_id', $reserva->vehiculo_id)
                     ->where('estado_contrato', EstadoContratoEnum::ACTIVO->value)
                     ->where(function ($query) use ($inicioEvaluar, $finEvaluar) {
-                        $query->where('fecha_hora_entrega', '<', $finEvaluar)
-                            ->where('fecha_hora_devolucion', '>', $inicioEvaluar);
+                        $query->whereDate('fecha_hora_entrega', '<', $finEvaluar)
+                            ->whereDate('fecha_hora_devolucion', '>', $inicioEvaluar);
                     })->exists();
 
                 if ($contratoTraslapado) {
@@ -356,8 +401,8 @@ class ReservaController extends Controller
                 $clienteContratoTraslapado = Contrato::where('cliente_id', $reserva->cliente_id)
                     ->where('estado_contrato', EstadoContratoEnum::ACTIVO->value)
                     ->where(function ($query) use ($inicioEvaluar, $finEvaluar) {
-                        $query->where('fecha_hora_entrega', '<', $finEvaluar)
-                            ->where('fecha_hora_devolucion', '>', $inicioEvaluar);
+                        $query->whereDate('fecha_hora_entrega', '<', $finEvaluar)
+                            ->whereDate('fecha_hora_devolucion', '>', $inicioEvaluar);
                     })->exists();
 
                 if ($clienteContratoTraslapado) {

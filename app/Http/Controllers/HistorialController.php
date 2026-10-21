@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\IncidenciaTipoResponsableEnum;
 use App\Models\Cliente;
 use App\Models\Incidencia;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -19,7 +20,9 @@ class HistorialController extends Controller
             $totalContratos = $cliente->contratos()->count();
 
             $contratosIds = $cliente->contratos()->pluck('id');
-            $totalIncidencias = Incidencia::whereIn('contrato_id', $contratosIds)->count();
+            $totalIncidencias = Incidencia::whereIn('contrato_id', $contratosIds)
+                ->where('responsable_tipo', IncidenciaTipoResponsableEnum::CLIENTE->value)
+                ->count();
 
             return response()->json([
                 'status' => 'success',
@@ -130,6 +133,7 @@ class HistorialController extends Controller
             $contratosIds = $cliente->contratos()->pluck('id');
 
             $incidencias = Incidencia::whereIn('contrato_id', $contratosIds)
+                ->where('responsable_tipo', IncidenciaTipoResponsableEnum::CLIENTE->value)
                 ->with(['vehiculo', 'contrato', 'usuario'])
                 ->when($request->filled('estado'), function ($query) use ($request) {
                     $query->where('estado_incidencia', $request->estado);

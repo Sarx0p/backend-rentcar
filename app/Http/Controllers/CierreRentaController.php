@@ -202,6 +202,12 @@ class CierreRentaController extends Controller
                     $partesObservaciones[] = "INCIDENCIAS NO RESUELTAS:\n" . $textoIncidencias;
                 }
 
+                $montoDevuelto = max(0, round($totalPagado - (float) $contrato->monto_total_renta, 2));
+
+                if ($montoDevuelto > 0) {
+                    $partesObservaciones[] = "MONTO DEVUELTO AL CLIENTE: $" . number_format($montoDevuelto, 2);
+                }
+
                 $montoDeuda = $forzarConDeuda
                     ? max(0, (float) $contrato->monto_total_renta - $totalPagado)
                     : null;
@@ -220,6 +226,7 @@ class CierreRentaController extends Controller
                         : CierreRentaEstadoEnum::FINALIZADO->value,
                     'motivo_cierre_deuda'         => $forzarConDeuda ? $request->motivo_cierre_deuda : null,
                     'monto_deuda'                 => $montoDeuda,
+                    'monto_devuelto'              => $montoDevuelto,
                 ]);
 
 
@@ -279,7 +286,9 @@ class CierreRentaController extends Controller
                 'cierre_completado' => true,
                 'message'           => $cierre->estado === CierreRentaEstadoEnum::FINALIZADO_CON_DEUDA->value
                     ? 'Renta cerrada con deuda pendiente registrada'
-                    : 'Renta cerrada con éxito',
+                    : ($cierre->monto_devuelto > 0
+                        ? 'Renta cerrada con éxito. Devolver $' . number_format($cierre->monto_devuelto, 2) . ' al cliente.'
+                        : 'Renta cerrada con éxito'),
                 'data'              => $cierre,
             ], 201);
         } catch (ModelNotFoundException $e) {
@@ -291,7 +300,6 @@ class CierreRentaController extends Controller
             return response()->json([
                 'status'  => 'error',
                 'message' => 'Error interno del servidor',
-                'error'   => $e->getMessage(),
             ], 500);
         }
     }

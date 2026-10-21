@@ -3,9 +3,11 @@
 namespace App\Http\Requests\VehiculoController;
 
 use App\Enums\RolEnum;
+use App\Enums\EstadoPropietarioEnum;
 use App\Models\Categoria;
 use App\Rules\PlacaValida;
 use App\Rules\TextoValido;
+use Illuminate\Validation\Rule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Http\Exceptions\HttpResponseException;
@@ -33,7 +35,7 @@ class StoreVehiculoRequest extends FormRequest
             'placa'               => ['required', 'string', 'max:20', 'unique:vehiculos,placa', new PlacaValida()],
             'capacidad_pasajeros' => 'required|integer|min:1|max:255',
             'observaciones'       => 'sometimes|nullable|string|max:400',
-            'propietario_id'      => 'required|integer|exists:propietarios,id',
+            'propietario_id'      => ['required', 'integer', Rule::exists('propietarios', 'id')->where('estado', EstadoPropietarioEnum::ACTIVO->value)],
             'categoria_id'        => 'required|integer|exists:categorias,id',
             'modelo_id'           => 'required|integer|exists:modelos,id',
         ];
@@ -54,7 +56,7 @@ class StoreVehiculoRequest extends FormRequest
             'placa.unique'                 => 'Ya existe un vehículo registrado con esa placa.',
             'capacidad_pasajeros.required' => 'La capacidad de pasajeros es obligatoria.',
             'propietario_id.required'      => 'Debe seleccionar un propietario.',
-            'propietario_id.exists'        => 'El propietario seleccionado no existe.',
+            'propietario_id.exists'        => 'El propietario seleccionado no existe o está inactivo.',
             'categoria_id.required'        => 'Debe seleccionar una categoría.',
             'categoria_id.exists'          => 'La categoría seleccionada no existe.',
             'modelo_id.required'           => 'Debe seleccionar un modelo.',

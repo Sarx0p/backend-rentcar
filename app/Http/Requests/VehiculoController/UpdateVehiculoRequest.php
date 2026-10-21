@@ -3,6 +3,7 @@
 namespace App\Http\Requests\VehiculoController;
 
 use App\Enums\RolEnum;
+use App\Enums\EstadoPropietarioEnum;
 use App\Models\Categoria;
 use App\Rules\PlacaValida;
 use App\Rules\TextoValido;
@@ -31,7 +32,7 @@ class UpdateVehiculoRequest extends FormRequest
             'placa'               => ['sometimes', 'string', 'max:20', Rule::unique('vehiculos', 'placa')->ignore($id), new PlacaValida()],
             'capacidad_pasajeros' => 'sometimes|integer|min:1|max:255',
             'observaciones'       => 'sometimes|nullable|string|max:400',
-            'propietario_id'      => 'sometimes|integer|exists:propietarios,id',
+            'propietario_id'      => ['sometimes', 'integer', Rule::exists('propietarios', 'id')->where('estado', EstadoPropietarioEnum::ACTIVO->value)],
             'categoria_id'        => 'sometimes|integer|exists:categorias,id',
             'modelo_id'           => 'sometimes|integer|exists:modelos,id',
         ];
@@ -44,7 +45,7 @@ class UpdateVehiculoRequest extends FormRequest
             'anio.min'               => 'El año no puede ser menor a 1980.',
             'anio.max'               => 'El año no puede ser mayor a ' . (now()->year + 1) . '.',
             'placa.unique'           => 'Ya existe un vehículo registrado con esa placa.',
-            'propietario_id.exists'  => 'El propietario seleccionado no existe.',
+            'propietario_id.exists'  => 'El propietario seleccionado no existe o está inactivo.',
             'categoria_id.exists'    => 'La categoría seleccionada no existe.',
             'modelo_id.exists'       => 'El modelo seleccionado no existe.',
         ];
