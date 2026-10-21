@@ -18,6 +18,7 @@ use App\Models\Reserva;
 use App\Models\Cliente;
 use App\Models\Vehiculo;
 use App\Models\Incidencia;
+use App\Models\Seguro;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -159,6 +160,34 @@ class ContratoController extends Controller
                 ], 422);
             }
 
+            if ($reserva->cliente->vencimiento_dui->isPast()) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'El cliente tiene el DUI vencido, no puede generar el contrato',
+                ], 422);
+            }
+
+            if ($reserva->cliente->vencimiento_licencia->lte($devolucion->copy()->startOfDay())) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'La licencia del cliente vence el ' . $reserva->cliente->vencimiento_licencia->format('d/m/Y') . ', antes de la devolución del vehículo',
+                ], 422);
+            }
+
+            if ($reserva->cliente->vencimiento_dui->lte($devolucion->copy()->startOfDay())) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'El DUI del cliente vence el ' . $reserva->cliente->vencimiento_dui->format('d/m/Y') . ', antes de la devolución del vehículo',
+                ], 422);
+            }
+
+            if (Seguro::faltaCobertura($vehiculo->id, $entrega->toDateString(), $devolucion->toDateString())) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'El vehículo no tiene un seguro vigente que cubra hasta el ' . $devolucion->format('d/m/Y') . '. Renueva el seguro antes de rentarlo.',
+                ], 422);
+            }
+
             $contratoTraslapado = Contrato::where('vehiculo_id', $vehiculo->id)
                 ->where('estado_contrato', EstadoContratoEnum::ACTIVO->value)
                 ->where(function ($query) use ($entrega, $devolucion) {
@@ -197,12 +226,14 @@ class ContratoController extends Controller
                 ], 422);
             }
 
-            $subtotal = $dias * (float) $vehiculo->categoria->precio_dia;
+            $subtotal          = $dias * (float) $vehiculo->categoria->precio_dia;
+            $porcentajeMaximo  = (float) config('app.descuento_maximo_porcentaje');
+            $descuentoMaximo   = round($subtotal * $porcentajeMaximo / 100, 2);
 
-            if (($request->monto_descuento ?? 0) > $subtotal) {
+            if (($request->monto_descuento ?? 0) > $descuentoMaximo) {
                 return response()->json([
                     'status'  => 'error',
-                    'message' => 'El descuento no puede ser mayor que el total de la renta ($' . number_format($subtotal, 2) . ')',
+                    'message' => 'El descuento no puede ser mayor al ' . $porcentajeMaximo . '% de la renta ($' . number_format($descuentoMaximo, 2) . ')',
                 ], 422);
             }
 
@@ -346,6 +377,34 @@ class ContratoController extends Controller
             }
             $fechaEntrega    = now();
             $fechaDevolucion = $fechaEntrega->copy()->addDays($request->dias_acordados);
+
+            if ($cliente->vencimiento_dui->isPast()) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'El cliente tiene el DUI vencido, no puede rentar un vehículo',
+                ], 422);
+            }
+
+            if ($cliente->vencimiento_licencia->lte($fechaDevolucion->copy()->startOfDay())) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'La licencia del cliente vence el ' . $cliente->vencimiento_licencia->format('d/m/Y') . ', antes de la devolución del vehículo',
+                ], 422);
+            }
+
+            if ($cliente->vencimiento_dui->lte($fechaDevolucion->copy()->startOfDay())) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'El DUI del cliente vence el ' . $cliente->vencimiento_dui->format('d/m/Y') . ', antes de la devolución del vehículo',
+                ], 422);
+            }
+
+            if (Seguro::faltaCobertura($vehiculo->id, $fechaEntrega->toDateString(), $fechaDevolucion->toDateString())) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'El vehículo no tiene un seguro vigente que cubra hasta el ' . $fechaDevolucion->format('d/m/Y') . '. Renueva el seguro antes de rentarlo.',
+                ], 422);
+            }
             $contratoTraslapado = Contrato::where('vehiculo_id', $vehiculo->id)
                 ->where('estado_contrato', EstadoContratoEnum::ACTIVO->value)
                 ->where(function ($query) use ($fechaEntrega, $fechaDevolucion) {
@@ -364,8 +423,8 @@ class ContratoController extends Controller
             $reservaTraslapada = Reserva::where('vehiculo_id', $vehiculo->id)
                 ->whereIn('estado', [EstadoReservaEnum::PENDIENTE->value, EstadoReservaEnum::CONFIRMADA->value])
                 ->where(function ($query) use ($fechaEntrega, $fechaDevolucion) {
-                    $query->where('fecha_inicio', '<', $fechaDevolucion)
-                        ->where('fecha_fin', '>', $fechaEntrega);
+                    $query->whereDate('fecha_inicio', '<', $fechaDevolucion->toDateString())
+                        ->whereDate('fecha_fin', '>', $fechaEntrega->toDateString());
                 })
                 ->exists();
 
@@ -379,8 +438,8 @@ class ContratoController extends Controller
             $reservaClienteTraslapada = Reserva::where('cliente_id', $request->cliente_id)
                 ->whereIn('estado', [EstadoReservaEnum::PENDIENTE->value, EstadoReservaEnum::CONFIRMADA->value])
                 ->where(function ($query) use ($fechaEntrega, $fechaDevolucion) {
-                    $query->where('fecha_inicio', '<', $fechaDevolucion)
-                        ->where('fecha_fin', '>', $fechaEntrega);
+                    $query->whereDate('fecha_inicio', '<', $fechaDevolucion->toDateString())
+                        ->whereDate('fecha_fin', '>', $fechaEntrega->toDateString());
                 })
                 ->exists();
 
@@ -390,12 +449,14 @@ class ContratoController extends Controller
                     'message' => 'Este cliente ya tiene una reserva activa que se traslapa con estas fechas. Genera el contrato desde esa reserva o cancélala primero.',
                 ], 422);
             }
-            $subtotal = $request->dias_acordados * (float) $vehiculo->categoria->precio_dia;
+            $subtotal          = $request->dias_acordados * (float) $vehiculo->categoria->precio_dia;
+            $porcentajeMaximo  = (float) config('app.descuento_maximo_porcentaje');
+            $descuentoMaximo   = round($subtotal * $porcentajeMaximo / 100, 2);
 
-            if (($request->monto_descuento ?? 0) > $subtotal) {
+            if (($request->monto_descuento ?? 0) > $descuentoMaximo) {
                 return response()->json([
                     'status'  => 'error',
-                    'message' => 'El descuento no puede ser mayor que el total de la renta ($' . number_format($subtotal, 2) . ')',
+                    'message' => 'El descuento no puede ser mayor al ' . $porcentajeMaximo . '% de la renta ($' . number_format($descuentoMaximo, 2) . ')',
                 ], 422);
             }
 
@@ -525,8 +586,8 @@ class ContratoController extends Controller
             $reservaTraslapada = Reserva::where('vehiculo_id', $vehiculoNuevo->id)
                 ->whereIn('estado', [EstadoReservaEnum::PENDIENTE->value, EstadoReservaEnum::CONFIRMADA->value])
                 ->where(function ($query) use ($ahora, $contrato) {
-                    $query->where('fecha_inicio', '<', $contrato->fecha_hora_devolucion)
-                        ->where('fecha_fin', '>', $ahora);
+                    $query->whereDate('fecha_inicio', '<', $contrato->fecha_hora_devolucion->toDateString())
+                        ->whereDate('fecha_fin', '>', $ahora->toDateString());
                 })
                 ->exists();
 
@@ -793,12 +854,17 @@ class ContratoController extends Controller
 
     private function generarNumeroContrato(): string
     {
-        $ultimoContrato = Contrato::orderBy('id', 'desc')->lockForUpdate()->first();
+        $prefijo = 'CONT-' . now()->format('Y') . '-';
 
-        $numero = $ultimoContrato
-            ? str_pad((intval(substr($ultimoContrato->numero_contrato, -4)) + 1), 4, '0', STR_PAD_LEFT)
-            : '0001';
+        $ultimoContrato = Contrato::where('numero_contrato', 'like', $prefijo . '%')
+            ->orderBy('id', 'desc')
+            ->lockForUpdate()
+            ->first();
 
-        return 'CONT-' . date('Y') . '-' . $numero;
+        $correlativo = $ultimoContrato
+            ? (int) substr($ultimoContrato->numero_contrato, strlen($prefijo)) + 1
+            : 1;
+
+        return $prefijo . str_pad($correlativo, 4, '0', STR_PAD_LEFT);
     }
 }

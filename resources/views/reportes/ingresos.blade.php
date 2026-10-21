@@ -40,8 +40,42 @@
                 <td class="right">${{ number_format($pago->monto, 2) }}</td>
             </tr>
             @endforeach
+            <tr>
+                <td colspan="3"><strong>Total cobrado</strong></td>
+                <td class="right"><strong>${{ number_format($totalCobrado, 2) }}</strong></td>
+            </tr>
+        </tbody>
+    </table>
+
+    <div class="seccion-titulo">Montos devueltos</div>
+    <table>
+        <thead>
+            <tr>
+                <th>Fecha</th>
+                <th>Nº Contrato</th>
+                <th>Motivo</th>
+                <th class="right">Monto</th>
+            </tr>
+        </thead>
+        <tbody>
+            @forelse($devoluciones as $devolucion)
+            <tr>
+                <td>{{ $devolucion->fecha_hora_recepcion->format('d/m/Y') }}</td>
+                <td>{{ $devolucion->contrato->numero_contrato }}</td>
+                <td>Devuelto al cliente</td>
+                <td class="right">${{ number_format($devolucion->monto_devuelto, 2) }}</td>
+            </tr>
+            @empty
+            <tr>
+                <td colspan="4" style="text-align:center;">No hubo montos devueltos en este período.</td>
+            </tr>
+            @endforelse
+            <tr>
+                <td colspan="3"><strong>Total devuelto</strong></td>
+                <td class="right"><strong>${{ number_format($totalDevuelto, 2) }}</strong></td>
+            </tr>
             <tr class="total-destacado">
-                <td colspan="3">Total General</td>
+                <td colspan="3">Total General (cobrado − devuelto)</td>
                 <td class="right">${{ number_format($totalIngresos, 2) }}</td>
             </tr>
         </tbody>

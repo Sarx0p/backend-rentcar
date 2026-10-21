@@ -17,6 +17,7 @@ use App\Enums\TipoPropietarioEnum;
 use App\Models\Mantenimiento;
 use App\Models\Cliente;
 use App\Models\Cancelacion;
+use App\Models\CierreRenta;
 use App\Models\Contrato;
 use App\Models\Incidencia;
 use App\Models\Reserva;
@@ -62,6 +63,16 @@ class ReporteController extends Controller
         ];
     }
 
+    private function devolucionesDeVehiculos($vehiculoIds, $fechaInicio, $fechaFin): float
+    {
+        return (float) CierreRenta::query()
+            ->when($vehiculoIds !== null, fn ($q) => $q->whereHas('contrato', fn ($c) => $c->whereIn('vehiculo_id', $vehiculoIds)))
+            ->where('monto_devuelto', '>', 0)
+            ->whereDate('fecha_hora_recepcion', '>=', $fechaInicio)
+            ->whereDate('fecha_hora_recepcion', '<=', $fechaFin)
+            ->sum('monto_devuelto');
+    }
+
     // El empleado solo entra a reportes sin dinero (estado de flota, licencias, reservas canceladas)
     private function tienePermiso($incluirContador = false, $incluirEmpleado = true): bool
     {
@@ -101,10 +112,22 @@ class ReporteController extends Controller
                 ->orderBy('fecha_pago')
                 ->get();
 
-            $totalIngresos = $pagos->sum('monto');
+            $devoluciones = CierreRenta::with('contrato:id,numero_contrato')
+                ->where('monto_devuelto', '>', 0)
+                ->whereDate('fecha_hora_recepcion', '>=', $fechaInicio)
+                ->whereDate('fecha_hora_recepcion', '<=', $fechaFin)
+                ->orderBy('fecha_hora_recepcion')
+                ->get();
+
+            $totalCobrado  = $pagos->sum('monto');
+            $totalDevuelto = $devoluciones->sum('monto_devuelto');
+            $totalIngresos = $totalCobrado - $totalDevuelto;
 
             $pdf = Pdf::loadView('reportes.ingresos', [
                 'pagos'         => $pagos,
+                'devoluciones'  => $devoluciones,
+                'totalCobrado'  => $totalCobrado,
+                'totalDevuelto' => $totalDevuelto,
                 'totalIngresos' => $totalIngresos,
                 'fechaInicio'   => $fechaInicio,
                 'fechaFin'      => $fechaFin,
@@ -250,6 +273,9 @@ class ReporteController extends Controller
                         ->whereDate('fecha_pago', '<=', $fechaFin)
                         ->sum('monto');
 
+                    $devoluciones = $this->devolucionesDeVehiculos($vehiculoIds, $fechaInicio, $fechaFin);
+                    $ingresoNeto  = $ingresos - $devoluciones;
+
                     $mantenimientos = Mantenimiento::whereIn('vehiculo_id', $vehiculoIds)
                         ->where('estado', '!=', EstadoMantenimientoEnum::CANCELADO->value)
                         ->whereDate('fecha', '>=', $fechaInicio)
@@ -276,13 +302,14 @@ class ReporteController extends Controller
                     $aplicaAdministracion = $propietario->tipo_propietario !== TipoPropietarioEnum::PROPIO->value;
 
                     $montoAdministracion = $aplicaAdministracion
-                        ? round($ingresos * $porcentajeAdmin / 100, 2)
+                        ? round($ingresoNeto * $porcentajeAdmin / 100, 2)
                         : 0;
 
                     return [
                         'propietario'            => $propietario,
                         'num_vehiculos'          => $vehiculoIds->count(),
                         'ingresos'               => $ingresos,
+                        'devoluciones'           => $devoluciones,
                         'gasto_incidencias'      => $gastoIncidencias,
                         'incidencias_detalle'    => $incidenciasNegocio,
                         'gasto_mantenimientos'   => $gastoMantenimientos,
@@ -290,13 +317,14 @@ class ReporteController extends Controller
                         'gasto_total'            => $gastoTotal,
                         'aplica_administracion'  => $aplicaAdministracion,
                         'monto_administracion'   => $montoAdministracion,
-                        'resultado_neto'         => $ingresos - $gastoTotal - $montoAdministracion,
+                        'resultado_neto'         => $ingresoNeto - $gastoTotal - $montoAdministracion,
                     ];
                 })
                 ->sortByDesc('resultado_neto')
                 ->values();
 
             $totalIngresos       = $propietarios->sum('ingresos');
+            $totalDevoluciones   = $propietarios->sum('devoluciones');
             $totalIncidencias    = $propietarios->sum('gasto_incidencias');
             $totalMantenimientos = $propietarios->sum('gasto_mantenimientos');
             $totalGastos         = $propietarios->sum('gasto_total');
@@ -306,6 +334,7 @@ class ReporteController extends Controller
             $pdf = Pdf::loadView('reportes.resultado-neto-por-propietario', [
                 'propietarios'        => $propietarios,
                 'totalIngresos'       => $totalIngresos,
+                'totalDevoluciones'   => $totalDevoluciones,
                 'totalIncidencias'    => $totalIncidencias,
                 'totalMantenimientos' => $totalMantenimientos,
                 'totalGastos'         => $totalGastos,
@@ -381,10 +410,13 @@ class ReporteController extends Controller
             $fechaInicio = $request->fecha_inicio ?? now()->startOfMonth()->format('Y-m-d');
             $fechaFin    = $request->fecha_fin ?? now()->endOfMonth()->format('Y-m-d');
 
-            $totalIngresos = Pago::where('estado_transaccion', EstadoTransaccionEnum::CONFIRMADO->value)
+            $totalCobrado = Pago::where('estado_transaccion', EstadoTransaccionEnum::CONFIRMADO->value)
                 ->whereDate('fecha_pago', '>=', $fechaInicio)
                 ->whereDate('fecha_pago', '<=', $fechaFin)
                 ->sum('monto');
+
+            $totalDevoluciones = $this->devolucionesDeVehiculos(null, $fechaInicio, $fechaFin);
+            $totalIngresos     = $totalCobrado - $totalDevoluciones;
 
             $totalContratos = Contrato::where('estado_contrato', '!=', EstadoContratoEnum::ANULADO->value)
                 ->whereDate('fecha_hora_entrega', '>=', $fechaInicio)
@@ -411,6 +443,8 @@ class ReporteController extends Controller
             $pdf = Pdf::loadView('reportes.desempeno-general', [
                 'fechaInicio'            => $fechaInicio,
                 'fechaFin'               => $fechaFin,
+                'totalCobrado'           => $totalCobrado,
+                'totalDevoluciones'      => $totalDevoluciones,
                 'totalIngresos'          => $totalIngresos,
                 'totalContratos'         => $totalContratos,
                 'totalVehiculos'         => $totalVehiculos,
@@ -483,16 +517,22 @@ class ReporteController extends Controller
                         ->whereDate('fecha_hora_entrega', '<=', $fechaFin)
                         ->count();
 
+                    $devoluciones = $this->devolucionesDeVehiculos([$vehiculo->id], $fechaInicio, $fechaFin);
+
                     return [
-                        'vehiculo'   => $vehiculo,
-                        'ingresos'   => $ingresos,
-                        'num_rentas' => $rentas,
+                        'vehiculo'     => $vehiculo,
+                        'ingresos'     => $ingresos,
+                        'devoluciones' => $devoluciones,
+                        'ingreso_neto' => $ingresos - $devoluciones,
+                        'num_rentas'   => $rentas,
                     ];
                 })
-                ->sortByDesc('ingresos')
+                ->sortByDesc('ingreso_neto')
                 ->values();
 
-            $totalGeneral = $vehiculos->sum('ingresos');
+            $totalCobrado      = $vehiculos->sum('ingresos');
+            $totalDevoluciones = $vehiculos->sum('devoluciones');
+            $totalGeneral      = $vehiculos->sum('ingreso_neto');
 
             $propietario = null;
             if ($propietarioId) {
@@ -503,6 +543,8 @@ class ReporteController extends Controller
 
             $pdf = Pdf::loadView('reportes.ingresos-por-vehiculo', [
                 'vehiculos'           => $vehiculos,
+                'totalCobrado'        => $totalCobrado,
+                'totalDevoluciones'   => $totalDevoluciones,
                 'totalGeneral'        => $totalGeneral,
                 'fechaInicio'         => $fechaInicio,
                 'fechaFin'            => $fechaFin,
@@ -603,25 +645,29 @@ class ReporteController extends Controller
                         ->whereDate('fecha_pago', '<=', $fechaFin)
                         ->sum('monto');
 
-                    $gastoTotal = $this->gastosDeVehiculos([$vehiculo->id], $fechaInicio, $fechaFin)['total'];
+                    $gastoTotal   = $this->gastosDeVehiculos([$vehiculo->id], $fechaInicio, $fechaFin)['total'];
+                    $devoluciones = $this->devolucionesDeVehiculos([$vehiculo->id], $fechaInicio, $fechaFin);
 
                     return [
                         'vehiculo'       => $vehiculo,
                         'ingresos'       => $ingresos,
+                        'devoluciones'   => $devoluciones,
                         'gastos'         => $gastoTotal,
-                        'resultado_neto' => $ingresos - $gastoTotal,
+                        'resultado_neto' => $ingresos - $devoluciones - $gastoTotal,
                     ];
                 })
                 ->sortByDesc('resultado_neto')
                 ->values();
 
-            $totalIngresos = $vehiculos->sum('ingresos');
-            $totalGastos   = $vehiculos->sum('gastos');
-            $totalNeto     = $vehiculos->sum('resultado_neto');
+            $totalIngresos     = $vehiculos->sum('ingresos');
+            $totalDevoluciones = $vehiculos->sum('devoluciones');
+            $totalGastos       = $vehiculos->sum('gastos');
+            $totalNeto         = $vehiculos->sum('resultado_neto');
 
             $pdf = Pdf::loadView('reportes.resultado-neto-por-vehiculo', [
-                'vehiculos'     => $vehiculos,
-                'totalIngresos' => $totalIngresos,
+                'vehiculos'         => $vehiculos,
+                'totalIngresos'     => $totalIngresos,
+                'totalDevoluciones' => $totalDevoluciones,
                 'totalGastos'   => $totalGastos,
                 'totalNeto'     => $totalNeto,
                 'fechaInicio'   => $fechaInicio,

@@ -35,12 +35,11 @@ class DashboardController extends Controller
             ])
             ->count();
 
-        // 2. Reservas del mes (omite canceladas y concluidas)
+        // 2. Reservas del mes (omite canceladas)
         $reservasDelMes = Reserva::whereMonth('fecha_inicio', Carbon::now()->month)
             ->whereYear('fecha_inicio', Carbon::now()->year)
             ->whereNotIn('estado', [
                 EstadoReservaEnum::CANCELADA->value,
-                EstadoReservaEnum::CONCLUIDA->value,
             ])
             ->count();
 

@@ -101,6 +101,11 @@ class Contrato extends Model
             ->sum('monto');
     }
 
+    public function saldoAFavor(): float
+    {
+        return max(0, round($this->montoPagado() - (float) $this->monto_total_renta, 2));
+    }
+
     /**
      * Recalcula y guarda monto_total_renta y estado_pago desde cero:
      * renta base + cargos vigentes + incidencias cobradas al cliente.

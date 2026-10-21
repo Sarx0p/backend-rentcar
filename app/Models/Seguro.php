@@ -41,4 +41,23 @@ class Seguro extends Model
             ->whereDate('fecha_vencimiento', '<=', now()->toDateString())
             ->update(['estado' => SeguroEstadoEnum::VENCIDO->value]);
     }
+
+    public static function faltaCobertura(int $vehiculoId, string $inicio, string $fin): bool
+    {
+        self::vencerVigentes();
+
+        $tieneSeguros = self::where('vehiculo_id', $vehiculoId)
+            ->where('estado', '!=', SeguroEstadoEnum::CANCELADO->value)
+            ->exists();
+
+        if (!$tieneSeguros) {
+            return false;
+        }
+
+        return !self::where('vehiculo_id', $vehiculoId)
+            ->where('estado', SeguroEstadoEnum::VIGENTE->value)
+            ->whereDate('fecha_inicio', '<=', $inicio)
+            ->whereDate('fecha_vencimiento', '>', $fin)
+            ->exists();
+    }
 }

@@ -50,6 +50,14 @@
         </thead>
         <tbody>
             <tr>
+                <td>Total cobrado</td>
+                <td>${{ number_format($totalCobrado ?? 0, 2) }}</td>
+            </tr>
+            <tr>
+                <td>Montos devueltos</td>
+                <td>${{ number_format($totalDevoluciones ?? 0, 2) }}</td>
+            </tr>
+            <tr>
                 <td>Total de ingresos</td>
                 <td>${{ number_format($totalIngresos ?? 0, 2) }}</td>
             </tr>

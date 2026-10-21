@@ -58,6 +58,8 @@ return [
     // Desde cuándo hay datos en el sistema: los reportes no aceptan fechas anteriores
     'reportes_fecha_inicio' => env('REPORTES_FECHA_INICIO', '2026-01-01'),
 
+    'descuento_maximo_porcentaje' => env('DESCUENTO_MAXIMO_PORCENTAJE', 50),
+
     /*
     |--------------------------------------------------------------------------
     | Application Timezone

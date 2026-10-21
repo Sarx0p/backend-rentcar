@@ -94,7 +94,7 @@ class SeguroController extends Controller
             ) {
                 return response()->json([
                     'status'  => 'error',
-                    'message' => 'No tienes permiso para ver los seguros',// error de sintaxis
+                    'message' => 'No tienes permiso para ver los seguros',
                 ], 403);
             }
 
@@ -142,13 +142,17 @@ class SeguroController extends Controller
 
             DB::beginTransaction();
 
-            $seguro->update($request->only([
+            $seguro->update(array_merge($request->only([
                 'vehiculo_id',
                 'aseguradora',
                 'numero_poliza',
                 'fecha_inicio',
                 'fecha_vencimiento',
                 'cobertura',
+            ]), [
+                'estado' => $request->fecha_vencimiento > now()->toDateString()
+                    ? SeguroEstadoEnum::VIGENTE->value
+                    : SeguroEstadoEnum::VENCIDO->value,
             ]));
 
             DB::commit();

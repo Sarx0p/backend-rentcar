@@ -39,6 +39,8 @@
                 <th>Propietario</th>
                 <th>Marca / Modelo</th>
                 <th class="right">N° Rentas</th>
+                <th class="right">Cobrado</th>
+                <th class="right">Devuelto</th>
                 <th class="right">Ingresos</th>
             </tr>
         </thead>
@@ -55,16 +57,20 @@
                 </td>
                 <td class="right">{{ $item['num_rentas'] }}</td>
                 <td class="right">${{ number_format($item['ingresos'], 2) }}</td>
+                <td class="right">${{ number_format($item['devoluciones'], 2) }}</td>
+                <td class="right">${{ number_format($item['ingreso_neto'], 2) }}</td>
             </tr>
             @empty
             <tr>
-                <td colspan="5" style="text-align:center;">No se encontraron resultados para este filtro.</td>
+                <td colspan="7" style="text-align:center;">No se encontraron resultados para este filtro.</td>
             </tr>
             @endforelse
 
             @if($vehiculos->isNotEmpty())
             <tr class="total-destacado">
                 <td colspan="4">Total general</td>
+                <td class="right">${{ number_format($totalCobrado, 2) }}</td>
+                <td class="right">${{ number_format($totalDevoluciones, 2) }}</td>
                 <td class="right">${{ number_format($totalGeneral, 2) }}</td>
             </tr>
             @endif

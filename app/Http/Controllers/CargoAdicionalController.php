@@ -253,10 +253,16 @@ class CargoAdicionalController extends Controller
 
             $cargo->load('contrato:id,numero_contrato,monto_total_renta,estado_pago');
 
+            $saldoAFavor = $contrato->fresh()->saldoAFavor();
+
             return response()->json([
-                'status'  => 'success',
-                'message' => 'Cargo adicional actualizado correctamente',
-                'data'    => $cargo,
+                'status'        => 'success',
+                'message'       => 'Cargo adicional actualizado correctamente',
+                'advertencia'   => $saldoAFavor > 0
+                    ? 'Hay un monto a devolver al cliente de $' . number_format($saldoAFavor, 2) . '.'
+                    : null,
+                'saldo_a_favor' => $saldoAFavor,
+                'data'          => $cargo,
             ], 200);
 
         } catch (ModelNotFoundException $e) {
@@ -314,9 +320,15 @@ class CargoAdicionalController extends Controller
                 $contrato->recalcularTotalYEstadoPago();
             });
 
+            $saldoAFavor = $contrato->fresh()->saldoAFavor();
+
             return response()->json([
-                'status'  => 'success',
-                'message' => 'Cargo adicional eliminado y saldos recalculados correctamente',
+                'status'        => 'success',
+                'message'       => 'Cargo adicional eliminado y saldos recalculados correctamente',
+                'advertencia'   => $saldoAFavor > 0
+                    ? 'Hay un monto a devolver al cliente de $' . number_format($saldoAFavor, 2) . '.'
+                    : null,
+                'saldo_a_favor' => $saldoAFavor,
             ], 200);
 
         } catch (ModelNotFoundException $e) {
