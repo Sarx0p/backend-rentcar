@@ -103,9 +103,7 @@ class PagoController extends Controller
                 ], 422);
             }
 
-            $totalPagadoActual = $contrato->pagos()
-                ->where('estado_transaccion', EstadoTransaccionEnum::CONFIRMADO->value)
-                ->sum('monto');
+            $totalPagadoActual = $contrato->montoPagado();
 
             $saldoPendiente = $contrato->monto_total_renta - $totalPagadoActual;
 
@@ -126,9 +124,7 @@ class PagoController extends Controller
                     'fecha_pago'         => $request->fecha_pago,
                 ]);
 
-                $totalPagado = $contrato->pagos()
-                    ->where('estado_transaccion', EstadoTransaccionEnum::CONFIRMADO->value)
-                    ->sum('monto');
+                $totalPagado = $contrato->montoPagado();
 
                 $contrato->update([
                     'estado_pago' => $totalPagado >= $contrato->monto_total_renta
@@ -273,9 +269,7 @@ class PagoController extends Controller
                 if ($eraConfirmado && $pago->contrato) {
                     $contrato = $pago->contrato;
 
-                    $totalPagadoActual = $contrato->pagos()
-                        ->where('estado_transaccion', EstadoTransaccionEnum::CONFIRMADO->value)
-                        ->sum('monto');
+                    $totalPagadoActual = $contrato->montoPagado();
 
                     if ($totalPagadoActual <= 0) {
                         $nuevoEstadoPago = EstadoPagoEnum::PENDIENTE->value;

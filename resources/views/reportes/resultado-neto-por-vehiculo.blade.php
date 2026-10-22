@@ -31,6 +31,7 @@
                 <th class="right">Ingresos</th>
                 <th class="right">Devuelto</th>
                 <th class="right">Gastos</th>
+                <th class="right">Diferencia por daños</th>
                 <th class="right">Resultado Neto</th>
             </tr>
         </thead>
@@ -49,6 +50,7 @@
                 <td class="right">${{ number_format($item['ingresos'], 2) }}</td>
                 <td class="right">${{ number_format($item['devoluciones'], 2) }}</td>
                 <td class="right">${{ number_format($item['gastos'], 2) }}</td>
+                <td class="right" style="{{ $item['diferencia_danios'] < 0 ? 'color:#b00000;' : '' }}">${{ number_format($item['diferencia_danios'], 2) }}</td>
                 <td class="right" style="{{ $item['resultado_neto'] < 0 ? 'color:#b00000;' : '' }}">
                     ${{ number_format($item['resultado_neto'], 2) }}
                 </td>
@@ -60,12 +62,15 @@
                 <td class="right">${{ number_format($totalIngresos, 2) }}</td>
                 <td class="right">${{ number_format($totalDevoluciones, 2) }}</td>
                 <td class="right">${{ number_format($totalGastos, 2) }}</td>
+                <td class="right">${{ number_format($totalDiferenciaDanios, 2) }}</td>
                 <td class="right" style="{{ $totalNeto < 0 ? 'color:#b00000;' : '' }}">
                     ${{ number_format($totalNeto, 2) }}
                 </td>
             </tr>
         </tbody>
     </table>
+
+    <div class="nota-final">La diferencia por daños es lo que se le cobró al cliente por daños menos lo que costó repararlos. Ya está incluida en los ingresos y los gastos; se muestra aparte para ver cuánto se ganó o perdió por esos daños.</div>
 
     <div class="nota-final">Reporte generado automáticamente por el sistema.</div>
 

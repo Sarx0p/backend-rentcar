@@ -22,6 +22,8 @@ class Contrato extends Model
         'vehiculo_id',
         'info_registro',
         'reserva_id',
+        'contrato_origen_id',
+        'saldo_trasladado',
         'fecha_hora_entrega',
         'fecha_hora_devolucion',
         'dias_acordados',
@@ -48,6 +50,7 @@ class Contrato extends Model
         'precio_por_dia'        => 'decimal:2',
         'monto_descuento'       => 'decimal:2',
         'monto_total_renta'     => 'decimal:2',
+        'saldo_trasladado'      => 'decimal:2',
         'info_registro'         => 'array',
     ];
 
@@ -91,14 +94,28 @@ class Contrato extends Model
         return $this->hasMany(Incidencia::class, 'contrato_id');
     }
 
+    public function contratoOrigen(): BelongsTo
+    {
+        return $this->belongsTo(Contrato::class, 'contrato_origen_id');
+    }
+
+    public function continuacion(): HasOne
+    {
+        return $this->hasOne(Contrato::class, 'contrato_origen_id');
+    }
+
     /**
      * Suma de pagos confirmados del contrato.
      */
     public function montoPagado(): float
     {
-        return (float) $this->pagos()
+        $pagos = (float) $this->pagos()
             ->where('estado_transaccion', EstadoTransaccionEnum::CONFIRMADO->value)
             ->sum('monto');
+
+        $trasladadoAlSiguiente = (float) $this->continuacion()->sum('saldo_trasladado');
+
+        return round($pagos + (float) $this->saldo_trasladado - $trasladadoAlSiguiente, 2);
     }
 
     public function saldoAFavor(): float
@@ -128,13 +145,11 @@ class Contrato extends Model
         $total  = $base + $cargos + $incidencias;
         $pagado = $this->montoPagado();
 
-        $estado = $total <= 0
+        $estado = $pagado >= $total
             ? EstadoPagoEnum::PAGADO->value
-            : ($pagado >= $total
-                ? EstadoPagoEnum::PAGADO->value
-                : ($pagado > 0
-                    ? EstadoPagoEnum::PARCIAL->value
-                    : EstadoPagoEnum::PENDIENTE->value));
+            : ($pagado > 0
+                ? EstadoPagoEnum::PARCIAL->value
+                : EstadoPagoEnum::PENDIENTE->value);
 
         $this->update([
             'monto_total_renta' => $total,

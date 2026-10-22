@@ -32,6 +32,10 @@
             <div class="card-value">${{ number_format($totalGastos ?? 0, 2) }}</div>
         </div>
         <div class="card">
+            <div class="card-label">Diferencia por daños</div>
+            <div class="card-value">${{ number_format($totalDiferenciaDanios ?? 0, 2) }}</div>
+        </div>
+        <div class="card">
             <div class="card-label">Administración ({{ number_format($porcentajeAdmin ?? 0, 2) }}%)</div>
             <div class="card-value">${{ number_format($totalAdministracion ?? 0, 2) }}</div>
         </div>
@@ -55,6 +59,7 @@
                 <th class="right">Gasto Incidencias</th>
                 <th class="right">Gasto Mantenimientos</th>
                 <th class="right">Gasto Total</th>
+                <th class="right">Diferencia por daños</th>
                 <th class="right">Administración ({{ number_format($porcentajeAdmin ?? 0, 2) }}%)</th>
                 <th class="right">Resultado Neto</th>
             </tr>
@@ -69,6 +74,7 @@
                     <td class="right">${{ number_format($item['gasto_incidencias'], 2) }}</td>
                     <td class="right">${{ number_format($item['gasto_mantenimientos'], 2) }}</td>
                     <td class="right">${{ number_format($item['gasto_total'], 2) }}</td>
+                    <td class="right" style="{{ $item['diferencia_danios'] < 0 ? 'color:#b00000;' : '' }}">${{ number_format($item['diferencia_danios'], 2) }}</td>
                     <td class="right">
                         @if($item['aplica_administracion'])
                             ${{ number_format($item['monto_administracion'], 2) }}
@@ -80,7 +86,7 @@
                 </tr>
             @empty
                 <tr>
-                    <td colspan="9">No hay propietarios registrados.</td>
+                    <td colspan="10">No hay propietarios registrados.</td>
                 </tr>
             @endforelse
 
@@ -91,11 +97,14 @@
                 <td class="right">${{ number_format($totalIncidencias ?? 0, 2) }}</td>
                 <td class="right">${{ number_format($totalMantenimientos ?? 0, 2) }}</td>
                 <td class="right">${{ number_format($totalGastos ?? 0, 2) }}</td>
+                <td class="right">${{ number_format($totalDiferenciaDanios ?? 0, 2) }}</td>
                 <td class="right">${{ number_format($totalAdministracion ?? 0, 2) }}</td>
                 <td class="right">${{ number_format($totalNeto ?? 0, 2) }}</td>
             </tr>
         </tbody>
     </table>
+
+    <div class="nota-final">La diferencia por daños es lo que se le cobró al cliente por daños menos lo que costó repararlos. Ya está incluida en los ingresos y los gastos; se muestra aparte para ver cuánto ganó o perdió el propietario por esos daños.</div>
 
     @foreach($propietarios as $item)
         @if(isset($item['incidencias_detalle']) && $item['incidencias_detalle']->isNotEmpty())
@@ -122,6 +131,44 @@
                             <td class="right">${{ number_format($inc->costo, 2) }}</td>
                         </tr>
                     @endforeach
+                </tbody>
+            </table>
+        @endif
+
+        @if(isset($item['danios_detalle']) && $item['danios_detalle']->isNotEmpty())
+            <div class="seccion-titulo">
+                Daños cobrados al cliente — {{ $item['propietario']->nombre ?? 'N/A' }}
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Vehículo</th>
+                        <th>Fecha</th>
+                        <th>Descripción</th>
+                        <th class="right">Cobrado al cliente</th>
+                        <th class="right">Costo real</th>
+                        <th class="right">Diferencia</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach($item['danios_detalle'] as $danio)
+                        <tr>
+                            <td>{{ $danio['placa'] }}</td>
+                            <td>{{ \Carbon\Carbon::parse($danio['fecha'])->format('d/m/Y') }}</td>
+                            <td>{{ $danio['descripcion'] }}</td>
+                            <td class="right">${{ number_format($danio['cobrado'], 2) }}</td>
+                            @if($danio['pendiente'])
+                                <td class="right" colspan="2">Pendiente de reparación</td>
+                            @else
+                                <td class="right">${{ number_format($danio['costo'], 2) }}</td>
+                                <td class="right" style="{{ $danio['diferencia'] < 0 ? 'color:#b00000;' : '' }}">${{ number_format($danio['diferencia'], 2) }}</td>
+                            @endif
+                        </tr>
+                    @endforeach
+                    <tr class="total-destacado">
+                        <td colspan="5">Diferencia por daños</td>
+                        <td class="right">${{ number_format($item['diferencia_danios'], 2) }}</td>
+                    </tr>
                 </tbody>
             </table>
         @endif

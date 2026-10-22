@@ -119,9 +119,7 @@ class CierreRentaController extends Controller
                 ? (int) ceil($fechaLimite->diffInMinutes($fechaRecepcionReal, false) / 60)
                 : 0;
 
-                $totalPagado = (float) $contrato->pagos()
-                    ->where('estado_transaccion', EstadoTransaccionEnum::CONFIRMADO->value)
-                    ->sum('monto');
+                $totalPagado = $contrato->montoPagado();
 
                 $tarifaHoraRetraso = 5.00;
                 $montoRetraso      = 0;
