@@ -73,6 +73,78 @@ class ReporteController extends Controller
             ->sum('monto_devuelto');
     }
 
+    private function trasladosDeVehiculos($vehiculoIds, $fechaInicio, $fechaFin): float
+    {
+        $entrantes = Contrato::whereIn('vehiculo_id', $vehiculoIds)
+            ->whereNotNull('contrato_origen_id')
+            ->whereDate('fecha_hora_entrega', '>=', $fechaInicio)
+            ->whereDate('fecha_hora_entrega', '<=', $fechaFin)
+            ->sum('saldo_trasladado');
+
+        $salientes = Contrato::whereNotNull('contrato_origen_id')
+            ->whereHas('contratoOrigen', fn ($q) => $q->whereIn('vehiculo_id', $vehiculoIds))
+            ->whereDate('fecha_hora_entrega', '>=', $fechaInicio)
+            ->whereDate('fecha_hora_entrega', '<=', $fechaFin)
+            ->sum('saldo_trasladado');
+
+        return (float) $entrantes - (float) $salientes;
+    }
+
+    private function daniosClienteDeVehiculos($vehiculoIds, $fechaInicio, $fechaFin): array
+    {
+        $reparados = Mantenimiento::with(['incidencia', 'vehiculo:id,placa'])
+            ->whereIn('vehiculo_id', $vehiculoIds)
+            ->where('estado', '!=', EstadoMantenimientoEnum::CANCELADO->value)
+            ->whereDate('fecha', '>=', $fechaInicio)
+            ->whereDate('fecha', '<=', $fechaFin)
+            ->whereHas('incidencia', function ($q) {
+                $q->where('responsable_tipo', IncidenciaTipoResponsableEnum::CLIENTE->value)
+                    ->where('estado_incidencia', '!=', IncidenciaEstadoEnum::ANULADA->value);
+            })
+            ->orderBy('fecha')
+            ->get()
+            ->map(fn ($mantenimiento) => [
+                'placa'       => optional($mantenimiento->vehiculo)->placa,
+                'fecha'       => $mantenimiento->fecha,
+                'descripcion' => $mantenimiento->incidencia->descripcion,
+                'cobrado'     => (float) $mantenimiento->incidencia->costo,
+                'costo'       => (float) $mantenimiento->costo,
+                'diferencia'  => round((float) $mantenimiento->incidencia->costo - (float) $mantenimiento->costo, 2),
+                'pendiente'   => false,
+            ]);
+
+        $incidenciasConMantenimiento = Mantenimiento::whereNotNull('incidencia_id')
+            ->where('estado', '!=', EstadoMantenimientoEnum::CANCELADO->value)
+            ->pluck('incidencia_id');
+
+        $pendientes = Incidencia::with('vehiculo:id,placa')
+            ->whereIn('vehiculo_id', $vehiculoIds)
+            ->where('responsable_tipo', IncidenciaTipoResponsableEnum::CLIENTE->value)
+            ->whereNotIn('estado_incidencia', [
+                IncidenciaEstadoEnum::ANULADA->value,
+                IncidenciaEstadoEnum::RESUELTA->value,
+            ])
+            ->whereNotIn('id', $incidenciasConMantenimiento)
+            ->whereDate('fecha', '>=', $fechaInicio)
+            ->whereDate('fecha', '<=', $fechaFin)
+            ->orderBy('fecha')
+            ->get()
+            ->map(fn ($incidencia) => [
+                'placa'       => optional($incidencia->vehiculo)->placa,
+                'fecha'       => $incidencia->fecha,
+                'descripcion' => $incidencia->descripcion,
+                'cobrado'     => (float) $incidencia->costo,
+                'costo'       => null,
+                'diferencia'  => null,
+                'pendiente'   => true,
+            ]);
+
+        return [
+            'diferencia' => round($reparados->sum('diferencia'), 2),
+            'detalle'    => $reparados->concat($pendientes)->values(),
+        ];
+    }
+
     // El empleado solo entra a reportes sin dinero (estado de flota, licencias, reservas canceladas)
     private function tienePermiso($incluirContador = false, $incluirEmpleado = true): bool
     {
@@ -273,7 +345,10 @@ class ReporteController extends Controller
                         ->whereDate('fecha_pago', '<=', $fechaFin)
                         ->sum('monto');
 
+                    $ingresos += $this->trasladosDeVehiculos($vehiculoIds, $fechaInicio, $fechaFin);
+
                     $devoluciones = $this->devolucionesDeVehiculos($vehiculoIds, $fechaInicio, $fechaFin);
+                    $danios       = $this->daniosClienteDeVehiculos($vehiculoIds, $fechaInicio, $fechaFin);
                     $ingresoNeto  = $ingresos - $devoluciones;
 
                     $mantenimientos = Mantenimiento::whereIn('vehiculo_id', $vehiculoIds)
@@ -315,6 +390,8 @@ class ReporteController extends Controller
                         'gasto_mantenimientos'   => $gastoMantenimientos,
                         'mantenimientos_detalle' => $mantenimientos,
                         'gasto_total'            => $gastoTotal,
+                        'diferencia_danios'      => $danios['diferencia'],
+                        'danios_detalle'         => $danios['detalle'],
                         'aplica_administracion'  => $aplicaAdministracion,
                         'monto_administracion'   => $montoAdministracion,
                         'resultado_neto'         => $ingresoNeto - $gastoTotal - $montoAdministracion,
@@ -328,6 +405,7 @@ class ReporteController extends Controller
             $totalIncidencias    = $propietarios->sum('gasto_incidencias');
             $totalMantenimientos = $propietarios->sum('gasto_mantenimientos');
             $totalGastos         = $propietarios->sum('gasto_total');
+            $totalDiferenciaDanios = $propietarios->sum('diferencia_danios');
             $totalAdministracion = $propietarios->sum('monto_administracion');
             $totalNeto           = $propietarios->sum('resultado_neto');
 
@@ -338,6 +416,7 @@ class ReporteController extends Controller
                 'totalIncidencias'    => $totalIncidencias,
                 'totalMantenimientos' => $totalMantenimientos,
                 'totalGastos'         => $totalGastos,
+                'totalDiferenciaDanios' => $totalDiferenciaDanios,
                 'totalAdministracion' => $totalAdministracion,
                 'totalNeto'           => $totalNeto,
                 'porcentajeAdmin'     => $porcentajeAdmin,
@@ -419,6 +498,7 @@ class ReporteController extends Controller
             $totalIngresos     = $totalCobrado - $totalDevoluciones;
 
             $totalContratos = Contrato::where('estado_contrato', '!=', EstadoContratoEnum::ANULADO->value)
+                ->whereNull('contrato_origen_id')
                 ->whereDate('fecha_hora_entrega', '>=', $fechaInicio)
                 ->whereDate('fecha_hora_entrega', '<=', $fechaFin)
                 ->count();
@@ -516,6 +596,8 @@ class ReporteController extends Controller
                         ->whereDate('fecha_hora_entrega', '>=', $fechaInicio)
                         ->whereDate('fecha_hora_entrega', '<=', $fechaFin)
                         ->count();
+
+                    $ingresos += $this->trasladosDeVehiculos([$vehiculo->id], $fechaInicio, $fechaFin);
 
                     $devoluciones = $this->devolucionesDeVehiculos([$vehiculo->id], $fechaInicio, $fechaFin);
 
@@ -645,14 +727,18 @@ class ReporteController extends Controller
                         ->whereDate('fecha_pago', '<=', $fechaFin)
                         ->sum('monto');
 
+                    $ingresos += $this->trasladosDeVehiculos([$vehiculo->id], $fechaInicio, $fechaFin);
+
                     $gastoTotal   = $this->gastosDeVehiculos([$vehiculo->id], $fechaInicio, $fechaFin)['total'];
                     $devoluciones = $this->devolucionesDeVehiculos([$vehiculo->id], $fechaInicio, $fechaFin);
+                    $danios       = $this->daniosClienteDeVehiculos([$vehiculo->id], $fechaInicio, $fechaFin);
 
                     return [
                         'vehiculo'       => $vehiculo,
                         'ingresos'       => $ingresos,
                         'devoluciones'   => $devoluciones,
                         'gastos'         => $gastoTotal,
+                        'diferencia_danios' => $danios['diferencia'],
                         'resultado_neto' => $ingresos - $devoluciones - $gastoTotal,
                     ];
                 })
@@ -662,6 +748,7 @@ class ReporteController extends Controller
             $totalIngresos     = $vehiculos->sum('ingresos');
             $totalDevoluciones = $vehiculos->sum('devoluciones');
             $totalGastos       = $vehiculos->sum('gastos');
+            $totalDiferenciaDanios = $vehiculos->sum('diferencia_danios');
             $totalNeto         = $vehiculos->sum('resultado_neto');
 
             $pdf = Pdf::loadView('reportes.resultado-neto-por-vehiculo', [
@@ -669,6 +756,7 @@ class ReporteController extends Controller
                 'totalIngresos'     => $totalIngresos,
                 'totalDevoluciones' => $totalDevoluciones,
                 'totalGastos'   => $totalGastos,
+                'totalDiferenciaDanios' => $totalDiferenciaDanios,
                 'totalNeto'     => $totalNeto,
                 'fechaInicio'   => $fechaInicio,
                 'fechaFin'      => $fechaFin,
@@ -709,7 +797,7 @@ class ReporteController extends Controller
                 ->where('estado_contrato', '!=', EstadoContratoEnum::ANULADO->value)
                 ->get()
                 ->map(function ($contrato) {
-                    $totalPagado = $contrato->pagos->sum('monto');
+                    $totalPagado = $contrato->montoPagado();
 
                     return [
                         'contrato'      => $contrato,

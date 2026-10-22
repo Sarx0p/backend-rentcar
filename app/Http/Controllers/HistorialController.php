@@ -17,7 +17,7 @@ class HistorialController extends Controller
             $cliente = Cliente::findOrFail($clienteId);
 
             $totalReservas = $cliente->reservas()->count();
-            $totalContratos = $cliente->contratos()->count();
+            $totalContratos = $cliente->contratos()->whereNull('contrato_origen_id')->count();
 
             $contratosIds = $cliente->contratos()->pluck('id');
             $totalIncidencias = Incidencia::whereIn('contrato_id', $contratosIds)

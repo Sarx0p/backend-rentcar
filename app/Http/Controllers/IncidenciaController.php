@@ -213,10 +213,13 @@ class IncidenciaController extends Controller
         try {
             $incidencia = Incidencia::with(['contrato', 'vehiculo'])->findOrFail($id);
 
-            if ($incidencia->contrato && $incidencia->contrato->estado_contrato !== EstadoContratoEnum::ACTIVO->value) {
+            $esDelCliente = $incidencia->responsable_tipo === IncidenciaTipoResponsableEnum::CLIENTE->value
+                || $request->input('responsable_tipo') === IncidenciaTipoResponsableEnum::CLIENTE->value;
+
+            if ($esDelCliente && $incidencia->contrato && $incidencia->contrato->estado_contrato !== EstadoContratoEnum::ACTIVO->value) {
                 return response()->json([
                     'status'  => 'error',
-                    'message' => 'No se puede modificar una incidencia de un contrato que ya está ' . $incidencia->contrato->estado_contrato . '.',
+                    'message' => 'No se puede modificar una incidencia del cliente de un contrato que ya está ' . $incidencia->contrato->estado_contrato . '.',
                 ], 422);
             }
 
@@ -235,7 +238,7 @@ class IncidenciaController extends Controller
 
                 $incidencia->refresh();
 
-                if ($incidencia->contrato) {
+                if ($incidencia->contrato && $incidencia->contrato->estado_contrato === EstadoContratoEnum::ACTIVO->value) {
                     $incidencia->contrato->recalcularTotalYEstadoPago();
                 }
 
@@ -305,10 +308,14 @@ class IncidenciaController extends Controller
                 ], 409);
             }
 
-            if ($incidencia->contrato && $incidencia->contrato->estado_contrato !== EstadoContratoEnum::ACTIVO->value) {
+            if (
+                $incidencia->responsable_tipo === IncidenciaTipoResponsableEnum::CLIENTE->value
+                && $incidencia->contrato
+                && $incidencia->contrato->estado_contrato !== EstadoContratoEnum::ACTIVO->value
+            ) {
                 return response()->json([
                     'status'  => 'error',
-                    'message' => 'No se puede anular una incidencia de un contrato que ya está ' . $incidencia->contrato->estado_contrato . '.',
+                    'message' => 'No se puede anular una incidencia del cliente de un contrato que ya está ' . $incidencia->contrato->estado_contrato . '.',
                 ], 422);
             }
 
@@ -317,7 +324,7 @@ class IncidenciaController extends Controller
                     'estado_incidencia' => IncidenciaEstadoEnum::ANULADA->value,
                 ]);
 
-                if ($incidencia->contrato) {
+                if ($incidencia->contrato && $incidencia->contrato->estado_contrato === EstadoContratoEnum::ACTIVO->value) {
                     $incidencia->contrato->recalcularTotalYEstadoPago();
                 }
             });

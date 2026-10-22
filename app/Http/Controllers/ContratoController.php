@@ -10,15 +10,17 @@ use App\Enums\EstadoReservaEnum;
 use App\Enums\VehiculoEstadoEnum;
 use App\Enums\IncidenciaEstadoEnum;
 use App\Enums\TipoIncidenciaEnum;
+use App\Enums\CierreRentaEstadoEnum;
 use App\Http\Requests\ContratoController\StoreContratoRequest;
 use App\Http\Requests\ContratoController\StoreContratoDirectoRequest;
 use App\Http\Requests\ContratoController\CambiarVehiculoRequest;
+use App\Http\Requests\ContratoController\AnularContratoRequest;
 use App\Models\Contrato;
 use App\Models\Reserva;
 use App\Models\Cliente;
 use App\Models\Vehiculo;
 use App\Models\Incidencia;
-use App\Models\Seguro;
+use App\Models\CierreRenta;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -111,131 +113,10 @@ class ContratoController extends Controller
                 'cliente.municipio.departamento',
             ])->findOrFail($request->reserva_id);
 
-            if ($reserva->estado !== EstadoReservaEnum::PENDIENTE->value) {
-                return response()->json([
-                    'status'  => 'error',
-                    'message' => 'Solo se puede crear un contrato para una reserva en estado PENDIENTE',
-                ], 422);
-            }
-
-            if ($reserva->contrato) {
-                return response()->json([
-                    'status'  => 'error',
-                    'message' => 'Esta reserva ya tiene un contrato generado',
-                ], 422);
-            }
-
-            if ($reserva->cliente->vencimiento_licencia->isPast()) {
-                return response()->json([
-                    'status'  => 'error',
-                    'message' => 'El cliente tiene la licencia vencida, no puede generar el contrato',
-                ], 422);
-            }
-
-            $entrega = Carbon::parse($request->fecha_hora_entrega);
-
-            if (!$entrega->isSameDay($reserva->fecha_inicio)) {
-                return response()->json([
-                    'status'  => 'error',
-                    'message' => 'La entrega debe realizarse el día de inicio de la reserva',
-                ], 422);
-            }
-
+            $entrega    = Carbon::parse($request->fecha_hora_entrega);
             $dias       = max(1, (int) $reserva->fecha_inicio->diffInDays($reserva->fecha_fin));
             $devolucion = $entrega->copy()->addDays($dias);
-
-            if ($request->filled('vehiculo_id') && (int) $request->vehiculo_id !== (int) $reserva->vehiculo_id) {
-                return response()->json([
-                    'status'  => 'error',
-                    'message' => 'El vehículo enviado no coincide con el de la reserva',
-                ], 422);
-            }
-
-            $vehiculo = $reserva->vehiculo;
-
-            if ($vehiculo->estado !== VehiculoEstadoEnum::DISPONIBLE->value) {
-                return response()->json([
-                    'status'  => 'error',
-                    'message' => 'El vehículo no está disponible, estado actual: ' . $vehiculo->estado,
-                ], 422);
-            }
-
-            if ($reserva->cliente->vencimiento_dui->isPast()) {
-                return response()->json([
-                    'status'  => 'error',
-                    'message' => 'El cliente tiene el DUI vencido, no puede generar el contrato',
-                ], 422);
-            }
-
-            if ($reserva->cliente->vencimiento_licencia->lte($devolucion->copy()->startOfDay())) {
-                return response()->json([
-                    'status'  => 'error',
-                    'message' => 'La licencia del cliente vence el ' . $reserva->cliente->vencimiento_licencia->format('d/m/Y') . ', antes de la devolución del vehículo',
-                ], 422);
-            }
-
-            if ($reserva->cliente->vencimiento_dui->lte($devolucion->copy()->startOfDay())) {
-                return response()->json([
-                    'status'  => 'error',
-                    'message' => 'El DUI del cliente vence el ' . $reserva->cliente->vencimiento_dui->format('d/m/Y') . ', antes de la devolución del vehículo',
-                ], 422);
-            }
-
-            if (Seguro::faltaCobertura($vehiculo->id, $entrega->toDateString(), $devolucion->toDateString())) {
-                return response()->json([
-                    'status'  => 'error',
-                    'message' => 'El vehículo no tiene un seguro vigente que cubra hasta el ' . $devolucion->format('d/m/Y') . '. Renueva el seguro antes de rentarlo.',
-                ], 422);
-            }
-
-            $contratoTraslapado = Contrato::where('vehiculo_id', $vehiculo->id)
-                ->where('estado_contrato', EstadoContratoEnum::ACTIVO->value)
-                ->where(function ($query) use ($entrega, $devolucion) {
-                    $query->where('fecha_hora_entrega', '<', $devolucion)
-                        ->where('fecha_hora_devolucion', '>', $entrega);
-                })
-                ->exists();
-
-            if ($contratoTraslapado) {
-                return response()->json([
-                    'status'  => 'error',
-                    'message' => 'El vehículo ya tiene un contrato activo que se traslapa con esas fechas',
-                ], 422);
-            }
-
-            $tieneContratoActivo = Contrato::where('cliente_id', $reserva->cliente_id)
-                ->where('estado_contrato', EstadoContratoEnum::ACTIVO->value)
-                ->exists();
-
-            if ($tieneContratoActivo) {
-                return response()->json([
-                    'status'  => 'error',
-                    'message' => 'Este cliente ya tiene un contrato activo. No se puede generar otro hasta cerrarlo.',
-                ], 422);
-            }
-
-            $contratoConDeuda = Contrato::where('cliente_id', $reserva->cliente_id)
-                ->where('estado_contrato', EstadoContratoEnum::FINALIZADO->value)
-                ->where('estado_pago', '!=', EstadoPagoEnum::PAGADO->value)
-                ->first();
-
-            if ($contratoConDeuda) {
-                return response()->json([
-                    'status'  => 'error',
-                    'message' => 'El cliente tiene un saldo pendiente en el contrato ' . $contratoConDeuda->numero_contrato . '. Debe pagarlo antes de rentar otro vehículo.',
-                ], 422);
-            }
-
-            $subtotal          = $dias * (float) $vehiculo->categoria->precio_dia;
-            $porcentajeMaximo  = (float) config('app.descuento_maximo_porcentaje');
-            $descuentoMaximo   = round($subtotal * $porcentajeMaximo / 100, 2);
-
-            if (($request->monto_descuento ?? 0) > $descuentoMaximo) {
-                return response()->json([
-                    'status'  => 'error',
-                    'message' => 'El descuento no puede ser mayor al ' . $porcentajeMaximo . '% de la renta ($' . number_format($descuentoMaximo, 2) . ')',
-                ], 422);
-            }
+            $vehiculo   = $reserva->vehiculo;
 
             $incidenciasEsteticas = $vehiculo->incidencias()
                 ->where('estado_incidencia', '!=', IncidenciaEstadoEnum::RESUELTA->value)
@@ -337,128 +218,10 @@ class ContratoController extends Controller
         try {
             $cliente = Cliente::with('municipio.departamento')->findOrFail($request->cliente_id);
 
-            if ($cliente->vencimiento_licencia->isPast()) {
-                return response()->json([
-                    'status'  => 'error',
-                    'message' => 'El cliente tiene la licencia vencida, no puede rentar un vehículo',
-                ], 422);
-            }
-
-            $tieneContratoActivo = Contrato::where('cliente_id', $cliente->id)
-                ->where('estado_contrato', EstadoContratoEnum::ACTIVO->value)
-                ->exists();
-
-            if ($tieneContratoActivo) {
-                return response()->json([
-                    'status'  => 'error',
-                    'message' => 'Este cliente ya tiene un contrato activo. No se puede generar otro hasta cerrarlo.',
-                ], 422);
-            }
-
-            $contratoConDeuda = Contrato::where('cliente_id', $cliente->id)
-                ->where('estado_contrato', EstadoContratoEnum::FINALIZADO->value)
-                ->where('estado_pago', '!=', EstadoPagoEnum::PAGADO->value)
-                ->first();
-
-            if ($contratoConDeuda) {
-                return response()->json([
-                    'status'  => 'error',
-                    'message' => 'El cliente tiene un saldo pendiente en el contrato ' . $contratoConDeuda->numero_contrato . '. Debe pagarlo antes de rentar otro vehículo.',
-                ], 422);
-            }
-
             $vehiculo = Vehiculo::with(['modelo.marca', 'categoria'])->findOrFail($request->vehiculo_id);
 
-            if ($vehiculo->estado !== VehiculoEstadoEnum::DISPONIBLE->value) {
-                return response()->json([
-                    'status'  => 'error',
-                    'message' => 'El vehículo no está disponible, estado actual: ' . $vehiculo->estado,
-                ], 422);
-            }
             $fechaEntrega    = now();
             $fechaDevolucion = $fechaEntrega->copy()->addDays($request->dias_acordados);
-
-            if ($cliente->vencimiento_dui->isPast()) {
-                return response()->json([
-                    'status'  => 'error',
-                    'message' => 'El cliente tiene el DUI vencido, no puede rentar un vehículo',
-                ], 422);
-            }
-
-            if ($cliente->vencimiento_licencia->lte($fechaDevolucion->copy()->startOfDay())) {
-                return response()->json([
-                    'status'  => 'error',
-                    'message' => 'La licencia del cliente vence el ' . $cliente->vencimiento_licencia->format('d/m/Y') . ', antes de la devolución del vehículo',
-                ], 422);
-            }
-
-            if ($cliente->vencimiento_dui->lte($fechaDevolucion->copy()->startOfDay())) {
-                return response()->json([
-                    'status'  => 'error',
-                    'message' => 'El DUI del cliente vence el ' . $cliente->vencimiento_dui->format('d/m/Y') . ', antes de la devolución del vehículo',
-                ], 422);
-            }
-
-            if (Seguro::faltaCobertura($vehiculo->id, $fechaEntrega->toDateString(), $fechaDevolucion->toDateString())) {
-                return response()->json([
-                    'status'  => 'error',
-                    'message' => 'El vehículo no tiene un seguro vigente que cubra hasta el ' . $fechaDevolucion->format('d/m/Y') . '. Renueva el seguro antes de rentarlo.',
-                ], 422);
-            }
-            $contratoTraslapado = Contrato::where('vehiculo_id', $vehiculo->id)
-                ->where('estado_contrato', EstadoContratoEnum::ACTIVO->value)
-                ->where(function ($query) use ($fechaEntrega, $fechaDevolucion) {
-                    $query->where('fecha_hora_entrega', '<', $fechaDevolucion)
-                        ->where('fecha_hora_devolucion', '>', $fechaEntrega);
-                })
-                ->exists();
-
-            if ($contratoTraslapado) {
-                return response()->json([
-                    'status'  => 'error',
-                    'message' => 'El vehículo ya tiene un contrato activo que se traslapa con esas fechas',
-                ], 422);
-            }
-
-            $reservaTraslapada = Reserva::where('vehiculo_id', $vehiculo->id)
-                ->whereIn('estado', [EstadoReservaEnum::PENDIENTE->value, EstadoReservaEnum::CONFIRMADA->value])
-                ->where(function ($query) use ($fechaEntrega, $fechaDevolucion) {
-                    $query->whereDate('fecha_inicio', '<', $fechaDevolucion->toDateString())
-                        ->whereDate('fecha_fin', '>', $fechaEntrega->toDateString());
-                })
-                ->exists();
-
-            if ($reservaTraslapada) {
-                return response()->json([
-                    'status'  => 'error',
-                    'message' => 'El vehículo tiene una reserva que se traslapa con estas fechas. No se puede generar un contrato directo.',
-                ], 422);
-            }
-
-            $reservaClienteTraslapada = Reserva::where('cliente_id', $request->cliente_id)
-                ->whereIn('estado', [EstadoReservaEnum::PENDIENTE->value, EstadoReservaEnum::CONFIRMADA->value])
-                ->where(function ($query) use ($fechaEntrega, $fechaDevolucion) {
-                    $query->whereDate('fecha_inicio', '<', $fechaDevolucion->toDateString())
-                        ->whereDate('fecha_fin', '>', $fechaEntrega->toDateString());
-                })
-                ->exists();
-
-            if ($reservaClienteTraslapada) {
-                return response()->json([
-                    'status'  => 'error',
-                    'message' => 'Este cliente ya tiene una reserva activa que se traslapa con estas fechas. Genera el contrato desde esa reserva o cancélala primero.',
-                ], 422);
-            }
-            $subtotal          = $request->dias_acordados * (float) $vehiculo->categoria->precio_dia;
-            $porcentajeMaximo  = (float) config('app.descuento_maximo_porcentaje');
-            $descuentoMaximo   = round($subtotal * $porcentajeMaximo / 100, 2);
-
-            if (($request->monto_descuento ?? 0) > $descuentoMaximo) {
-                return response()->json([
-                    'status'  => 'error',
-                    'message' => 'El descuento no puede ser mayor al ' . $porcentajeMaximo . '% de la renta ($' . number_format($descuentoMaximo, 2) . ')',
-                ], 422);
-            }
 
             $incidenciasEsteticas = $vehiculo->incidencias()
                 ->where('estado_incidencia', '!=', IncidenciaEstadoEnum::RESUELTA->value)
@@ -555,50 +318,23 @@ class ContratoController extends Controller
     public function cambiarVehiculo(CambiarVehiculoRequest $request, string $id)
     {
         try {
-            $contrato = Contrato::with('vehiculo')->findOrFail($id);
-
-            if ($contrato->estado_contrato !== EstadoContratoEnum::ACTIVO->value) {
-                return response()->json([
-                    'status'  => 'error',
-                    'message' => 'Solo se puede cambiar el vehículo de un contrato ACTIVO',
-                ], 422);
-            }
+            $contrato = Contrato::with(['vehiculo', 'reserva', 'cliente.municipio.departamento'])->findOrFail($id);
 
             $vehiculoAnterior = $contrato->vehiculo;
-            $vehiculoNuevo    = Vehiculo::findOrFail($request->vehiculo_nuevo_id);
+            $vehiculoNuevo    = Vehiculo::with(['modelo.marca', 'categoria'])->findOrFail($request->vehiculo_nuevo_id);
+            $ahora            = now();
 
-            if ((int) $vehiculoNuevo->id === (int) $vehiculoAnterior->id) {
-                return response()->json([
-                    'status'  => 'error',
-                    'message' => 'El vehículo de reemplazo debe ser distinto al actual',
-                ], 422);
-            }
+            $diasAcordados = (int) $contrato->dias_acordados;
+            $minutos       = max(0, intdiv($ahora->getTimestamp() - $contrato->fecha_hora_entrega->getTimestamp(), 60));
+            $diasCompletos = intdiv($minutos, 1440);
+            $diasUsados    = $diasCompletos + (($minutos - $diasCompletos * 1440) > 120 ? 1 : 0);
+            $diasUsados    = max(1, min($diasUsados, $diasAcordados));
+            $diasRestantes = $diasAcordados - $diasUsados;
 
-            if ($vehiculoNuevo->estado !== VehiculoEstadoEnum::DISPONIBLE->value) {
-                return response()->json([
-                    'status'  => 'error',
-                    'message' => 'El vehículo de reemplazo no está disponible, estado actual: ' . $vehiculoNuevo->estado,
-                ], 422);
-            }
+            $descuentoUsado    = round((float) $contrato->monto_descuento * $diasUsados / $diasAcordados, 2);
+            $descuentoRestante = round((float) $contrato->monto_descuento - $descuentoUsado, 2);
 
-            $ahora = now();
-
-            $reservaTraslapada = Reserva::where('vehiculo_id', $vehiculoNuevo->id)
-                ->whereIn('estado', [EstadoReservaEnum::PENDIENTE->value, EstadoReservaEnum::CONFIRMADA->value])
-                ->where(function ($query) use ($ahora, $contrato) {
-                    $query->whereDate('fecha_inicio', '<', $contrato->fecha_hora_devolucion->toDateString())
-                        ->whereDate('fecha_fin', '>', $ahora->toDateString());
-                })
-                ->exists();
-
-            if ($reservaTraslapada) {
-                return response()->json([
-                    'status'  => 'error',
-                    'message' => 'El vehículo de reemplazo tiene una reserva que se traslapa con el resto del contrato',
-                ], 422);
-            }
-
-            $contrato = DB::transaction(function () use ($request, $contrato, $vehiculoAnterior, $vehiculoNuevo, $ahora) {
+            $continuacion = DB::transaction(function () use ($request, $contrato, $vehiculoAnterior, $vehiculoNuevo, $ahora, $diasUsados, $diasRestantes, $descuentoUsado, $descuentoRestante) {
                 $incidencia = Incidencia::create([
                     'vehiculo_id'       => $vehiculoAnterior->id,
                     'contrato_id'       => $contrato->id,
@@ -610,44 +346,160 @@ class ContratoController extends Controller
                     'fecha'             => $ahora->toDateString(),
                     'costo'             => $request->costo,
                 ]);
-                $vehiculoAnterior->update(['estado' => VehiculoEstadoEnum::ENPROCESO->value]);
-                $vehiculoNuevo->update(['estado' => VehiculoEstadoEnum::RENTADO->value]);
-                $info = $contrato->info_registro ?? [];
-                $info['cambios_vehiculo'][] = [
-                    'fecha'                     => $ahora->toDateTimeString(),
-                    'vehiculo_anterior'         => [
-                        'id'    => $vehiculoAnterior->id,
-                        'placa' => $vehiculoAnterior->placa,
-                    ],
-                    'vehiculo_nuevo'            => [
-                        'id'    => $vehiculoNuevo->id,
-                        'placa' => $vehiculoNuevo->placa,
-                        'color' => $vehiculoNuevo->color,
-                        'anio'  => $vehiculoNuevo->anio,
-                    ],
-                    'incidencia_id'             => $incidencia->id,
-                    'responsable_tipo'          => $request->responsable_tipo,
-                    'nivel_combustible_entrega' => $request->nivel_combustible_entrega,
-                    'motivo'                    => $request->motivo,
-                    'usuario_id'                => auth('api')->id(),
-                ];
+
                 $contrato->update([
-                    'vehiculo_id'   => $vehiculoNuevo->id,
-                    'info_registro' => $info,
+                    'dias_acordados'  => $diasUsados,
+                    'monto_descuento' => $descuentoUsado,
                 ]);
 
-                return $contrato;
+                $contrato->recalcularTotalYEstadoPago();
+
+                $saldoTrasladado = round($contrato->montoPagado() - (float) $contrato->monto_total_renta, 2);
+
+                $nivelRecepcion = $request->nivel_combustible_recepcion ?? $contrato->nivel_combustible_entrega;
+
+                $observacionesCierre = "CAMBIO DE VEHÍCULO:\n- Motivo: " . $request->motivo
+                    . "\n- Días usados con este vehículo: " . $diasUsados;
+
+                if (!$request->filled('nivel_combustible_recepcion')) {
+                    $observacionesCierre .= "\n- No se indicó el combustible de recepción, se tomó el de la entrega";
+                }
+
+                CierreRenta::create([
+                    'contrato_id'                 => $contrato->id,
+                    'usuario_id'                  => auth('api')->id(),
+                    'fecha_hora_recepcion'        => $ahora,
+                    'nivel_combustible_recepcion' => $nivelRecepcion,
+                    'estado_vehiculo_recepcion'   => 'RECIBIDO CON DAÑOS',
+                    'observaciones'               => $observacionesCierre,
+                    'horas_retraso'               => 0,
+                    'monto_extras'                => $contrato->cargosAdicionales()
+                        ->where('estado_cargo', '!=', CargoAdicionalEstadoEnum::ANULADO->value)
+                        ->sum('monto'),
+                    'estado'                      => CierreRentaEstadoEnum::CAMBIO_VEHICULO->value,
+                    'monto_devuelto'              => 0,
+                ]);
+
+                $incidenciasEsteticas = $vehiculoNuevo->incidencias()
+                    ->where('estado_incidencia', '!=', IncidenciaEstadoEnum::RESUELTA->value)
+                    ->where('tipo_incidencia', TipoIncidenciaEnum::DANIO_ESTETICO->value)
+                    ->get(['descripcion', 'fecha']);
+
+                $observacionesEntrega = 'Continuación del contrato ' . $contrato->numero_contrato . ' por cambio de vehículo.';
+
+                if ($incidenciasEsteticas->isNotEmpty()) {
+                    $observacionesEntrega .= ' Daños estéticos previos: ' . $incidenciasEsteticas->map(function ($inc) {
+                        $fechaFormat = $inc->fecha ? Carbon::parse($inc->fecha)->format('d/m/Y') : 'N/A';
+                        return "{$inc->descripcion} ({$fechaFormat})";
+                    })->implode(' | ');
+                }
+
+                $cliente = $contrato->cliente;
+
+                $nuevo = Contrato::create([
+                    'numero_contrato'    => $this->generarNumeroContrato(),
+                    'cliente_id'         => $contrato->cliente_id,
+                    'vehiculo_id'        => $vehiculoNuevo->id,
+                    'info_registro'      => [
+                        'vehiculo' => [
+                            'placa'      => $vehiculoNuevo->placa,
+                            'color'      => $vehiculoNuevo->color,
+                            'anio'       => $vehiculoNuevo->anio,
+                            'modelo'     => $vehiculoNuevo->modelo->nombre,
+                            'marca'      => $vehiculoNuevo->modelo->marca->nombre,
+                            'categoria'  => $vehiculoNuevo->categoria->nombre,
+                            'precio_dia' => $contrato->precio_por_dia,
+                        ],
+                        'cliente' => [
+                            'nombre'          => $cliente->nombre,
+                            'dui'             => $cliente->dui,
+                            'telefono'        => $cliente->telefono,
+                            'numero_licencia' => $cliente->numero_licencia,
+                            'municipio'       => $cliente->municipio->nombre ?? null,
+                            'departamento'    => $cliente->municipio->departamento->nombre ?? null,
+                        ],
+                        'continuacion_de' => [
+                            'contrato_id'                 => $contrato->id,
+                            'numero_contrato'             => $contrato->numero_contrato,
+                            'fecha_cambio'                => $ahora->toDateTimeString(),
+                            'motivo'                      => $request->motivo,
+                            'responsable_tipo'            => $request->responsable_tipo,
+                            'incidencia_id'               => $incidencia->id,
+                            'dias_usados'                 => $diasUsados,
+                            'saldo_trasladado'            => $saldoTrasladado,
+                            'nivel_combustible_recepcion' => $nivelRecepcion,
+                            'vehiculo_anterior'           => [
+                                'id'    => $vehiculoAnterior->id,
+                                'placa' => $vehiculoAnterior->placa,
+                            ],
+                            'usuario_id'                  => auth('api')->id(),
+                        ],
+                    ],
+                    'reserva_id'                => null,
+                    'contrato_origen_id'        => $contrato->id,
+                    'saldo_trasladado'          => $saldoTrasladado,
+                    'fecha_hora_entrega'        => $ahora,
+                    'fecha_hora_devolucion'     => $contrato->fecha_hora_devolucion,
+                    'dias_acordados'            => $diasRestantes,
+                    'precio_por_dia'            => $contrato->precio_por_dia,
+                    'monto_descuento'           => $descuentoRestante,
+                    'monto_total_renta'         => max(0, ($diasRestantes * (float) $contrato->precio_por_dia) - $descuentoRestante),
+                    'nivel_combustible_entrega' => $request->nivel_combustible_entrega,
+                    'observaciones_entrega'     => mb_substr($observacionesEntrega, 0, 500),
+                    'observaciones'             => $contrato->observaciones,
+                    'estado_contrato'           => EstadoContratoEnum::ACTIVO->value,
+                    'estado_pago'               => EstadoPagoEnum::PENDIENTE->value,
+                    'usuario_id'                => auth('api')->id(),
+                ]);
+
+                $nuevo->recalcularTotalYEstadoPago();
+
+                $info = $contrato->info_registro ?? [];
+                $info['continuado_en'] = [
+                    'contrato_id'     => $nuevo->id,
+                    'numero_contrato' => $nuevo->numero_contrato,
+                    'fecha_cambio'    => $ahora->toDateTimeString(),
+                    'vehiculo_nuevo'  => [
+                        'id'    => $vehiculoNuevo->id,
+                        'placa' => $vehiculoNuevo->placa,
+                    ],
+                ];
+
+                $contrato->update([
+                    'estado_contrato' => EstadoContratoEnum::FINALIZADO->value,
+                    'info_registro'   => $info,
+                ]);
+
+                $contrato->recalcularTotalYEstadoPago();
+
+                if ($contrato->reserva) {
+                    $contrato->reserva->update([
+                        'estado' => EstadoReservaEnum::CONCLUIDA->value,
+                    ]);
+                }
+
+                $vehiculoAnterior->update(['estado' => VehiculoEstadoEnum::ENPROCESO->value]);
+                $vehiculoNuevo->update(['estado' => VehiculoEstadoEnum::RENTADO->value]);
+
+                return $nuevo;
             });
 
-            $contrato->load([
+            $continuacion->load([
                 'cliente:id,nombre,dui',
                 'vehiculo.modelo.marca',
+                'contratoOrigen:id,numero_contrato,dias_acordados,monto_total_renta,estado_contrato,estado_pago',
             ]);
+
+            $saldo = (float) $continuacion->saldo_trasladado;
 
             return response()->json([
                 'status'  => 'success',
-                'message' => 'Vehículo cambiado con éxito, el precio del contrato se mantiene',
-                'data'    => $contrato,
+                'message' => 'Vehículo cambiado. El contrato ' . $continuacion->contratoOrigen->numero_contrato
+                    . ' se cerró con ' . $diasUsados . ' día(s) y continúa en el contrato ' . $continuacion->numero_contrato
+                    . ' con ' . $diasRestantes . ' día(s) al mismo precio.'
+                    . ($saldo > 0 ? ' Se trasladaron $' . number_format($saldo, 2) . ' ya pagados.' : '')
+                    . ($saldo < 0 ? ' Se trasladó un saldo pendiente de $' . number_format(abs($saldo), 2) . '.' : ''),
+                'data'    => $continuacion,
             ], 201);
         } catch (ModelNotFoundException $e) {
             return response()->json([
@@ -662,56 +514,12 @@ class ContratoController extends Controller
         }
     }
 
-    public function anular(Request $request, string $id)
+    public function anular(AnularContratoRequest $request, string $id)
     {
         try {
             $userAuth = auth('api')->user();
 
-            if (!$userAuth->hasRole(RolEnum::ADMINISTRADOR->value)) {
-                return response()->json([
-                    'status'  => 'error',
-                    'message' => 'No tienes permiso para anular contratos',
-                ], 403);
-            }
-
-            $request->validate([
-                'motivo' => 'required|string|min:5|max:500',
-            ], [
-                'motivo.required' => 'Debe indicar el motivo de la anulación.',
-                'motivo.min'      => 'El motivo debe tener al menos 5 caracteres.',
-                'motivo.max'      => 'El motivo no puede exceder los 500 caracteres.',
-            ]);
-
             $contrato = Contrato::with(['vehiculo', 'reserva'])->findOrFail($id);
-
-            if ($contrato->estado_contrato !== EstadoContratoEnum::ACTIVO->value) {
-                return response()->json([
-                    'status'  => 'error',
-                    'message' => 'Solo se puede anular un contrato en estado ACTIVO',
-                ], 422);
-            }
-
-            if ($contrato->montoPagado() > 0) {
-                return response()->json([
-                    'status'  => 'error',
-                    'message' => 'El contrato tiene pagos confirmados, primero debe cancelarlos',
-                ], 422);
-            }
-
-            $tieneCargos = $contrato->cargosAdicionales()
-                ->where('estado_cargo', '!=', CargoAdicionalEstadoEnum::ANULADO->value)
-                ->exists();
-
-            $tieneIncidencias = $contrato->incidencias()
-                ->where('estado_incidencia', '!=', IncidenciaEstadoEnum::ANULADA->value)
-                ->exists();
-
-            if ($tieneCargos || $tieneIncidencias) {
-                return response()->json([
-                    'status'  => 'error',
-                    'message' => 'El contrato tiene cargos o incidencias vigentes, primero debe anularlos',
-                ], 422);
-            }
 
             DB::transaction(function () use ($request, $contrato, $userAuth) {
                 $info = $contrato->info_registro ?? [];
