@@ -126,11 +126,8 @@ class ContratoController extends Controller
             $contrato = DB::transaction(function () use ($request, $reserva, $vehiculo, $incidenciasEsteticas, $entrega, $devolucion, $dias) {
 
                 $precioDia  = (float) $vehiculo->categoria->precio_dia;
-                $subtotal   = $dias * $precioDia;
-
-                $porcentajeDescuento = (float) ($request->descuento_porcentaje ?? 0);
-                $descuento  = round($subtotal * ($porcentajeDescuento / 100), 2);
-                $montoTotal = $subtotal - $descuento;
+                $descuento  = $request->monto_descuento ?? 0;
+                $montoTotal = ($dias * $precioDia) - $descuento;
 
                 $textoEstetico = $incidenciasEsteticas->isNotEmpty()
                     ? 'Daños estéticos previos: ' . $incidenciasEsteticas->map(function ($inc) {
@@ -164,9 +161,6 @@ class ContratoController extends Controller
                             'numero_licencia' => $reserva->cliente->numero_licencia,
                             'municipio'       => $reserva->cliente->municipio->nombre ?? null,
                             'departamento'    => $reserva->cliente->municipio->departamento->nombre ?? null,
-                        ],
-                        'descuento' => [
-                            'porcentaje_aplicado' => $porcentajeDescuento,
                         ],
                     ],
                     'reserva_id'                => $reserva->id,
@@ -236,12 +230,8 @@ class ContratoController extends Controller
 
             $contrato = DB::transaction(function () use ($request, $cliente, $vehiculo, $fechaEntrega, $fechaDevolucion, $incidenciasEsteticas) {
                 $precioDia  = (float) $vehiculo->categoria->precio_dia;
-                $subtotal   = $request->dias_acordados * $precioDia;
-
-                // Cambio: Recibimos porcentaje y calculamos dinero
-                $porcentajeDescuento = (float) ($request->descuento_porcentaje ?? 0);
-                $descuento  = round($subtotal * ($porcentajeDescuento / 100), 2);
-                $montoTotal = $subtotal - $descuento;
+                $descuento  = $request->monto_descuento ?? 0;
+                $montoTotal = ($request->dias_acordados * $precioDia) - $descuento;
 
                 $textoEstetico = $incidenciasEsteticas->isNotEmpty()
                     ? 'Daños estéticos previos: ' . $incidenciasEsteticas->map(function ($inc) {
@@ -276,16 +266,13 @@ class ContratoController extends Controller
                             'municipio'       => $cliente->municipio->nombre ?? null,
                             'departamento'    => $cliente->municipio->departamento->nombre ?? null,
                         ],
-                        'descuento' => [
-                            'porcentaje_aplicado' => $porcentajeDescuento,
-                        ],
                     ],
                     'reserva_id'                => null,
                     'fecha_hora_entrega'        => $fechaEntrega,
                     'fecha_hora_devolucion'     => $fechaDevolucion,
                     'dias_acordados'            => $request->dias_acordados,
                     'precio_por_dia'            => $precioDia,
-                    'monto_descuento'           => $descuento, // Se guarda en dinero
+                    'monto_descuento'           => $descuento,
                     'monto_total_renta'         => $montoTotal,
                     'nivel_combustible_entrega' => $request->nivel_combustible_entrega,
                     'observaciones_entrega'     => $observacionesFinal ?: null,
