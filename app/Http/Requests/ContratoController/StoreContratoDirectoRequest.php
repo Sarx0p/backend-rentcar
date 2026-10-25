@@ -39,8 +39,7 @@ class StoreContratoDirectoRequest extends FormRequest
             'dias_acordados'            => 'required|integer|min:1|max:' . $this->diasMaximos(),
             'precio_por_dia'            => 'sometimes|numeric|min:0.1',
             'nivel_combustible_entrega' => 'required|string|in:E,1/4,1/2,3/4,F',
-            // Cambiado para recibir porcentaje
-            'descuento_porcentaje'      => 'sometimes|numeric|min:0|max:100',
+            'monto_descuento'           => 'sometimes|numeric|min:0|max:999999.99',
             'observaciones_entrega'     => 'sometimes|nullable|string|max:500',
             'observaciones'             => 'sometimes|nullable|string|max:500',
         ];
@@ -66,7 +65,7 @@ class StoreContratoDirectoRequest extends FormRequest
             'precio_por_dia.min'                 => 'El precio por día tiene que ser mayor que 0.',
             'nivel_combustible_entrega.required' => 'El nivel de combustible de entrega es obligatorio.',
             'nivel_combustible_entrega.in'       => 'El nivel de combustible de entrega debe ser E, 1/4, 1/2, 3/4 o F.',
-            'descuento_porcentaje.max'           => 'El descuento no puede ser mayor al 100%.',
+            'monto_descuento.max'                => 'El descuento no puede ser mayor a 999,999.99.',
         ];
     }
 
@@ -176,12 +175,12 @@ class StoreContratoDirectoRequest extends FormRequest
         if ($reservaClienteTraslapada) {
             return 'Este cliente ya tiene una reserva activa que se traslapa con estas fechas. Genera el contrato desde esa reserva o cancélala primero.';
         }
+        $subtotal          = $this->dias_acordados * (float) $vehiculo->categoria->precio_dia;
+        $porcentajeMaximo  = (float) config('app.descuento_maximo_porcentaje');
+        $descuentoMaximo   = round($subtotal * $porcentajeMaximo / 100, 2);
 
-        $porcentajeMaximo = (float) config('app.descuento_maximo_porcentaje');
-        $porcentajeEnviado = (float) ($this->descuento_porcentaje ?? 0);
-
-        if ($porcentajeEnviado > $porcentajeMaximo) {
-            return 'El descuento no puede ser mayor al ' . $porcentajeMaximo . '%';
+        if (($this->monto_descuento ?? 0) > $descuentoMaximo) {
+            return 'El descuento no puede ser mayor al ' . $porcentajeMaximo . '% de la renta ($' . number_format($descuentoMaximo, 2) . ')';
         }
 
         return null;
