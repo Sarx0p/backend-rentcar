@@ -14,7 +14,6 @@ return new class extends Migration
         Schema::create('contratos', function (Blueprint $table) {
             $table->id();
             $table->string('numero_contrato', 50)->unique();
-
             $table->foreignId('cliente_id')->constrained('clientes');
             $table->foreignId('vehiculo_id')->constrained('vehiculos');
             $table->json('info_registro')->nullable();

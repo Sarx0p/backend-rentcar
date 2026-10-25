@@ -32,7 +32,7 @@ class StoreContratoRequest extends FormRequest
             'fecha_hora_entrega'        => 'required|date',
             'precio_por_dia'            => 'sometimes|numeric|min:0.1',
             'nivel_combustible_entrega' => 'required|string|in:E,1/4,1/2,3/4,F',
-            'monto_descuento'           => 'sometimes|numeric|min:0|max:999999.99',
+            'descuento_porcentaje'      => 'sometimes|numeric|min:0|max:100',
             'observaciones_entrega'     => 'sometimes|nullable|string|max:500',
             'observaciones'             => 'sometimes|nullable|string|max:500',
         ];
@@ -49,7 +49,7 @@ class StoreContratoRequest extends FormRequest
             'precio_por_dia.min'                 => 'El precio por día tiene que ser mayor que 0.',
             'nivel_combustible_entrega.required' => 'El nivel de combustible de entrega es obligatorio.',
             'nivel_combustible_entrega.in'       => 'El nivel de combustible de entrega debe ser E, 1/4, 1/2, 3/4 o F.',
-            'monto_descuento.max'                => 'El descuento no puede ser mayor a 999,999.99.',
+            'descuento_porcentaje.max'           => 'El descuento no puede ser mayor al 100%.',
         ];
     }
 
@@ -152,12 +152,11 @@ class StoreContratoRequest extends FormRequest
             return 'El cliente tiene un saldo pendiente en el contrato ' . $contratoConDeuda->numero_contrato . '. Debe pagarlo antes de rentar otro vehículo.';
         }
 
-        $subtotal          = $dias * (float) $vehiculo->categoria->precio_dia;
-        $porcentajeMaximo  = (float) config('app.descuento_maximo_porcentaje');
-        $descuentoMaximo   = round($subtotal * $porcentajeMaximo / 100, 2);
+        $porcentajeMaximo = (float) config('app.descuento_maximo_porcentaje');
+        $porcentajeEnviado = (float) ($this->descuento_porcentaje ?? 0);
 
-        if (($this->monto_descuento ?? 0) > $descuentoMaximo) {
-            return 'El descuento no puede ser mayor al ' . $porcentajeMaximo . '% de la renta ($' . number_format($descuentoMaximo, 2) . ')';
+        if ($porcentajeEnviado > $porcentajeMaximo) {
+            return 'El descuento no puede ser mayor al ' . $porcentajeMaximo . '%';
         }
 
         return null;
