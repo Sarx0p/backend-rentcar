@@ -70,7 +70,7 @@
                 <td>{{ $totalVehiculos ?? 0 }}</td>
             </tr>
             <tr>
-                <td>Vehículos actualmente rentados</td>
+                <td>Vehículos rentados en el período</td>
                 <td>{{ $vehiculosRentados ?? 0 }}</td>
             </tr>
             <tr>

@@ -95,17 +95,27 @@ class CargoAdicionalController extends Controller
                 ], 403);
             }
 
+            $esDiaExtra = $request->tipo_cargo === CargoAdicionalTipoEnum::DIA_EXTRA->value;
+
             $request->validate([
                 'contrato_id'    => 'required|exists:contratos,id',
                 'tipo_cargo'     => 'required|in:' . implode(',', array_column(CargoAdicionalTipoEnum::cases(), 'value')),
                 'descripcion'    => 'sometimes|string|nullable|max:500',
-                'monto'          => 'required|numeric|min:0.01|max:999999.99',
+                'monto'          => $esDiaExtra ? 'nullable' : 'required|numeric|min:0.01|max:999999.99',
+                'dias'           => 'sometimes|nullable|integer|min:1|max:365',
             ], [
                 'monto.max'       => 'El monto no puede ser mayor a 999,999.99.',
                 'descripcion.max' => 'La descripción no puede tener más de 500 caracteres.',
+                'dias.integer'    => 'Los días extra deben ser un número entero.',
+                'dias.min'        => 'Los días extra deben ser al menos 1.',
+                'dias.max'        => 'Los días extra no pueden ser más de 365.',
             ]);
 
             $contrato = Contrato::findOrFail($request->contrato_id);
+
+            $monto = $esDiaExtra
+                ? round((int) ($request->dias ?? 1) * (float) $contrato->precio_por_dia, 2)
+                : $request->monto;
 
             if ($contrato->estado_contrato !== EstadoContratoEnum::ACTIVO->value) {
                 return response()->json([
@@ -114,13 +124,13 @@ class CargoAdicionalController extends Controller
                 ], 422);
             }
 
-            $cargo = DB::transaction(function () use ($request, $contrato) {
+            $cargo = DB::transaction(function () use ($request, $contrato, $monto) {
 
                 $cargo = CargoAdicional::create([
                     'contrato_id'    => $contrato->id,
                     'tipo_cargo'     => $request->tipo_cargo,
                     'descripcion'    => $request->descripcion ?? null,
-                    'monto'          => $request->monto,
+                    'monto'          => $monto,
                     'fecha_registro' => now(),
                     'estado_cargo'   => CargoAdicionalEstadoEnum::PENDIENTE->value,
                 ]);

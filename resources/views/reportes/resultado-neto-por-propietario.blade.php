@@ -124,7 +124,7 @@
                 <tbody>
                     @foreach($item['incidencias_detalle'] as $inc)
                         <tr>
-                            <td>{{ $inc->vehiculo_id }}</td>
+                            <td>{{ optional($inc->vehiculo)->placa }}</td>
                             <td>{{ $inc->tipo_incidencia }}</td>
                             <td>{{ $inc->descripcion }}</td>
                             <td>{{ \Carbon\Carbon::parse($inc->fecha)->format('d/m/Y') }}</td>
@@ -191,7 +191,7 @@
                 <tbody>
                     @foreach($item['mantenimientos_detalle'] as $mant)
                         <tr>
-                            <td>{{ $mant->vehiculo_id }}</td>
+                            <td>{{ optional($mant->vehiculo)->placa }}</td>
                             <td>{{ $mant->tipo_mantenimiento }}</td>
                             <td>{{ $mant->descripcion }}</td>
                             <td>{{ $mant->lugar }}</td>
