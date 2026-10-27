@@ -25,6 +25,7 @@ use App\Models\Propietario;
 use Illuminate\Http\Request;
 use App\Http\Requests\ReporteController\ReporteRequest;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Carbon\Carbon;
 
 class ReporteController extends Controller
 {
@@ -142,6 +143,53 @@ class ReporteController extends Controller
         return [
             'diferencia' => round($reparados->sum('diferencia'), 2),
             'detalle'    => $reparados->concat($pendientes)->values(),
+        ];
+    }
+
+    private function ocupacionDelPeriodo($fechaInicio, $fechaFin, $totalVehiculos): array
+    {
+        $inicio = Carbon::parse($fechaInicio)->startOfDay();
+        $fin    = Carbon::parse(min($fechaFin, now()->toDateString()))->endOfDay();
+
+        $contratos = Contrato::with('cierreRenta:id,contrato_id,fecha_hora_recepcion')
+            ->whereIn('estado_contrato', [
+                EstadoContratoEnum::ACTIVO->value,
+                EstadoContratoEnum::FINALIZADO->value,
+            ])
+            ->where('fecha_hora_entrega', '<=', $fin)
+            ->get(['id', 'vehiculo_id', 'estado_contrato', 'fecha_hora_entrega', 'fecha_hora_devolucion']);
+
+        $diasRentados = 0;
+        $vehiculos    = collect();
+
+        foreach ($contratos as $contrato) {
+            if ($contrato->cierreRenta) {
+                $salida = $contrato->cierreRenta->fecha_hora_recepcion;
+            } elseif ($contrato->estado_contrato === EstadoContratoEnum::ACTIVO->value) {
+                $salida = now()->max($contrato->fecha_hora_devolucion);
+            } else {
+                $salida = $contrato->fecha_hora_devolucion;
+            }
+
+            $desde = $contrato->fecha_hora_entrega->max($inicio);
+            $hasta = $salida->min($fin);
+
+            if ($hasta->lessThanOrEqualTo($desde)) {
+                continue;
+            }
+
+            $diasRentados += max(1, (int) ceil(abs($desde->diffInHours($hasta)) / 24));
+            $vehiculos->push($contrato->vehiculo_id);
+        }
+
+        $diasPeriodo = (int) abs($inicio->diffInDays($fin->copy()->startOfDay())) + 1;
+        $capacidad   = $totalVehiculos * $diasPeriodo;
+
+        return [
+            'vehiculos' => $vehiculos->unique()->count(),
+            'tasa'      => $capacidad > 0
+                ? min(100, round($diasRentados / $capacidad * 100, 2))
+                : 0,
         ];
     }
 
@@ -269,10 +317,8 @@ class ReporteController extends Controller
 
             $dias = (int) ($request->dias ?? 30);
 
-            $clientes = Cliente::whereBetween('vencimiento_licencia', [
-                now(),
-                now()->addDays($dias),
-            ])
+            $clientes = Cliente::whereDate('vencimiento_licencia', '>=', now()->toDateString())
+                ->whereDate('vencimiento_licencia', '<=', now()->addDays($dias)->toDateString())
                 ->orderBy('vencimiento_licencia')
                 ->get();
 
@@ -325,7 +371,6 @@ class ReporteController extends Controller
             }
 
             $propietarios = Propietario::with('vehiculos.modelo.marca')
-                ->where('estado', EstadoPropietarioEnum::ACTIVO->value)
                 ->when($propietarioId, function ($query) use ($propietarioId) {
                     $query->whereKey($propietarioId);
                 }, function ($query) use ($propietarioBusqueda) {
@@ -351,7 +396,8 @@ class ReporteController extends Controller
                     $danios       = $this->daniosClienteDeVehiculos($vehiculoIds, $fechaInicio, $fechaFin);
                     $ingresoNeto  = $ingresos - $devoluciones;
 
-                    $mantenimientos = Mantenimiento::whereIn('vehiculo_id', $vehiculoIds)
+                    $mantenimientos = Mantenimiento::with('vehiculo:id,placa')
+                        ->whereIn('vehiculo_id', $vehiculoIds)
                         ->where('estado', '!=', EstadoMantenimientoEnum::CANCELADO->value)
                         ->whereDate('fecha', '>=', $fechaInicio)
                         ->whereDate('fecha', '<=', $fechaFin)
@@ -362,7 +408,8 @@ class ReporteController extends Controller
                         ->where('estado', '!=', EstadoMantenimientoEnum::CANCELADO->value)
                         ->pluck('incidencia_id');
 
-                    $incidenciasNegocio = Incidencia::whereIn('vehiculo_id', $vehiculoIds)
+                    $incidenciasNegocio = Incidencia::with('vehiculo:id,placa')
+                        ->whereIn('vehiculo_id', $vehiculoIds)
                         ->where('responsable_tipo', IncidenciaTipoResponsableEnum::NEGOCIO->value)
                         ->where('estado_incidencia', '!=', IncidenciaEstadoEnum::ANULADA->value)
                         ->whereNotIn('id', $incidenciasReparadas)
@@ -397,6 +444,12 @@ class ReporteController extends Controller
                         'resultado_neto'         => $ingresoNeto - $gastoTotal - $montoAdministracion,
                     ];
                 })
+                ->filter(fn ($item) => $propietarioId
+                    || $item['propietario']->estado === EstadoPropietarioEnum::ACTIVO->value
+                    || $item['ingresos'] != 0
+                    || $item['devoluciones'] != 0
+                    || $item['gasto_total'] != 0
+                    || $item['danios_detalle']->isNotEmpty())
                 ->sortByDesc('resultado_neto')
                 ->values();
 
@@ -505,11 +558,10 @@ class ReporteController extends Controller
 
             $totalVehiculos = Vehiculo::count();
 
-            $vehiculosRentados = Vehiculo::where('estado', VehiculoEstadoEnum::RENTADO->value)->count();
+            $ocupacion = $this->ocupacionDelPeriodo($fechaInicio, $fechaFin, $totalVehiculos);
 
-            $tasaOcupacion = $totalVehiculos > 0
-                ? round(($vehiculosRentados / $totalVehiculos) * 100, 2)
-                : 0;
+            $vehiculosRentados = $ocupacion['vehiculos'];
+            $tasaOcupacion     = $ocupacion['tasa'];
 
             $totalClientesNuevos = Cliente::whereDate('created_at', '>=', $fechaInicio)
                 ->whereDate('created_at', '<=', $fechaFin)
