@@ -250,6 +250,30 @@ class CargoAdicionalController extends Controller
                 'estado_cargo.in' => 'El estado del cargo solo se puede cambiar a PENDIENTE o ANULADO.',
             ]);
 
+            $diaExtra = CargoAdicionalTipoEnum::DIA_EXTRA->value;
+
+            if (
+                $request->has('tipo_cargo') &&
+                $request->tipo_cargo !== $cargo->tipo_cargo &&
+                ($cargo->tipo_cargo === $diaExtra || $request->tipo_cargo === $diaExtra)
+            ) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'No se puede cambiar el tipo de un cargo a Día extra ni de Día extra a otro tipo. Anula el cargo y registra uno nuevo.',
+                ], 422);
+            }
+
+            if (
+                $cargo->tipo_cargo === $diaExtra &&
+                $request->has('monto') &&
+                round((float) $request->monto, 2) !== round((float) $cargo->monto, 2)
+            ) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'El monto de un cargo por día extra lo calcula el sistema y no se puede modificar.',
+                ], 422);
+            }
+
             DB::transaction(function () use ($request, $cargo, $contrato) {
                 $cargo->update($request->only([
                     'tipo_cargo',
