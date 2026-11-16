@@ -29,10 +29,11 @@ class ClienteController extends Controller
                 ], 403);
             }
 
-            $clientes = Cliente::with('municipio:id,nombre,departamento_id', 'municipio.departamento:id,nombre')
+            $clientes = Cliente::with('municipio:id,nombre,departamento_id', 'municipio.departamento:id,nombre', 'pais:id,nombre')
                 ->when($request->search, function ($query, $search) {
                     $query->where('nombre', 'like', '%' . $search . '%')
                           ->orWhere('dui', 'like', '%' . $search . '%')
+                          ->orWhere('pasaporte', 'like', '%' . $search . '%')
                           ->orWhere('numero_licencia', 'like', '%' . $search . '%')
                           ->orWhere('telefono', 'like', '%' . $search . '%');
                 })
@@ -59,7 +60,7 @@ class ClienteController extends Controller
         try {
             $cliente = Cliente::create($request->validated());
 
-            $cliente->load('municipio:id,nombre,departamento_id', 'municipio.departamento:id,nombre');
+            $cliente->load('municipio:id,nombre,departamento_id', 'municipio.departamento:id,nombre', 'pais:id,nombre');
 
             return response()->json([
                 'status'  => 'success',
@@ -95,6 +96,7 @@ class ClienteController extends Controller
             $cliente = Cliente::with([
                 'municipio:id,nombre,departamento_id',
                 'municipio.departamento:id,nombre',
+                'pais:id,nombre',
                 'reservas' => function ($query) {
                     $query->select('id', 'cliente_id', 'vehiculo_id', 'fecha_inicio', 'fecha_fin', 'estado')
                         ->latest();
@@ -131,7 +133,7 @@ class ClienteController extends Controller
 
             $cliente->update($request->validated());
 
-            $cliente->load('municipio:id,nombre,departamento_id', 'municipio.departamento:id,nombre');
+            $cliente->load('municipio:id,nombre,departamento_id', 'municipio.departamento:id,nombre', 'pais:id,nombre');
 
             return response()->json([
                 'status'  => 'success',

@@ -104,19 +104,21 @@ class ContratoController extends Controller
     /**
      * Store a newly created resource in storage — desde una reserva existente.
      */
-    public function store(StoreContratoRequest $request)
+   public function store(StoreContratoRequest $request)
     {
         try {
             $reserva = Reserva::with([
                 'vehiculo.modelo.marca',
                 'vehiculo.categoria',
                 'cliente.municipio.departamento',
+                'cliente.pais',
             ])->findOrFail($request->reserva_id);
 
-            $entrega    = Carbon::parse($request->fecha_hora_entrega);
-            $dias       = max(1, (int) $reserva->fecha_inicio->diffInDays($reserva->fecha_fin));
-            $devolucion = $entrega->copy()->addDays($dias);
-            $vehiculo   = $reserva->vehiculo;
+            $entrega      = Carbon::parse($request->fecha_hora_entrega);
+            $horasReserva = $reserva->fecha_inicio->diffInHours($reserva->fecha_fin);
+            $dias         = max(1, (int) ceil($horasReserva / 24));
+            $devolucion   = $entrega->copy()->addDays($dias);
+            $vehiculo     = $reserva->vehiculo;
 
             $incidenciasEsteticas = $vehiculo->incidencias()
                 ->where('estado_incidencia', '!=', IncidenciaEstadoEnum::RESUELTA->value)
@@ -157,6 +159,8 @@ class ContratoController extends Controller
                         'cliente' => [
                             'nombre'          => $reserva->cliente->nombre,
                             'dui'             => $reserva->cliente->dui,
+                            'pasaporte'       => $reserva->cliente->pasaporte,
+                            'pais'            => $reserva->cliente->pais->nombre ?? null,
                             'telefono'        => $reserva->cliente->telefono,
                             'numero_licencia' => $reserva->cliente->numero_licencia,
                             'municipio'       => $reserva->cliente->municipio->nombre ?? null,
@@ -213,14 +217,17 @@ class ContratoController extends Controller
         }
     }
 
+
     public function storeDirecto(StoreContratoDirectoRequest $request)
     {
         try {
-            $cliente = Cliente::with('municipio.departamento')->findOrFail($request->cliente_id);
+            $cliente = Cliente::with('municipio.departamento', 'pais')->findOrFail($request->cliente_id);
 
             $vehiculo = Vehiculo::with(['modelo.marca', 'categoria'])->findOrFail($request->vehiculo_id);
 
-            $fechaEntrega    = now();
+            $fechaEntrega    = $request->filled('fecha_hora_entrega')
+                ? Carbon::parse($request->fecha_hora_entrega)
+                : now();
             $fechaDevolucion = $fechaEntrega->copy()->addDays($request->dias_acordados);
 
             $incidenciasEsteticas = $vehiculo->incidencias()
@@ -261,6 +268,8 @@ class ContratoController extends Controller
                         'cliente' => [
                             'nombre'          => $cliente->nombre,
                             'dui'             => $cliente->dui,
+                            'pasaporte'       => $cliente->pasaporte,
+                            'pais'            => $cliente->pais->nombre ?? null,
                             'telefono'        => $cliente->telefono,
                             'numero_licencia' => $cliente->numero_licencia,
                             'municipio'       => $cliente->municipio->nombre ?? null,
@@ -318,7 +327,7 @@ class ContratoController extends Controller
     public function cambiarVehiculo(CambiarVehiculoRequest $request, string $id)
     {
         try {
-            $contrato = Contrato::with(['vehiculo', 'reserva', 'cliente.municipio.departamento'])->findOrFail($id);
+            $contrato = Contrato::with(['vehiculo', 'reserva', 'cliente.municipio.departamento', 'cliente.pais'])->findOrFail($id);
 
             $vehiculoAnterior = $contrato->vehiculo;
             $vehiculoNuevo    = Vehiculo::with(['modelo.marca', 'categoria'])->findOrFail($request->vehiculo_nuevo_id);
@@ -413,6 +422,8 @@ class ContratoController extends Controller
                         'cliente' => [
                             'nombre'          => $cliente->nombre,
                             'dui'             => $cliente->dui,
+                            'pasaporte'       => $cliente->pasaporte,
+                            'pais'            => $cliente->pais->nombre ?? null,
                             'telefono'        => $cliente->telefono,
                             'numero_licencia' => $cliente->numero_licencia,
                             'municipio'       => $cliente->municipio->nombre ?? null,

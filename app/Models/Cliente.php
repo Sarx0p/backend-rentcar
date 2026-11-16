@@ -14,10 +14,12 @@ class Cliente extends Model
         'nombre',
         'dui',
         'vencimiento_dui',
+        'pasaporte',
         'numero_licencia',
         'vencimiento_licencia',
         'telefono',
         'municipio_id',
+        'pais_id',
     ];
 
     protected $hidden = [
@@ -43,5 +45,10 @@ class Cliente extends Model
     public function municipio(): BelongsTo
     {
         return $this->belongsTo(Municipio::class, 'municipio_id');
+    }
+
+    public function pais(): BelongsTo
+    {
+        return $this->belongsTo(Pais::class, 'pais_id');
     }
 }

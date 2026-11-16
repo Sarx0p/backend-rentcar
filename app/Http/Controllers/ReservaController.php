@@ -104,7 +104,7 @@ class ReservaController extends Controller
                 ], 422);
             }
 
-            if ($cliente->vencimiento_dui->isPast()) {
+            if ($cliente->vencimiento_dui && $cliente->vencimiento_dui->isPast()) {
                 return response()->json([
                     'status'  => 'error',
                     'message' => 'El cliente tiene el DUI vencido, no puede hacer una reserva',
@@ -120,7 +120,7 @@ class ReservaController extends Controller
                 ], 422);
             }
 
-            if ($cliente->vencimiento_dui->lte($fechaFin)) {
+            if ($cliente->vencimiento_dui && $cliente->vencimiento_dui->lte($fechaFin)) {
                 return response()->json([
                     'status'  => 'error',
                     'message' => 'El DUI del cliente vence el ' . $cliente->vencimiento_dui->format('d/m/Y') . ', antes de terminar la reserva',
@@ -178,8 +178,8 @@ class ReservaController extends Controller
             $contratoTraslapado = Contrato::where('vehiculo_id', $request->vehiculo_id)
                 ->where('estado_contrato', EstadoContratoEnum::ACTIVO->value)
                 ->where(function ($query) use ($request) {
-                    $query->whereDate('fecha_hora_entrega', '<', $request->fecha_fin)
-                        ->whereDate('fecha_hora_devolucion', '>', $request->fecha_inicio);
+                    $query->where('fecha_hora_entrega', '<', $request->fecha_fin)
+                        ->where('fecha_hora_devolucion', '>', $request->fecha_inicio);
                 })->exists();
 
             if ($contratoTraslapado) {
@@ -206,8 +206,8 @@ class ReservaController extends Controller
             $clienteContratoTraslapado = Contrato::where('cliente_id', $request->cliente_id)
                 ->where('estado_contrato', EstadoContratoEnum::ACTIVO->value)
                 ->where(function ($query) use ($request) {
-                    $query->whereDate('fecha_hora_entrega', '<', $request->fecha_fin)
-                        ->whereDate('fecha_hora_devolucion', '>', $request->fecha_inicio);
+                    $query->where('fecha_hora_entrega', '<', $request->fecha_fin)
+                        ->where('fecha_hora_devolucion', '>', $request->fecha_inicio);
                 })->exists();
 
             if ($clienteContratoTraslapado) {
@@ -347,7 +347,7 @@ class ReservaController extends Controller
                     ], 422);
                 }
 
-                if ($cliente->vencimiento_dui->lte($fechaFin)) {
+                if ($cliente->vencimiento_dui && $cliente->vencimiento_dui->lte($fechaFin)) {
                     return response()->json([
                         'status'  => 'error',
                         'message' => 'El DUI del cliente vence el ' . $cliente->vencimiento_dui->format('d/m/Y') . ', antes de terminar la reserva',
@@ -372,8 +372,9 @@ class ReservaController extends Controller
                 $contratoTraslapado = Contrato::where('vehiculo_id', $reserva->vehiculo_id)
                     ->where('estado_contrato', EstadoContratoEnum::ACTIVO->value)
                     ->where(function ($query) use ($inicioEvaluar, $finEvaluar) {
-                        $query->whereDate('fecha_hora_entrega', '<', $finEvaluar)
-                            ->whereDate('fecha_hora_devolucion', '>', $inicioEvaluar);
+                        // AQUÍ SE CAMBIÓ: where en vez de whereDate para respetar horas
+                        $query->where('fecha_hora_entrega', '<', $finEvaluar)
+                            ->where('fecha_hora_devolucion', '>', $inicioEvaluar);
                     })->exists();
 
                 if ($contratoTraslapado) {
@@ -401,8 +402,8 @@ class ReservaController extends Controller
                 $clienteContratoTraslapado = Contrato::where('cliente_id', $reserva->cliente_id)
                     ->where('estado_contrato', EstadoContratoEnum::ACTIVO->value)
                     ->where(function ($query) use ($inicioEvaluar, $finEvaluar) {
-                        $query->whereDate('fecha_hora_entrega', '<', $finEvaluar)
-                            ->whereDate('fecha_hora_devolucion', '>', $inicioEvaluar);
+                        $query->where('fecha_hora_entrega', '<', $finEvaluar)
+                            ->where('fecha_hora_devolucion', '>', $inicioEvaluar);
                     })->exists();
 
                 if ($clienteContratoTraslapado) {

@@ -20,6 +20,7 @@ use App\Http\Controllers\CierreRentaController;
 use App\Http\Controllers\IncidenciaController;
 use App\Http\Controllers\CancelarController;
 use App\Http\Controllers\DepartamentoController;
+use App\Http\Controllers\PaisController;
 use App\Http\Controllers\PropietarioController;
 use App\Http\Controllers\ReporteController;
 use App\Http\Controllers\SeguroController;
@@ -94,6 +95,7 @@ Route::prefix('admin')->middleware(['auth:api', 'estado.activo'])->group(functio
         Route::apiResource('mantenimientos', MantenimientoController::class);
         Route::get('/departamentos', [DepartamentoController::class, 'index']);
         Route::get('/departamentos/{departamentoId}/municipios', [DepartamentoController::class, 'porDepartamento']);
+        Route::get('/paises', [PaisController::class, 'index']);
 
         Route::prefix('clientes/{cliente}/historial')->group(function () {
             Route::get('/resumen', [HistorialController::class, 'resumen']);

@@ -29,7 +29,7 @@ class StoreReservaRequest extends FormRequest
         return [
             'cliente_id'   => 'required|exists:clientes,id',
             'vehiculo_id'  => 'required|exists:vehiculos,id',
-            'fecha_inicio' => 'required|date|after_or_equal:tomorrow|before_or_equal:' . RangoFechas::fechaMaximaTexto(),
+            'fecha_inicio' => 'required|date|after_or_equal:now|before_or_equal:' . RangoFechas::fechaMaximaTexto(),
             'fecha_fin'    => 'required|date|after:fecha_inicio|before_or_equal:' . RangoFechas::fechaMaximaTexto(),
         ];
     }
@@ -48,7 +48,7 @@ class StoreReservaRequest extends FormRequest
             'vehiculo_id.exists'          => 'El vehículo seleccionado no existe.',
             'fecha_inicio.required'       => 'La fecha de inicio es obligatoria.',
             'fecha_inicio.date'           => 'La fecha de inicio no tiene un formato válido.',
-            'fecha_inicio.after_or_equal' => 'La fecha de inicio debe ser al menos desde el día de mañana.',
+            'fecha_inicio.after_or_equal' => 'La fecha y hora de inicio no puede ser en el pasado.',
             'fecha_fin.required'          => 'La fecha de fin es obligatoria.',
             'fecha_fin.date'              => 'La fecha de fin no tiene un formato válido.',
             'fecha_fin.after'             => 'La fecha de fin debe ser posterior a la fecha de inicio.',

@@ -36,6 +36,7 @@ class StoreContratoDirectoRequest extends FormRequest
         return [
             'cliente_id'                => 'required|exists:clientes,id',
             'vehiculo_id'               => 'required|exists:vehiculos,id',
+            'fecha_hora_entrega'        => 'sometimes|date',
             'dias_acordados'            => 'required|integer|min:1|max:' . $this->diasMaximos(),
             'precio_por_dia'            => 'sometimes|numeric|min:0.1',
             'nivel_combustible_entrega' => 'required|string|in:E,1/4,1/2,3/4,F',
@@ -122,10 +123,13 @@ class StoreContratoDirectoRequest extends FormRequest
         if ($vehiculo->estado !== VehiculoEstadoEnum::DISPONIBLE->value) {
             return 'El vehículo no está disponible, estado actual: ' . $vehiculo->estado;
         }
-        $fechaEntrega    = now();
+
+        $fechaEntrega    = $this->filled('fecha_hora_entrega')
+            ? \Carbon\Carbon::parse($this->fecha_hora_entrega)
+            : now();
         $fechaDevolucion = $fechaEntrega->copy()->addDays($this->dias_acordados);
 
-        if ($cliente->vencimiento_dui->isPast()) {
+        if ($cliente->vencimiento_dui && $cliente->vencimiento_dui->isPast()) {
             return 'El cliente tiene el DUI vencido, no puede rentar un vehículo';
         }
 
@@ -133,7 +137,7 @@ class StoreContratoDirectoRequest extends FormRequest
             return 'La licencia del cliente vence el ' . $cliente->vencimiento_licencia->format('d/m/Y') . ', antes de la devolución del vehículo';
         }
 
-        if ($cliente->vencimiento_dui->lte($fechaDevolucion->copy()->startOfDay())) {
+        if ($cliente->vencimiento_dui && $cliente->vencimiento_dui->lte($fechaDevolucion->copy()->startOfDay())) {
             return 'El DUI del cliente vence el ' . $cliente->vencimiento_dui->format('d/m/Y') . ', antes de la devolución del vehículo';
         }
 
@@ -190,7 +194,7 @@ class StoreContratoDirectoRequest extends FormRequest
     {
         throw new HttpResponseException(response()->json([
             'status'  => 'error',
-            'message' => 'No tienes permiso para crear contratos',
+            'message' => 'No tienes permisos para crear contratos',
         ], 403));
     }
 

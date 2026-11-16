@@ -14,12 +14,14 @@ return new class extends Migration
         Schema::create('clientes', function (Blueprint $table) {
             $table->id();
             $table->string('nombre', 100);
-            $table->string('dui', 20)->unique();
-            $table->date('vencimiento_dui');
+            $table->string('dui', 20)->nullable()->unique();
+            $table->date('vencimiento_dui')->nullable();
+            $table->string('pasaporte',30)->nullable()->unique();
             $table->string('numero_licencia', 30)->unique();
             $table->date('vencimiento_licencia');
             $table->string('telefono', 25)->unique();
-            $table->foreignId('municipio_id')->constrained('municipios');
+            $table->foreignId('municipio_id')->nullable()->constrained('municipios');
+            $table->foreignId('pais_id')->nullable()->constrained('pais');
             $table->timestamps();
         });
     }
