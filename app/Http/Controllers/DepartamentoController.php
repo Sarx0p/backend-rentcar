@@ -4,16 +4,22 @@ namespace App\Http\Controllers;
 
 use App\Models\Departamento;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Http\Request;
 
 class DepartamentoController extends Controller
 {
     /**
      * Listar todos los departamentos.
      */
-    public function index()
+    public function index(Request $request)
     {
         try {
-            $departamentos = Departamento::orderBy('nombre')->get(['id', 'nombre']);
+            $departamentos = Departamento::query()
+                ->when($request->search, function ($query, $search) {
+                    $query->where('nombre', 'like', '%' . $search . '%');
+                })
+                ->orderBy('nombre')
+                ->get(['id', 'nombre']);
 
             return response()->json([
                 'status' => 'success',

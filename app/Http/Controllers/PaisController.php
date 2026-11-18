@@ -3,16 +3,22 @@
 namespace App\Http\Controllers;
 
 use App\Models\Pais;
+use Illuminate\Http\Request;
 
 class PaisController extends Controller
 {
     /**
      * Listar todos los países.
      */
-    public function index()
+    public function index(Request $request)
     {
         try {
-            $paises = Pais::orderBy('nombre')->get(['id', 'nombre']);
+            $paises = Pais::query()
+                ->when($request->search, function ($query, $search) {
+                    $query->where('nombre', 'like', '%' . $search . '%');
+                })
+                ->orderBy('nombre')
+                ->get(['id', 'nombre']);
 
             return response()->json([
                 'status' => 'success',
