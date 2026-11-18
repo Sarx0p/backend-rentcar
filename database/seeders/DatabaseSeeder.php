@@ -16,6 +16,7 @@ class DatabaseSeeder extends Seeder
             RolSeeder::class,
             DepartamentoSeeder::class,
             MunicipioSeeder::class,
+            PaisSeeder::class,
         ]);
 
         User::updateOrCreate(

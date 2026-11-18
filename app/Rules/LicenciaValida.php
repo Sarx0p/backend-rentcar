@@ -9,19 +9,19 @@ class LicenciaValida implements ValidationRule
 {
     public function validate(string $attribute, mixed $value, Closure $fail): void
     {
-        $licencia = (string) $value;
+        $licencia = strtoupper(trim((string) $value));
 
-        if (!preg_match('/^\d+$/', $licencia)) {
-            $fail('El número de licencia solo puede llevar números.');
+        if (!preg_match('/^[A-Z0-9]+$/', $licencia)) {
+            $fail('El número de licencia solo puede llevar letras y números.');
             return;
         }
 
-        if (!in_array(strlen($licencia), [9, 14], true)) {
-            $fail('La licencia debe tener 9 dígitos (número de DUI) o 14 dígitos (NIT).');
+        if (strlen($licencia) < 5 || strlen($licencia) > 30) {
+            $fail('La licencia debe tener entre 5 y 30 caracteres.');
             return;
         }
 
-        if (preg_match('/^(\d)\1+$/', $licencia)) {
+        if (preg_match('/^(\w)\1+$/', $licencia)) {
             $fail('Ingresa un número de licencia real, no una secuencia repetida.');
         }
     }

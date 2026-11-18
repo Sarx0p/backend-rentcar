@@ -27,7 +27,7 @@ class UpdateReservaRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'fecha_inicio' => 'sometimes|date|after_or_equal:tomorrow|before_or_equal:' . RangoFechas::fechaMaximaTexto(),
+            'fecha_inicio' => 'sometimes|date|after_or_equal:now|before_or_equal:' . RangoFechas::fechaMaximaTexto(),
             'fecha_fin'    => 'sometimes|date|before_or_equal:' . RangoFechas::fechaMaximaTexto(),
         ];
     }
@@ -39,7 +39,7 @@ class UpdateReservaRequest extends FormRequest
     {
         return [
             'fecha_inicio.date'           => 'La fecha de inicio no tiene un formato válido.',
-            'fecha_inicio.after_or_equal' => 'La fecha de inicio debe ser al menos desde el día de mañana.',
+            'fecha_inicio.after_or_equal' => 'La fecha y hora de inicio no puede ser en el pasado.',
             'fecha_fin.date'              => 'La fecha de fin no tiene un formato válido.',
             'fecha_inicio.before_or_equal' => RangoFechas::mensajeFechaMaxima(),
             'fecha_fin.before_or_equal'    => RangoFechas::mensajeFechaMaxima(),

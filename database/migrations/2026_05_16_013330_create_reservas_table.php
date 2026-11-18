@@ -14,8 +14,8 @@ return new class extends Migration
         Schema::create('reservas', function (Blueprint $table) {
             $table->id();
             $table->dateTime('fecha_solicitud');
-            $table->date('fecha_inicio');
-            $table->date('fecha_fin');
+            $table->datetime('fecha_inicio');
+            $table->datetime('fecha_fin');
             $table->string('estado', 30);
             $table->foreignId('cliente_id')->constrained('clientes');
             $table->foreignId('vehiculo_id')->constrained('vehiculos');

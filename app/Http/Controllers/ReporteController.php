@@ -32,7 +32,6 @@ class ReporteController extends Controller
     /**
      * Chequeo de permiso reutilizable para reportes.
      */
-    // gastos del negocio: mantenimientos no cancelados + incidencias del negocio que no tengan ya un mantenimiento
     private function gastosDeVehiculos($vehiculoIds, $fechaInicio, $fechaFin): array
     {
         $mantenimientos = Mantenimiento::query()
@@ -193,7 +192,6 @@ class ReporteController extends Controller
         ];
     }
 
-    // El empleado solo entra a reportes sin dinero (estado de flota, licencias, reservas canceladas)
     private function tienePermiso($incluirContador = false, $incluirEmpleado = true): bool
     {
         $userAuth = auth('api')->user();
@@ -264,7 +262,7 @@ class ReporteController extends Controller
         }
     }
 
-    public function estadoFlota(ReporteRequest $request)
+       public function estadoFlota(ReporteRequest $request)
     {
         try {
             if (!$this->tienePermiso(true)) {
@@ -285,6 +283,15 @@ class ReporteController extends Controller
                 'modelo.marca:id,nombre',
                 'categoria:id,nombre',
             ])
+                ->when($request->filled('vehiculo_ids'), function ($query) use ($request) {
+                    $query->whereIn('id', (array) $request->vehiculo_ids);
+                })
+                ->when($request->filled('vehiculo_id'), function ($query) use ($request) {
+                    $query->where('id', $request->vehiculo_id);
+                })
+                ->when($request->filled('propietario_id'), function ($query) use ($request) {
+                    $query->where('propietario_id', $request->propietario_id);
+                })
                 ->orderBy('estado')
                 ->get();
 
@@ -599,7 +606,7 @@ class ReporteController extends Controller
         }
     }
 
-    public function ingresosPorVehiculo(ReporteRequest $request)
+  public function ingresosPorVehiculo(ReporteRequest $request)
     {
         try {
             if (!$this->tienePermiso(true, false)) {
@@ -624,6 +631,12 @@ class ReporteController extends Controller
             }
 
             $vehiculos = Vehiculo::with(['modelo.marca', 'propietario'])
+                ->when($request->filled('vehiculo_ids'), function ($query) use ($request) {
+                    $query->whereIn('id', (array) $request->vehiculo_ids);
+                })
+                ->when($request->filled('vehiculo_id'), function ($query) use ($request) {
+                    $query->where('id', $request->vehiculo_id);
+                })
                 ->when($propietarioId, function ($query) use ($propietarioId) {
                     $query->where('propietario_id', $propietarioId);
                 }, function ($query) use ($propietarioBusqueda) {
@@ -704,7 +717,7 @@ class ReporteController extends Controller
     /**
      * Gastos por vehículo: incidencias del negocio y mantenimientos.
      */
-    public function gastosPorVehiculo(ReporteRequest $request)
+       public function gastosPorVehiculo(ReporteRequest $request)
     {
         try {
             if (!$this->tienePermiso(true, false)) {
@@ -718,6 +731,15 @@ class ReporteController extends Controller
             $fechaFin    = $request->fecha_fin ?? now()->endOfMonth()->format('Y-m-d');
 
             $vehiculos = Vehiculo::with(['modelo.marca'])
+                ->when($request->filled('vehiculo_ids'), function ($query) use ($request) {
+                    $query->whereIn('id', (array) $request->vehiculo_ids);
+                })
+                ->when($request->filled('vehiculo_id'), function ($query) use ($request) {
+                    $query->where('id', $request->vehiculo_id);
+                })
+                ->when($request->filled('propietario_id'), function ($query) use ($request) {
+                    $query->where('propietario_id', $request->propietario_id);
+                })
                 ->get()
                 ->map(function ($vehiculo) use ($fechaInicio, $fechaFin) {
                     $gastos = $this->gastosDeVehiculos([$vehiculo->id], $fechaInicio, $fechaFin);
@@ -769,6 +791,15 @@ class ReporteController extends Controller
             $fechaFin    = $request->fecha_fin ?? now()->endOfMonth()->format('Y-m-d');
 
             $vehiculos = Vehiculo::with(['modelo.marca', 'propietario'])
+                ->when($request->filled('vehiculo_ids'), function ($query) use ($request) {
+                    $query->whereIn('id', (array) $request->vehiculo_ids);
+                })
+                ->when($request->filled('vehiculo_id'), function ($query) use ($request) {
+                    $query->where('id', $request->vehiculo_id);
+                })
+                ->when($request->filled('propietario_id'), function ($query) use ($request) {
+                    $query->where('propietario_id', $request->propietario_id);
+                })
                 ->get()
                 ->map(function ($vehiculo) use ($fechaInicio, $fechaFin) {
                     $ingresos = Pago::whereHas('contrato', function ($q) use ($vehiculo) {

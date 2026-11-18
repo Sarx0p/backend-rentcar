@@ -30,8 +30,8 @@
 
     <div class="campo-row">
         <div class="campo" style="width:40%">
-            <span class="campo-label">Número de DUI: </span>
-            <span class="campo-valor">{{ $contrato->info_registro['cliente']['dui'] ?? '' }}</span>
+            <span class="campo-label">{{ $contrato->info_registro['cliente']['tipo_documento'] ?? 'DUI / Pasaporte' }}: </span>
+            <span class="campo-valor">{{ $contrato->info_registro['cliente']['documento'] ?? $contrato->info_registro['cliente']['dui'] ?? '' }}</span>
         </div>
         <div class="campo" style="width:60%">
             <span class="campo-label">Número de licencia: </span>
@@ -40,11 +40,15 @@
     </div>
 
     <div class="campo-row">
-        <div class="campo" style="width:40%">
+        <div class="campo" style="width:33%">
+            <span class="campo-label">País: </span>
+            <span class="campo-valor">{{ $contrato->info_registro['cliente']['pais'] ?? 'El Salvador' }}</span>
+        </div>
+        <div class="campo" style="width:33%">
             <span class="campo-label">Departamento: </span>
             <span class="campo-valor">{{ $contrato->info_registro['cliente']['departamento'] ?? '' }}</span>
         </div>
-        <div class="campo" style="width:60%">
+        <div class="campo" style="width:33%">
             <span class="campo-label">Municipio: </span>
             <span class="campo-valor">{{ $contrato->info_registro['cliente']['municipio'] ?? '' }}</span>
         </div>

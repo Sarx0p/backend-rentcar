@@ -94,8 +94,9 @@ class StoreContratoRequest extends FormRequest
             return 'La entrega debe realizarse el día de inicio de la reserva';
         }
 
-        $dias       = max(1, (int) $reserva->fecha_inicio->diffInDays($reserva->fecha_fin));
-        $devolucion = $entrega->copy()->addDays($dias);
+        $horasReserva = $reserva->fecha_inicio->diffInHours($reserva->fecha_fin);
+        $dias         = max(1, (int) ceil($horasReserva / 24));
+        $devolucion   = $entrega->copy()->addDays($dias);
 
         if ($this->filled('vehiculo_id') && (int) $this->vehiculo_id !== (int) $reserva->vehiculo_id) {
             return 'El vehículo enviado no coincide con el de la reserva';
@@ -107,7 +108,7 @@ class StoreContratoRequest extends FormRequest
             return 'El vehículo no está disponible, estado actual: ' . $vehiculo->estado;
         }
 
-        if ($reserva->cliente->vencimiento_dui->isPast()) {
+        if ($reserva->cliente->vencimiento_dui && $reserva->cliente->vencimiento_dui->isPast()) {
             return 'El cliente tiene el DUI vencido, no puede generar el contrato';
         }
 
@@ -115,7 +116,7 @@ class StoreContratoRequest extends FormRequest
             return 'La licencia del cliente vence el ' . $reserva->cliente->vencimiento_licencia->format('d/m/Y') . ', antes de la devolución del vehículo';
         }
 
-        if ($reserva->cliente->vencimiento_dui->lte($devolucion->copy()->startOfDay())) {
+        if ($reserva->cliente->vencimiento_dui && $reserva->cliente->vencimiento_dui->lte($devolucion->copy()->startOfDay())) {
             return 'El DUI del cliente vence el ' . $reserva->cliente->vencimiento_dui->format('d/m/Y') . ', antes de la devolución del vehículo';
         }
 
