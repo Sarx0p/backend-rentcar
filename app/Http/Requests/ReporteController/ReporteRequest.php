@@ -25,6 +25,10 @@ class ReporteRequest extends FormRequest
             'dias' => ['sometimes', 'integer', 'min:1', 'max:365'],
             'porcentaje_administracion' => ['sometimes', 'numeric', 'min:0', 'max:100'],
             'propietario_id' => ['sometimes', 'nullable', 'integer', 'exists:propietarios,id'],
+            'vehiculo_id' => ['sometimes', 'nullable', 'integer', 'exists:vehiculos,id'],
+            'vehiculo_ids' => ['sometimes', 'nullable', 'array'],
+            'vehiculo_ids.*' => ['integer', 'exists:vehiculos,id'],
+            'limite' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:500'],
         ];
     }
 
@@ -48,7 +52,15 @@ class ReporteRequest extends FormRequest
             'porcentaje_administracion.max' => 'El porcentaje de administración no puede ser mayor a 100.',
             'propietario_id.exists' => 'El propietario seleccionado no existe.',
             'porcentaje_administracion.numeric' => 'El porcentaje de administración debe ser un número.',
-            'propietario_id.integer'            => 'El propietario seleccionado no es válido.',
+            'propietario_id.integer' => 'El propietario seleccionado no es válido.',
+            'vehiculo_id.integer' => 'El vehículo seleccionado no es válido.',
+            'vehiculo_id.exists' => 'El vehículo seleccionado no existe.',
+            'vehiculo_ids.array' => 'Los vehículos deben enviarse como una lista.',
+            'vehiculo_ids.*.integer' => 'Uno de los vehículos seleccionados no es válido.',
+            'vehiculo_ids.*.exists' => 'Uno de los vehículos seleccionados no existe.',
+            'limite.integer' => 'El límite debe ser un número entero.',
+            'limite.min' => 'El límite debe ser al menos 1.',
+            'limite.max' => 'El límite no puede ser mayor a 500.',
         ];
     }
 
