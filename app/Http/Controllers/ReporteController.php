@@ -35,20 +35,20 @@ class ReporteController extends Controller
     private function gastosDeVehiculos($vehiculoIds, $fechaInicio, $fechaFin): array
     {
         $mantenimientos = Mantenimiento::query()
-            ->when($vehiculoIds !== null, fn ($q) => $q->whereIn('vehiculo_id', $vehiculoIds))
+            ->when($vehiculoIds !== null, fn($q) => $q->whereIn('vehiculo_id', $vehiculoIds))
             ->where('estado', '!=', EstadoMantenimientoEnum::CANCELADO->value)
             ->whereDate('fecha', '>=', $fechaInicio)
             ->whereDate('fecha', '<=', $fechaFin)
             ->sum('costo');
 
         $incidenciasReparadas = Mantenimiento::query()
-            ->when($vehiculoIds !== null, fn ($q) => $q->whereIn('vehiculo_id', $vehiculoIds))
+            ->when($vehiculoIds !== null, fn($q) => $q->whereIn('vehiculo_id', $vehiculoIds))
             ->whereNotNull('incidencia_id')
             ->where('estado', '!=', EstadoMantenimientoEnum::CANCELADO->value)
             ->pluck('incidencia_id');
 
         $incidencias = Incidencia::query()
-            ->when($vehiculoIds !== null, fn ($q) => $q->whereIn('vehiculo_id', $vehiculoIds))
+            ->when($vehiculoIds !== null, fn($q) => $q->whereIn('vehiculo_id', $vehiculoIds))
             ->where('responsable_tipo', IncidenciaTipoResponsableEnum::NEGOCIO->value)
             ->where('estado_incidencia', '!=', IncidenciaEstadoEnum::ANULADA->value)
             ->whereNotIn('id', $incidenciasReparadas)
@@ -66,7 +66,7 @@ class ReporteController extends Controller
     private function devolucionesDeVehiculos($vehiculoIds, $fechaInicio, $fechaFin): float
     {
         return (float) CierreRenta::query()
-            ->when($vehiculoIds !== null, fn ($q) => $q->whereHas('contrato', fn ($c) => $c->whereIn('vehiculo_id', $vehiculoIds)))
+            ->when($vehiculoIds !== null, fn($q) => $q->whereHas('contrato', fn($c) => $c->whereIn('vehiculo_id', $vehiculoIds)))
             ->where('monto_devuelto', '>', 0)
             ->whereDate('fecha_hora_recepcion', '>=', $fechaInicio)
             ->whereDate('fecha_hora_recepcion', '<=', $fechaFin)
@@ -82,7 +82,7 @@ class ReporteController extends Controller
             ->sum('saldo_trasladado');
 
         $salientes = Contrato::whereNotNull('contrato_origen_id')
-            ->whereHas('contratoOrigen', fn ($q) => $q->whereIn('vehiculo_id', $vehiculoIds))
+            ->whereHas('contratoOrigen', fn($q) => $q->whereIn('vehiculo_id', $vehiculoIds))
             ->whereDate('fecha_hora_entrega', '>=', $fechaInicio)
             ->whereDate('fecha_hora_entrega', '<=', $fechaFin)
             ->sum('saldo_trasladado');
@@ -103,7 +103,7 @@ class ReporteController extends Controller
             })
             ->orderBy('fecha')
             ->get()
-            ->map(fn ($mantenimiento) => [
+            ->map(fn($mantenimiento) => [
                 'placa'       => optional($mantenimiento->vehiculo)->placa,
                 'fecha'       => $mantenimiento->fecha,
                 'descripcion' => $mantenimiento->incidencia->descripcion,
@@ -129,7 +129,7 @@ class ReporteController extends Controller
             ->whereDate('fecha', '<=', $fechaFin)
             ->orderBy('fecha')
             ->get()
-            ->map(fn ($incidencia) => [
+            ->map(fn($incidencia) => [
                 'placa'       => optional($incidencia->vehiculo)->placa,
                 'fecha'       => $incidencia->fecha,
                 'descripcion' => $incidencia->descripcion,
@@ -262,7 +262,7 @@ class ReporteController extends Controller
         }
     }
 
-       public function estadoFlota(ReporteRequest $request)
+    public function estadoFlota(ReporteRequest $request)
     {
         try {
             if (!$this->tienePermiso(true)) {
@@ -271,12 +271,6 @@ class ReporteController extends Controller
                     'message' => 'No tienes permiso para ver este reporte',
                 ], 403);
             }
-
-            $estados = Vehiculo::selectRaw('estado, count(*) as total')
-                ->groupBy('estado')
-                ->get();
-
-            $totalVehiculos = $estados->sum('total');
 
             $vehiculos = Vehiculo::with([
                 'modelo:id,nombre,marca_id',
@@ -293,7 +287,21 @@ class ReporteController extends Controller
                     $query->where('propietario_id', $request->propietario_id);
                 })
                 ->orderBy('estado')
+                ->orderBy('id')
+                ->when($request->filled('limite'), function ($query) use ($request) {
+                    $query->limit((int) $request->limite);
+                })
                 ->get();
+
+            $estados = $vehiculos
+                ->groupBy('estado')
+                ->map(fn($grupo) => (object) [
+                    'estado' => $grupo->first()->estado,
+                    'total'  => $grupo->count(),
+                ])
+                ->values();
+
+            $totalVehiculos = $vehiculos->count();
 
             $pdf = Pdf::loadView('reportes.estado-flota', [
                 'estados'        => $estados,
@@ -451,7 +459,7 @@ class ReporteController extends Controller
                         'resultado_neto'         => $ingresoNeto - $gastoTotal - $montoAdministracion,
                     ];
                 })
-                ->filter(fn ($item) => $propietarioId
+                ->filter(fn($item) => $propietarioId
                     || $item['propietario']->estado === EstadoPropietarioEnum::ACTIVO->value
                     || $item['ingresos'] != 0
                     || $item['devoluciones'] != 0
@@ -606,7 +614,7 @@ class ReporteController extends Controller
         }
     }
 
-  public function ingresosPorVehiculo(ReporteRequest $request)
+    public function ingresosPorVehiculo(ReporteRequest $request)
     {
         try {
             if (!$this->tienePermiso(true, false)) {
@@ -717,7 +725,7 @@ class ReporteController extends Controller
     /**
      * Gastos por vehículo: incidencias del negocio y mantenimientos.
      */
-       public function gastosPorVehiculo(ReporteRequest $request)
+    public function gastosPorVehiculo(ReporteRequest $request)
     {
         try {
             if (!$this->tienePermiso(true, false)) {
